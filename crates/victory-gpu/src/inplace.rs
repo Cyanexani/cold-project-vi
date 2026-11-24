@@ -722,9 +722,6 @@ pub(crate) struct Probe {
     /// A section made with `SEC_RESERVE` (as `xmem` makes the page pool)
     /// was refused.
     pub(crate) reserved_section_refused: bool,
-    /// A reserved buffer's tiles map onto a committed section's heap in any
-    /// order: scattered pool pages can be shown by one buffer.
-    pub(crate) section_tiles: bool,
 }
 
 /// Tries the openings on memory of the probe's own, made the way `xmem`
@@ -756,15 +753,14 @@ pub(crate) fn probe(device: &ID3D12Device, memory: &dyn Fn() -> Option<[u64; 4]>
     unsafe {
         private(&mut p, &mut rig);
         section(&mut p, &mut rig);
-        tiles(&mut p, &mut rig);
         if mb > 0 {
             cost(&mut p, &mut rig, memory, mb);
         }
     }
     p.lines.push(format!(
         "VERDICT: private memory in place: reads {}, writes {}; the page pool's section in place: reads {}, writes {}, whatever the views do {}; \
-         a reserved section is refused {} (the pool must be made committed to be opened); scattered pages through tiles {}",
-        p.part_reads, p.part_writes, p.section_reads, p.section_writes, p.section_outlives_views, p.reserved_section_refused, p.section_tiles
+         a reserved section is refused {} (the pool must be made committed to be opened)",
+        p.part_reads, p.part_writes, p.section_reads, p.section_writes, p.section_outlives_views, p.reserved_section_refused
     ));
     p
 }
@@ -922,11 +918,26 @@ unsafe fn section(p: &mut Probe, rig: &mut Rig) {
     }
 }
 
+/// [`tiles`] on `device`, alone: on an NVIDIA card (and WARP) it loses
+/// the device, so it is never part of [`probe`] and never runs on the
+/// host's device; only the card test asks for it.
+#[cfg(test)]
+pub(crate) fn probe_tiles(device: &ID3D12Device) -> Probe {
+    let mut p = Probe::default();
+    match Rig::new(device) {
+        // SAFETY: memory of the probe's own, made and released there.
+        Ok(mut rig) => unsafe { tiles(&mut p, &mut rig) },
+        Err(e) => p.lines.push(format!("no queue of its own: {e}")),
+    }
+    p
+}
+
 /// A reserved buffer whose 64 KiB tiles are mapped, out of order, onto
 /// pages of a committed section opened as a heap: what one buffer needs to
 /// show a window of the page pool whose pages are scattered (the title's
 /// tiled heaps, its pool views). `Ok(true)` if the GPU reads the pages'
 /// bytes in the tiles' order and the CPU reads what a shader wrote.
+#[cfg(test)]
 unsafe fn tiles(p: &mut Probe, rig: &mut Rig) {
     const PAGES: usize = 8;
     // Tile k shows section page ORDER[k].
@@ -985,7 +996,6 @@ unsafe fn tiles(p: &mut Probe, rig: &mut Rig) {
                 Err(e) => format!("REFUSED {:#010x} ({})", e.code().0, e.message().trim()),
             }
         ));
-        p.section_tiles = matches!(result, Ok((true, true)));
         drop(opened);
         if !view.Value.is_null() {
             mem::UnmapViewOfFile(view);
@@ -1372,8 +1382,11 @@ mod tests {
         if unsafe { D3D12CreateDevice(None, D3D_FEATURE_LEVEL_12_0, &mut device) }.is_err() {
             return;
         }
-        let probe = probe(&device.unwrap(), &|| None, 0);
-        for line in &probe.lines {
+        let device = device.unwrap();
+        let probe = probe(&device, &|| None, 0);
+        // Last: it loses the device.
+        let tiles = probe_tiles(&device);
+        for line in probe.lines.iter().chain(&tiles.lines) {
             eprintln!("card probe: {line}");
         }
     }
