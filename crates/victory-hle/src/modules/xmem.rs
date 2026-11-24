@@ -51,8 +51,8 @@ pub(crate) fn on_wine() -> bool {
 /// (`SEC_COMMIT`): always under Wine (see [`XMemAllocatePhysicalPages`]),
 /// and with `VICTORY_POOL_COMMIT=1`, so that the GPU side can open them
 /// as host heaps and use the title's pages in place instead of copying
-/// them (`VICTORY_INPLACE`). The whole pool (6.1 GiB for Grand Theft Auto
-/// VI) is charged to the commit limit at once: the paging file must have
+/// them (`VICTORY_INPLACE`). The whole pool (6.1 GiB for the title)
+/// is charged to the commit limit at once: the paging file must have
 /// room for it.
 pub(crate) fn pool_committed() -> bool {
     static COMMITTED: LazyLock<bool> = LazyLock::new(|| {

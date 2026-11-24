@@ -1342,6 +1342,7 @@ fn v_permlanex16_reads_the_other_half_of_the_row() {
     run_cases_on(&shader, &[[0x7654_3210, 0xfedc_ba98, 0, 0]], card, |backend, _, _, got| {
         assert_eq!(got, 0, "{backend}: identity selectors: a lane read the wrong lane ({got:#x})");
     });
+}
 
 /// A one-thread program that stores 7 through the raw UAV whose descriptor
 /// it loads at heap index `s0` from the address in `s4`, which is the
