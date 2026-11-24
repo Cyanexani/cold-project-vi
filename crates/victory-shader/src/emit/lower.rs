@@ -5585,11 +5585,31 @@ impl<'a> Lower<'a> {
             if count <= 4
                 && let Some((lo, hi)) = self.view_address(site)
             {
+                // Dword 2, the record count, from the host view's size: the
+                // shallow-water programs test it against zero to skip an
+                // empty buffer before anything else (CS_MinTimestepReduce).
+                // shortcut: the count in bytes, a raw view's; a structured
+                // view counts elements, so only a test against zero is exact.
+                let records = (count >= 3)
+                    .then(|| {
+                        let src = Source::Loaded { load: site, first: 0 };
+                        self.handle(site, &src, false, (11, 0)).ok()
+                    })
+                    .flatten()
+                    .map(|h| {
+                        let c = self.cur;
+                        let i32t = self.s.t.i32;
+                        let dims = self.s.m.named_struct("dx.types.Dimensions", vec![i32t; 4]);
+                        let mip = self.s.m.undef(i32t);
+                        let d = self.s.op(c, "getDimensions", Attr::ReadOnly, dims, 72, &[h, mip]);
+                        self.s.m.extract(c, d, 0)
+                    });
                 for k in 0..count {
                     let reg = Reg::S(code + k as u8);
                     match k {
                         0 => self.write(inst, reg, lo, None),
                         1 => self.write(inst, reg, hi, None),
+                        2 if records.is_some() => self.write(inst, reg, records.unwrap_or(lo), None),
                         _ => {
                             if let Some(v) = inst.write(reg) {
                                 self.vals.insert(v, Val::Missing(OTHER));

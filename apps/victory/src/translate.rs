@@ -158,8 +158,33 @@ pub fn run(
     pipelines: bool,
     list: bool,
     jobs: Option<usize>,
+    cache: bool,
 ) -> Result<()> {
-    let paths = crate::default_paths(paths)?;
+    // The warm-up with no paths: the configured game's shader archive and its
+    // programs, not every file of the game (tens of GB read for nothing).
+    let paths = if cache && paths.is_empty() {
+        let cfg = victory_core::Config::load()?;
+        let dir = cfg.game_dir.ok_or_else(|| anyhow::anyhow!("no game_dir in victory.toml (or VICTORY_GAME_DIR)"))?;
+        let mut list = vec![dir.join("shaders.rpf")];
+        for e in std::fs::read_dir(&dir)?.flatten() {
+            let p = e.path();
+            let ext = p.extension().and_then(|x| x.to_str()).map(str::to_ascii_lowercase);
+            if matches!(ext.as_deref(), Some("exe" | "dll")) {
+                list.push(p);
+            }
+        }
+        list
+    } else {
+        crate::default_paths(paths)?
+    };
+    if cache {
+        // The warm-up: into the cache a run reads, keyed as a run keys it.
+        let cfg = victory_core::Config::load()?;
+        let dir = cfg.cache_subdir("shaders")?;
+        println!("warm-up      translating into {}", dir.display());
+        victory_hle::modules::d3d12x::use_shader_cache(dir);
+        WARM.store(true, Ordering::Relaxed);
+    }
     // `VICTORY_HOST_MAX_WAVE=32`: translate as for a host whose waves have
     // at most 32 lanes (as the runtime does on such a card).
     if let Some(n) = std::env::var("VICTORY_HOST_MAX_WAVE").ok().and_then(|v| v.parse().ok()) {
@@ -227,6 +252,20 @@ pub fn run(
         }
     }
     let t = total.into_inner().unwrap_or_else(|e| e.into_inner());
+    if cache {
+        println!(
+            "warm-up      done: {} shaders in the cache, {} the translator refuses ({} duplicates skipped)",
+            t.translated,
+            t.programs - t.translated,
+            t.duplicates
+        );
+        let mut failed: Vec<_> = t.failed.into_iter().collect();
+        failed.sort_by_key(|(_, (n, _))| std::cmp::Reverse(*n));
+        for (reason, (n, example)) in failed.into_iter().take(15) {
+            println!("  {n:>7}  {reason}  (e.g. {example})");
+        }
+        return Ok(());
+    }
     println!(
         "containers   {} ({} duplicates skipped)",
         t.containers, t.duplicates
@@ -306,6 +345,11 @@ pub fn run(
     Ok(())
 }
 
+/// `--cache`: each container goes into the shader cache as a run would translate it.
+static WARM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Containers the warm-up put in the cache (or found there).
+static WARMED: AtomicUsize = AtomicUsize::new(0);
+
 fn translate(
     source: &Source,
     path: &Path,
@@ -347,6 +391,25 @@ fn translate(
     let code = blake3::hash(dxil);
     let code8 = code.to_hex()[..8].to_owned();
     let example = || format!("{} ~{code8}", example());
+    if WARM.load(Ordering::Relaxed) {
+        // A run keys its cache by the whole container: one entry per container.
+        if !lock(seen).insert(blake3::hash(&bytes)) {
+            t.duplicates += 1;
+            return;
+        }
+        t.programs += 1;
+        match victory_hle::modules::d3d12x::warm_shader(&bytes) {
+            Ok(()) => {
+                t.translated += 1;
+                let n = WARMED.fetch_add(1, Ordering::Relaxed) + 1;
+                if n % 1000 == 0 {
+                    println!("warm-up      {n} shaders in the cache");
+                }
+            }
+            Err(e) => t.fail(e, example),
+        }
+        return;
+    }
     // `VICTORY_DUMP_MATCH=<dir>;<text>|<text>...`: the containers whose
     // line holds one of the texts (a name, `#hash`), as the title has them.
     if let Ok(spec) = std::env::var("VICTORY_DUMP_MATCH")

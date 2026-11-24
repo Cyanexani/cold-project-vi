@@ -394,10 +394,14 @@ pub fn emit(
         // each host wave, so the two cannot wait at different counts of one (what hung 121-124's
         // light-atlas programs, whose barriers sat in loops). `VICTORY_WAVE_WIDE=1`: every
         // program, as before; `0`: none.
-        let wide_on = match std::env::var("VICTORY_WAVE_WIDE").as_deref() {
-            Ok("1") => true,
-            Ok("0") => false,
-            _ => !has_loop(p),
+        // Programs with loops get it too where every branch it takes wave-wide lies outside
+        // all loops (`widen`'s `loops_ok`): the meetings then sit where each host wave passes
+        // the same number of times, as in a program with no loop. It translates two of the
+        // transparency programs (CS_AlphTransmissionPrefilterMip, one branch each).
+        let (wide_on, loops_ok) = match std::env::var("VICTORY_WAVE_WIDE").as_deref() {
+            Ok("1") => (true, true),
+            Ok("0") => (false, false),
+            _ => (true, !has_loop(p)),
         };
         // exact first: each host wave on its own where that is exact (the idiom, every
         // form; no barriers), then the other exact forms; then approximate
@@ -428,7 +432,7 @@ pub fn emit(
                         Some(p),
                     ];
                     if let Some(base) = bases.into_iter().flatten().next() {
-                        let again = widen(c, native, base, why);
+                        let again = widen(c, native, base, why, loops_ok);
                         report("wave-wide branches", &again);
                         if done(&again) {
                             return again.map(|(shader, _)| shader);
@@ -490,7 +494,8 @@ pub fn emit(
                 && what == lower::LANE_MASK
                 && std::env::var_os("VICTORY_WAVE_WIDE").is_none_or(|v| v != "0") =>
         {
-            let again = widen(c, native, p, std::env::var_os("VICTORY_WAVE_WHY").is_some());
+            // (as before: these programs' waves are the host's, so no barrier is placed)
+            let again = widen(c, native, p, std::env::var_os("VICTORY_WAVE_WHY").is_some(), true);
             match again {
                 Ok(_) => again,
                 Err(_) => emit_program(c, native, p, st, io, res),
@@ -528,6 +533,17 @@ pub fn emit(
 }
 
 /// Whether `p` has a loop: an edge back to a block at or before its own address.
+/// Whether block `b` lies inside a loop: between a loop's header and the block that jumps
+/// back to it, by offset.
+fn in_loop(p: &ir::Program, b: usize) -> bool {
+    let Some(at) = p.blocks.get(b).map(|x| x.offset) else { return true };
+    p.blocks.iter().any(|h| {
+        h.preds.iter().any(|&q| {
+            p.blocks.get(q).is_some_and(|from| from.offset >= h.offset && h.offset <= at && at <= from.offset)
+        })
+    })
+}
+
 fn has_loop(p: &ir::Program) -> bool {
     p.blocks.iter().any(|b| b.preds.iter().any(|&q| p.blocks.get(q).is_some_and(|from| from.offset >= b.offset)))
 }
@@ -544,6 +560,7 @@ fn widen(
     native: &NativeProgram,
     p: &ir::Program,
     why: bool,
+    loops_ok: bool,
 ) -> Result<(HostShader, Option<u32>), ShaderError> {
     const NOT: ShaderError = ShaderError::Unsupported {
         offset: 0,
@@ -577,6 +594,15 @@ fn widen(
         if !stuck {
             if why {
                 eprintln!("WAVE64-WIDE {} branches taken wave-wide", wide.len());
+            }
+            if !loops_ok && !wide.is_empty() && wide.iter().any(|&b| in_loop(p, b)) {
+                if why {
+                    eprintln!("WAVE64-WIDE refused: a branch taken wave-wide is inside a loop");
+                }
+                return Err(ShaderError::Unsupported {
+                    offset: 0,
+                    what: "wave-wide branches inside a loop (VICTORY_WAVE_WIDE=1 allows them)",
+                });
             }
             return r;
         }

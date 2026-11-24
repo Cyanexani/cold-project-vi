@@ -172,6 +172,14 @@ impl Shader {
     }
 }
 
+/// Translates the shader container `container` into the shader cache, as a run does at
+/// its first use (the warm-up, `victory translate --cache`): the same host device probes
+/// (wave size, view heap) and the same cache key, so a run then loads it.
+#[cfg(windows)]
+pub fn warm_shader(container: &[u8]) -> Result<(), String> {
+    translate(container).map(|_| ())
+}
+
 #[cfg(windows)]
 fn translate(container: &[u8]) -> Result<Translated, String> {
     use victory_shader::{Container, FourCC, HwStage};
