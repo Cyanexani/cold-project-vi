@@ -12,7 +12,7 @@ vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
 shaders extraits. Il faut sa propre copie du jeu. Ce projet n'est ni affilié à
 Rockstar Games ou Take-Two Interactive, ni approuvé par eux.
 
-Mis à jour le 24/11/2026.
+Mis à jour le 25/11/2026.
 
 ## Crédits et licence
 
@@ -38,8 +38,8 @@ Mis à jour le 24/11/2026.
 | Cinématique d'intro | ⚠️ se joue en entier, mais le logo Rockstar est mal éclairé |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ⚠️ s'affiche : personnages, textures, ciel, extérieur au soleil |
-| Lumière dans l'ombre | ❌ le ray tracing du jeu ne tourne pas encore : tout ce que le soleil ne touche pas est noir |
-| Images par seconde dans le monde | ❌ environ 2, pointes à 4 (avec les options de vitesse ci-dessous) |
+| Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore) |
+| Images par seconde dans le monde | ❌ environ 2 (500 à 570 ms par image), sans aucune option |
 | Mémoire | ❌ 18 à 23 Go après 3 à 5 minutes, trop pour un PC de 16 Go |
 | Stabilité | ⚠️ sans options, 5 minutes sans plantage ; avec les options mémoire, plantage entre 2 et 3 minutes |
 
@@ -47,8 +47,8 @@ Mis à jour le 24/11/2026.
 pie showData
     title Avancement des étapes (sur 8)
     "Fonctionne" : 2
-    "Partiel" : 3
-    "Pas encore" : 3
+    "Partiel" : 4
+    "Pas encore" : 2
 ```
 
 ## Lancer
@@ -61,40 +61,54 @@ target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute
 Le chemin du jeu peut aussi être mis dans `victory.toml` (modèle :
 `victory.example.toml`).
 
-**Options de vitesse recommandées** (pas encore par défaut) :
+Les options de vitesse d'avant (`VICTORY_TEXTURE_NO_WAIT`,
+`VICTORY_CARD_BUFFERS_MIN_MB`, `VICTORY_CARD_BUFFERS_MB`) sont maintenant
+actives par défaut : la commande ci-dessus suffit.
 
-```powershell
-$env:VICTORY_TEXTURE_NO_WAIT = '1'
-$env:VICTORY_CARD_BUFFERS_MIN_MB = '1'
-$env:VICTORY_CARD_BUFFERS_MB = '2048'
-$env:VICTORY_SHADER_LOOP_LIMIT = '32'
-```
-
-Après une mise à jour du traducteur, le premier lancement recompile les
-programmes graphiques : image noire ou cassée pendant plusieurs minutes. Le
-lancement suivant les recharge. Ce qui reste à essayer en jeu est décrit dans
+Après une mise à jour **du traducteur de shaders**, le premier lancement les
+retraduit : image noire ou cassée pendant plusieurs minutes. Le lancement
+suivant les recharge. Recompiler le reste de `victory.exe` ne vide plus ce
+cache (il ne dépend plus que du code du traducteur). Ce qui reste à essayer en jeu est décrit dans
 [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md).
 
 ## Vitesse
 
-Temps par image dans le monde, en millisecondes (meilleures images mesurées).
+Temps par image dans le monde, en millisecondes (scène de la cellule, carte
+RTX 3060, essais du 24/11).
 
 ```mermaid
 xychart-beta
     title "Temps par image (ms), plus bas = mieux"
-    x-axis ["Sans options", "Textures sans attente", "+ comparaison par la carte"]
-    y-axis "ms" 0 --> 2000
-    bar [1872, 1984, 490]
+    x-axis ["Avant (cache + attente)", "Après les correctifs du 24/11"]
+    y-axis "ms" 0 --> 1400
+    bar [1316, 540]
 ```
 
-| Par image | Sans options | Textures sans attente | + comparaison par la carte |
-|---|---|---|---|
-| Textures | 865 à 3 800 ms | 12 à 62 ms | 5 à 47 ms |
-| Recopie vers le jeu | environ 170 ms | 665 à 1 000 ms | 50 à 85 ms |
-| Carte graphique | environ 250 ms | 580 à 820 ms | 230 à 380 ms |
+```mermaid
+xychart-beta
+    title "Où passent les 540 ms d'une image (ms)"
+    x-axis ["Carte graphique", "Préparation (copies)", "Recopie vers le jeu"]
+    y-axis "ms" 0 --> 400
+    bar [325, 140, 65]
+```
 
-Ce qui limite maintenant : la carte travaille 220 à 270 ms par image. Pour
-30 images/s il faut descendre sous 33 ms.
+| Par image | Avant | Après |
+|---|---|---|
+| Attente des pipelines | 500 ms à chaque image | 0 ms |
+| Pipelines en cours de fabrication | 900 à 1 900, pendant des minutes | 0 une fois dans le monde |
+| Carte graphique | 390 à 440 ms | 300 à 340 ms |
+| Préparation (copies de la mémoire du jeu) | 230 à 280 ms | 130 à 160 ms |
+| Recopie vers le jeu | 90 à 120 ms | 57 à 70 ms |
+
+Ce qui a changé : une image n'attend plus des pipelines qui ne seront pas
+prêts à temps, les pipelines se fabriquent à la priorité du jeu, le cache des
+pipelines (1 Go) n'est plus réécrit toutes les 20 s, et le cache des shaders
+survit aux recompilations.
+
+Ce qui limite maintenant : la carte graphique (environ 325 ms), occupée à
+57 % seulement, et sa mémoire presque pleine (10,8 Go sur 12). La prochaine
+mesure (`VICTORY_GPU_TIMING=1`) dira quels programmes coûtent le plus. Pour
+15 images/s il faut descendre sous 66 ms.
 
 ## Mémoire
 
@@ -195,25 +209,25 @@ pie showData
 
 ### Shaders encore refusés par le traducteur
 
-Mesuré avant l'intégration des commits ray tracing du fork. Après : 10 refusés,
-dont 2 traduits depuis (`v_cvt_f32_f64`, `v_permlanex16_b32`), et les
-programmes wave64 sans boucle ont maintenant une forme en vagues de 32.
+Mesuré en jeu le 25/11 (scène de la cellule) : 10 refusés sur environ 2 000
+utilisés, contre 12 la veille. Les 2 programmes de flaques se traduisent
+maintenant. Sur tout le jeu (26 084 programmes), 25 572 se traduisent hors
+du jeu.
 
 ```mermaid
 pie showData
-    title Shaders refusés (14)
-    "Masque de lanes lu comme une donnée" : 8
-    "Réduction wave sans toutes les lanes" : 2
-    "Descripteur lu comme une donnée" : 2
-    "Échange de masque de lanes" : 1
-    "Section whole-wave" : 1
+    title Shaders refusés en jeu (10)
+    "Calcul en vagues de 64 avec mémoire partagée (transparence)" : 4
+    "Section whole-wave (eau)" : 2
+    "Surfaces (interpolation, se dessinent mal si forcées)" : 2
+    "Échange de masque de lanes (ombres)" : 1
+    "Adresse d'un descripteur lue (simulation d'eau)" : 1
 ```
 
-À cela s'ajoutaient **4 programmes de calcul refusés par le pilote NVIDIA**
-(« Paramètre incorrect ») : ils demandaient des vagues de 64 lanes, que les
-cartes NVIDIA n'ont pas. Le traducteur les refuse maintenant lui-même et leur
-cherche encore une forme en 32 lanes. Ce sont des programmes du constructeur
-de ray tracing : tant qu'il en manque un, le constructeur reste éteint.
+À cela s'ajoute **1 pipeline refusé par le pilote NVIDIA** (« Paramètre
+incorrect »). Les 2 programmes de surfaces se traduisaient avec une
+correction essayée le 25/11, mais ils rendaient les personnages flous : elle
+est retirée.
 
 ### Ray tracing
 
@@ -229,9 +243,8 @@ Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails
 
 ## Ce qui reste à faire
 
-1. Essayer en jeu ce qui vient d'être codé : [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
-   (carte des vues, forme wave64 sans boucle, lumière de secours
-   `VICTORY_RT_MISS=1`, cheveux, ray tracing, logo, murs).
+1. Mesurer le temps de chaque programme sur la carte (`VICTORY_GPU_TIMING=1`)
+   et réduire les plus coûteux (vitesse : objectif 15 images/s).
 2. Traduire les shaders encore refusés (descripteurs lus comme des données,
    programmes wave64 avec boucles).
 3. Faire tourner le ray tracing dans le jeu.
@@ -239,8 +252,8 @@ Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails
 5. Réduire la mémoire : fenêtres à trous qui ne suivent pas une seule section
    (2,6 Go encore copiés), textures côté PC (3 à 4,5 Go), buffers partagés
    avec la carte (environ 7 Go réservés).
-6. Régler `VICTORY_PIPELINE_WAIT_MS` pour supprimer les trous à l'image, et
-   vérifier que le cache des pipelines se remplit d'un lancement à l'autre.
+6. Essayer en jeu le reste de [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
+   (carte des vues, cheveux, ray tracing, logo, murs).
 
 ## Options utiles
 
@@ -252,12 +265,18 @@ Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails
 | `VICTORY_INPLACE_MB` | mémoire verrouillée au plus pour cela (4096 par défaut) |
 | `VICTORY_INPLACE_HOLES=0` | recopie les fenêtres partiellement mappées |
 | `VICTORY_PIPELINE_WAIT_MS` | attente maximale des pipelines par image (500 par défaut) |
+| `VICTORY_PIPELINE_WAIT_BACKLOG` | au-delà de ce nombre de pipelines en retard (16), une image ne les attend plus ; `0` : toujours attendre |
+| `VICTORY_PIPELINE_LOW_PRIORITY=1` | fabrique les pipelines en priorité basse, comme avant |
+| `VICTORY_SHADER_KEY_EXE=1` | cache des shaders lié à tout l'exécutable, comme avant |
+| `VICTORY_GPU_TIMING=1` | temps de chaque commande sur la carte, par programme |
+| `VICTORY_SKIP_PIPELINES=<hash>,...` | saute les dessins des programmes listés (pour comparer) |
+| `VICTORY_MISSING_LOG=1` | `translate` : dit quelle instruction n'a pas de valeur et pourquoi |
 | `VICTORY_D3D12_DEBUG=1` | couche de débogage Direct3D (build `diag`), nomme les erreurs |
 | `VICTORY_BVH_BUILDER=1` | active la construction des structures de ray tracing |
 | `VICTORY_WAVE_WIDE` | forme wave64 « vague entière » : par défaut sans boucle seulement ; `1` partout, `0` nulle part |
 | `VICTORY_WAVE_LOCAL=idiom` | seulement les formes exactes des programmes wave64 |
-| `VICTORY_RT_MISS=1` | lumière de secours : les rayons ne touchent rien |
+| `VICTORY_RT_MISS` | lumière de secours (rayons qui ne touchent rien) : active par défaut tant que le constructeur est éteint ; `0` la coupe |
 | `VICTORY_HEAP_MAP=0` | coupe la carte des vues de VIcky |
-| `VICTORY_TEXTURE_NO_WAIT=1` | les textures n'attendent pas les remappages du jeu |
-| `VICTORY_CARD_BUFFERS_MIN_MB=1` | la carte compare les buffers au lieu du processeur |
+| `VICTORY_TEXTURE_NO_WAIT=0` | les textures attendent les remappages du jeu (avant : défaut) |
+| `VICTORY_CARD_BUFFERS_MIN_MB` | taille dès laquelle la carte compare les buffers au lieu du processeur (1 Mo par défaut, avant 16) |
 | `VICTORY_PROFILE=4` | profileur (build `diag`) |

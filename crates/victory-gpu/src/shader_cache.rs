@@ -37,13 +37,21 @@ pub(crate) fn counts() -> (u64, u64) {
     (HITS.load(Ordering::Relaxed), MISSES.load(Ordering::Relaxed))
 }
 
-/// What identifies this build: the BLAKE3 of our executable file and of
-/// the translation settings it runs with (the loop limit, which a
-/// diagnostics build can change at run time).
+/// What identifies this build's translations: the translator's own id
+/// (a hash of its sources, `victory_shader::emit::TRANSLATOR_ID`) and the
+/// translation settings it runs with (the loop limit, which a diagnostics
+/// build can change at run time). It was the hash of the whole executable:
+/// every rebuild, whatever it changed, sent all of the title's shaders
+/// through the translator again on the next run.
+/// `VICTORY_SHADER_KEY_EXE=1`: keyed by the executable, as before.
 fn build() -> &'static [u8; 32] {
     static BUILD: OnceLock<[u8; 32]> = OnceLock::new();
     BUILD.get_or_init(|| {
-        let exe = std::env::current_exe().and_then(std::fs::read);
+        let exe = if std::env::var_os("VICTORY_SHADER_KEY_EXE").is_some_and(|v| v == "1") {
+            std::env::current_exe().and_then(std::fs::read)
+        } else {
+            Ok(victory_shader::emit::TRANSLATOR_ID.as_bytes().to_vec())
+        };
         let limit = victory_shader::emit::loop_limit();
         if limit != victory_shader::emit::DEFAULT_LOOP_LIMIT {
             tracing::warn!(
@@ -65,7 +73,11 @@ fn build() -> &'static [u8; 32] {
                     "VICTORY_WAVE_DEEP_SKIPS",
                     "VICTORY_WAVE_OWN_BITS",
                     "VICTORY_F16_NEAREST",
-                    "VICTORY_RT_MISS",
+                    "VICTORY_WAVE_LOCAL",
+                    "VICTORY_STRICT_JOINS",
+                    "VICTORY_MESH_OUTPUT_STRICT",
+                    "VICTORY_SHADER_OPT",
+                    "VICTORY_GROUP_SYNC",
                 ] {
                     bytes.extend_from_slice(name.as_bytes());
                     bytes.push(b'=');
@@ -74,6 +86,9 @@ fn build() -> &'static [u8; 32] {
                     }
                     bytes.push(0);
                 }
+                // Whether the ray/node test answers a miss (its default
+                // follows the structure builder).
+                bytes.push(u8::from(victory_shader::emit::rt_miss()));
                 // And which clean-up passes ran over the translated code.
                 bytes.extend_from_slice(&victory_shader::emit::shader_opt().to_le_bytes());
                 // And the view heap the host keeps (`probe_view_limit`, which

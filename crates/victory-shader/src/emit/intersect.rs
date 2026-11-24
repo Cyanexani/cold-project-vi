@@ -64,9 +64,20 @@ struct Ray {
 /// structures are missing or wrong (the builder off), instead of black.
 /// shortcut: a stand-in light, not the title's: no ray-traced shadow,
 /// occlusion or bounce.
-fn rt_miss() -> bool {
+///
+/// On by default while the structure builder is off (it is unless
+/// `VICTORY_BVH_BUILDER=1`): the structures are then never built, and the
+/// test walked whatever title memory held where they would be, a hit or a
+/// miss per ray at random (speckled faces, black interiors in the runs of
+/// 2026-11-24). `VICTORY_RT_MISS=0`: the structures are walked anyway;
+/// `=1`: a miss even with the builder on.
+pub fn rt_miss() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VICTORY_RT_MISS").is_some_and(|v| v == "1"))
+    *ON.get_or_init(|| match std::env::var_os("VICTORY_RT_MISS") {
+        Some(v) => v == "1",
+        // The tests check the walk itself against the reference.
+        None => !cfg!(test) && std::env::var_os("VICTORY_BVH_BUILDER").is_none_or(|v| v != "1"),
+    })
 }
 
 impl<'a> Lower<'a> {

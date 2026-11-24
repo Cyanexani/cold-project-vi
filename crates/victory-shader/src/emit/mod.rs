@@ -118,11 +118,16 @@ pub use bitcode::census;
 pub use sampler::StaticSampler;
 pub use lower::set_host_max_wave;
 pub use rect::rect_list_gs;
+pub use lower::intersect::rt_miss;
 pub use shader::{
     MEMORY_FAULTS, MEMORY_PAGES, ROOT_CBV_SPACE, SAMPLER_SPACE, SLOT_FAULTS, SLOT_MEMORY, SLOT_STRIDES,
     SLOT_STRIDES_COUNT, USER_DATA_SPACE, USER_MEMORY_BASE, USER_VIEW_ADDRESS, USER_VIEW_BIAS,
     set_view_heap_limit, set_view_heap_map, view_heap_limit, view_heap_map,
 };
+
+/// What identifies this translator: a hash of the crate's sources and
+/// features (`build.rs`). Two builds with the same id translate alike.
+pub const TRANSLATOR_ID: &str = env!("VICTORY_TRANSLATOR_ID");
 
 /// The loop limit without an override: 2^20.
 pub const DEFAULT_LOOP_LIMIT: u32 = lower::LOOP_LIMIT;

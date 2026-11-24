@@ -73,6 +73,8 @@ pub(crate) static EARLY: AtomicU64 = AtomicU64::new(0);
 /// at most every 20 s).
 pub(crate) static BLOB: AtomicU64 = AtomicU64::new(0);
 pub(crate) static SAVED: AtomicU64 = AtomicU64::new(0);
+/// How long the last save that wrote the library took, in ms.
+static SAVE_MS: AtomicU64 = AtomicU64::new(0);
 
 /// Whether the library's file is mapped ([`Blob`]) and saved through a
 /// mapping. On by default; `VICTORY_LIBRARY_MAP=0` uses buffers, as before.
@@ -564,16 +566,27 @@ pub(crate) fn pipeline(
 /// Writes the library and the early list if pipelines were added since the
 /// last save and `SAVE_EVERY` has passed (or `now`).
 pub(crate) fn save(now: bool) {
+    use std::time::Duration;
     static LAST: Mutex<Option<std::time::Instant>> = Mutex::new(None);
-    const SAVE_EVERY: std::time::Duration = std::time::Duration::from_secs(20);
+    const SAVE_EVERY: Duration = Duration::from_secs(20);
+    // While pipelines are still queued, a save only every few minutes: each
+    // one writes the whole library (1 GB after a few runs) and holds every
+    // store meanwhile, and it ran every 20 s through the minutes the world's
+    // first pipelines were made. The end of the run and the workers running
+    // out of work still save.
+    const SAVE_BUSY: Duration = Duration::from_secs(180);
     let (Some(dir), Some(library)) = (DIR.get(), library()) else { return };
     {
         let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
-        if !now && last.is_some_and(|t| t.elapsed() < SAVE_EVERY) {
+        // A save that took long spaces out the next ones (at most 1/20 of the time).
+        let took = Duration::from_millis(SAVE_MS.load(Ordering::Relaxed) * 20);
+        let every = if super::make::waiting() > 0 { SAVE_BUSY } else { SAVE_EVERY }.max(took);
+        if !now && last.is_some_and(|t| t.elapsed() < every) {
             return;
         }
         *last = Some(std::time::Instant::now());
     }
+    let began = std::time::Instant::now();
     if let Err(e) = std::fs::create_dir_all(dir) {
         tracing::warn!(error = %e, "host pipeline library not saved");
         return;
@@ -628,6 +641,13 @@ pub(crate) fn save(now: bool) {
     match written {
         Ok(()) => tracing::info!(
             bytes,
+            ms = {
+                let ms = began.elapsed().as_millis() as u64;
+                if bytes > 0 {
+                    SAVE_MS.store(ms, Ordering::Relaxed);
+                }
+                ms
+            },
             early = used.len(),
             made = MADE.load(Ordering::Relaxed),
             loaded = LOADED.load(Ordering::Relaxed),

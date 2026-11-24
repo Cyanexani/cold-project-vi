@@ -159,10 +159,34 @@ fn shared_budget() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_PIPELINE_WAIT_SHARED").is_none_or(|v| v != "0"))
 }
 
+/// Requested pipelines waiting past which a draw no longer waits for its
+/// own: with hundreds queued one frame's budget makes a handful of them,
+/// and every frame of the world spent its whole half second waiting
+/// (runs of 2026-11-24: "500.7 ms waiting for pipelines" in each frame
+/// while 700 to 1,900 were being made, at 1 fps). The draws are dropped
+/// as they were after the wait, and the workers keep going.
+/// `VICTORY_PIPELINE_WAIT_BACKLOG=<n>` (default 16; 0: always wait, as before).
+fn wait_backlog() -> usize {
+    static LIMIT: OnceLock<usize> = OnceLock::new();
+    *LIMIT.get_or_init(|| {
+        std::env::var("VICTORY_PIPELINE_WAIT_BACKLOG")
+            .ok()
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            .unwrap_or(16)
+    })
+}
+
+/// Whether so many requested pipelines are queued that waiting for one
+/// cannot help the frame ([`wait_backlog`]).
+fn backlogged() -> bool {
+    let limit = wait_backlog();
+    limit != 0 && QUEUE.lock().unwrap_or_else(|e| e.into_inner()).requested.len() >= limit
+}
+
 /// Waits for `p` while frame `frame` has budget left.
 fn wait(p: &Pending, frame: u64) {
     let budget = wait_budget();
-    if budget.is_zero() {
+    if budget.is_zero() || backlogged() {
         return;
     }
     // The frame the budget belongs to, and what was waited of it (or is
@@ -302,11 +326,17 @@ fn workers() -> bool {
             let spawned = std::thread::Builder::new()
                 .name(format!("victory-pipelines-{i}"))
                 .spawn(|| {
-                    // Below the title's own threads (loading, recording).
-                    // SAFETY: a plain call on our own thread.
-                    unsafe {
-                        use windows::Win32::System::Threading::*;
-                        let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+                    // Level with the title's threads: below them, with the
+                    // title using every processor, 2,400 pipelines all in
+                    // the library took minutes to load (about 20 a second)
+                    // and the world's draws were dropped meanwhile.
+                    // `VICTORY_PIPELINE_LOW_PRIORITY=1`: below, as before.
+                    if std::env::var_os("VICTORY_PIPELINE_LOW_PRIORITY").is_some_and(|v| v != "0") {
+                        // SAFETY: a plain call on our own thread.
+                        unsafe {
+                            use windows::Win32::System::Threading::*;
+                            let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+                        }
                     }
                     loop {
                         next().make();
