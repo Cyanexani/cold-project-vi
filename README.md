@@ -4,7 +4,9 @@ Version de travail de [VIctory](https://github.com/Marvisak/VIctory), qui fait
 tourner la version Xbox Series de Grand Theft Auto VI directement sous Windows,
 à partir des fichiers du jeu que l'utilisateur fournit. Elle part du fork
 [fxceless/victory-gta6](https://github.com/fxceless/victory-gta6) (commit
-`578d459`) et de ses commits suivants, jusqu'à `7b0f736`.
+`578d459`) et de ses commits suivants, jusqu'à `4e17478`, plus la « carte des
+vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
+`fx-heapmap`).
 
 **Ce dépôt ne contient aucun fichier du jeu** : ni exécutable, ni données, ni
 shaders extraits. Il faut sa propre copie du jeu. Ce projet n'est ni affilié à
@@ -20,6 +22,8 @@ Mis à jour le 24/11/2026.
   GPL-3.0-or-later, comme ce dépôt (voir `LICENSE`).
 - **[victory-gta6](https://github.com/fxceless/victory-gta6)**, par fxceless :
   le fork dont part ce travail (rendu du monde, ray tracing en cours).
+- **[VIcky](https://github.com/Xeltax/VIcky)**, par Xeltax : la carte des vues
+  pour la limite d'un million de vues des cartes NVIDIA.
 - **[XCL](https://github.com/ivall/xcl)**, par ivall (GPL-2.0-only), a servi de
   référence pour le comportement du jeu sous une autre couche.
 - Le texte d'origine, en anglais, est dans
@@ -35,7 +39,7 @@ Mis à jour le 24/11/2026.
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ⚠️ s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ❌ le ray tracing du jeu ne tourne pas encore : tout ce que le soleil ne touche pas est noir |
-| Images par seconde dans le monde | ❌ 2 à 3,5 |
+| Images par seconde dans le monde | ❌ environ 2, pointes à 4 (avec les options de vitesse ci-dessous) |
 | Mémoire | ❌ 18 à 23 Go après 3 à 5 minutes, trop pour un PC de 16 Go |
 | Stabilité | ⚠️ sans options, 5 minutes sans plantage ; avec les options mémoire, plantage entre 2 et 3 minutes |
 
@@ -56,6 +60,41 @@ target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute
 
 Le chemin du jeu peut aussi être mis dans `victory.toml` (modèle :
 `victory.example.toml`).
+
+**Options de vitesse recommandées** (pas encore par défaut) :
+
+```powershell
+$env:VICTORY_TEXTURE_NO_WAIT = '1'
+$env:VICTORY_CARD_BUFFERS_MIN_MB = '1'
+$env:VICTORY_CARD_BUFFERS_MB = '2048'
+$env:VICTORY_SHADER_LOOP_LIMIT = '32'
+```
+
+Après une mise à jour du traducteur, le premier lancement recompile les
+programmes graphiques : image noire ou cassée pendant plusieurs minutes. Le
+lancement suivant les recharge. Ce qui reste à essayer en jeu est décrit dans
+[docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md).
+
+## Vitesse
+
+Temps par image dans le monde, en millisecondes (meilleures images mesurées).
+
+```mermaid
+xychart-beta
+    title "Temps par image (ms), plus bas = mieux"
+    x-axis ["Sans options", "Textures sans attente", "+ comparaison par la carte"]
+    y-axis "ms" 0 --> 2000
+    bar [1872, 1984, 490]
+```
+
+| Par image | Sans options | Textures sans attente | + comparaison par la carte |
+|---|---|---|---|
+| Textures | 865 à 3 800 ms | 12 à 62 ms | 5 à 47 ms |
+| Recopie vers le jeu | environ 170 ms | 665 à 1 000 ms | 50 à 85 ms |
+| Carte graphique | environ 250 ms | 580 à 820 ms | 230 à 380 ms |
+
+Ce qui limite maintenant : la carte travaille 220 à 270 ms par image. Pour
+30 images/s il faut descendre sous 33 ms.
 
 ## Mémoire
 
@@ -156,8 +195,9 @@ pie showData
 
 ### Shaders encore refusés par le traducteur
 
-Mesuré avant l'intégration des commits ray tracing du fork, qui en traitent une
-partie (masques de lanes, wave64).
+Mesuré avant l'intégration des commits ray tracing du fork. Après : 10 refusés,
+dont 2 traduits depuis (`v_cvt_f32_f64`, `v_permlanex16_b32`), et les
+programmes wave64 sans boucle ont maintenant une forme en vagues de 32.
 
 ```mermaid
 pie showData
@@ -169,8 +209,11 @@ pie showData
     "Section whole-wave" : 1
 ```
 
-À cela s'ajoutent **4 programmes de calcul refusés par le pilote NVIDIA**
-(« Paramètre incorrect »).
+À cela s'ajoutaient **4 programmes de calcul refusés par le pilote NVIDIA**
+(« Paramètre incorrect ») : ils demandaient des vagues de 64 lanes, que les
+cartes NVIDIA n'ont pas. Le traducteur les refuse maintenant lui-même et leur
+cherche encore une forme en 32 lanes. Ce sont des programmes du constructeur
+de ray tracing : tant qu'il en manque un, le constructeur reste éteint.
 
 ### Ray tracing
 
@@ -178,22 +221,25 @@ Les commits `6a2d9f9` à `7b0f736` du fork sont intégrés : les programmes
 d'ombre et de tracé se traduisent, et le test rayon/boîte et rayon/triangle du
 matériel est émulé. La perte de la carte graphique de ces versions venait
 d'une forme « wave64 » des shaders de particules, qui met des barrières de
-groupe dans des branches : elle est désactivée sauf avec `VICTORY_WAVE_WIDE=1`.
+groupe dans des branches et des boucles. Elle est maintenant active par défaut
+pour les programmes **sans boucle** seulement (`VICTORY_WAVE_WIDE=1` : partout,
+`0` : nulle part).
 Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails :
 [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
 
 ## Ce qui reste à faire
 
-1. Traduire les shaders encore refusés.
-2. Corriger les 4 programmes refusés par le pilote NVIDIA.
-3. Corriger l'éclairage du logo Rockstar dans l'intro.
-4. Lumière de secours : éclaircir les zones noires en attendant le ray tracing.
-5. Faire tourner le ray tracing dans le jeu.
-6. Réduire la mémoire : fenêtres à trous qui ne suivent pas une seule section
+1. Essayer en jeu ce qui vient d'être codé : [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
+   (carte des vues, forme wave64 sans boucle, lumière de secours
+   `VICTORY_RT_MISS=1`, cheveux, ray tracing, logo, murs).
+2. Traduire les shaders encore refusés (descripteurs lus comme des données,
+   programmes wave64 avec boucles).
+3. Faire tourner le ray tracing dans le jeu.
+4. Réduire le travail de la carte graphique (vitesse).
+5. Réduire la mémoire : fenêtres à trous qui ne suivent pas une seule section
    (2,6 Go encore copiés), textures côté PC (3 à 4,5 Go), buffers partagés
    avec la carte (environ 7 Go réservés).
-7. Mesurer ce qui ralentit chaque image et attaquer le plus gros.
-8. Régler `VICTORY_PIPELINE_WAIT_MS` pour supprimer les trous à l'image, et
+6. Régler `VICTORY_PIPELINE_WAIT_MS` pour supprimer les trous à l'image, et
    vérifier que le cache des pipelines se remplit d'un lancement à l'autre.
 
 ## Options utiles
@@ -208,4 +254,10 @@ Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails
 | `VICTORY_PIPELINE_WAIT_MS` | attente maximale des pipelines par image (500 par défaut) |
 | `VICTORY_D3D12_DEBUG=1` | couche de débogage Direct3D (build `diag`), nomme les erreurs |
 | `VICTORY_BVH_BUILDER=1` | active la construction des structures de ray tracing |
-| `VICTORY_WAVE_WIDE=1` | forme wave64 des shaders (fait perdre la carte sur certains) |
+| `VICTORY_WAVE_WIDE` | forme wave64 « vague entière » : par défaut sans boucle seulement ; `1` partout, `0` nulle part |
+| `VICTORY_WAVE_LOCAL=idiom` | seulement les formes exactes des programmes wave64 |
+| `VICTORY_RT_MISS=1` | lumière de secours : les rayons ne touchent rien |
+| `VICTORY_HEAP_MAP=0` | coupe la carte des vues de VIcky |
+| `VICTORY_TEXTURE_NO_WAIT=1` | les textures n'attendent pas les remappages du jeu |
+| `VICTORY_CARD_BUFFERS_MIN_MB=1` | la carte compare les buffers au lieu du processeur |
+| `VICTORY_PROFILE=4` | profileur (build `diag`) |

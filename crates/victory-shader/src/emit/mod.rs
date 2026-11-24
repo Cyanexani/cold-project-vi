@@ -385,7 +385,15 @@ pub fn emit(
         // lost the card in a submission of two programs that had just moved to it
         // (`ptfx_CS_lightAtlas_Sprite` and `_Trail`). The 32-lane programs' form below, which
         // has no barrier, stays on.
-        let wide_on = std::env::var_os("VICTORY_WAVE_WIDE").is_some_and(|v| v == "1");
+        // Programs with no loop get it by default: there a group barrier is met once at most by
+        // each host wave, so the two cannot wait at different counts of one (what hung 121-124's
+        // light-atlas programs, whose barriers sat in loops). `VICTORY_WAVE_WIDE=1`: every
+        // program, as before; `0`: none.
+        let wide_on = match std::env::var("VICTORY_WAVE_WIDE").as_deref() {
+            Ok("1") => true,
+            Ok("0") => false,
+            _ => !has_loop(p),
+        };
         // exact first: each host wave on its own where that is exact (the idiom, every
         // form; no barriers), then the other exact forms; then approximate
         for exact in [true, false] {
@@ -485,6 +493,15 @@ pub fn emit(
         }
         other => other,
     };
+    // Still 64-lane waves on a host whose waves are 32 lanes at most: the driver refuses
+    // `WaveSize(64)` ("Paramètre incorrect"), so refuse it here, where the retry below
+    // can still find a 32-lane form, and the log names it as untranslated.
+    let original = match original {
+        Ok((_, Some(64))) if lower::host_max_wave() == 32 => {
+            Err(ShaderError::Unsupported { offset: 0, what: lower::WAVE64_ON_32 })
+        }
+        other => other,
+    };
     let original = original.map(|(shader, _)| shader);
     // Retry unsupported programs only. Threading can separate an unknown
     // register value from its apparent use on a mutually exclusive path.
@@ -499,7 +516,15 @@ pub fn emit(
     let st = structure::structure(&p)?;
     let io = io::raise(&p, native)?;
     let res = resource::track(&p, &native.layout, native.stage, Some(&st))?;
-    emit_program(c, native, &p, &st, &io, &res).map(|(shader, _)| shader)
+    match emit_program(c, native, &p, &st, &io, &res) {
+        Ok((_, Some(64))) if lower::host_max_wave() == 32 => original,
+        again => again.map(|(shader, _)| shader),
+    }
+}
+
+/// Whether `p` has a loop: an edge back to a block at or before its own address.
+fn has_loop(p: &ir::Program) -> bool {
+    p.blocks.iter().any(|b| b.preds.iter().any(|&q| p.blocks.get(q).is_some_and(|from| from.offset >= b.offset)))
 }
 
 /// `p` (a console wave64 compute program on a host of 32-lane waves) with the per-lane

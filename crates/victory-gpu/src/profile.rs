@@ -260,7 +260,7 @@ fn run(period: Duration) {
             }
         }
         for t in threads.values_mut() {
-            if t.cpu_ms_second < BUSY_MS && tick % 25 != 0 {
+            if t.cpu_ms_second < BUSY_MS && !tick.is_multiple_of(25) {
                 continue;
             }
             if let Some(stack) = capture(t.handle) {

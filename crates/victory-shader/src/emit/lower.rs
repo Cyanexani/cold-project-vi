@@ -334,6 +334,8 @@ enum MaskData {
 pub(super) const LANE_MASK: Why = "a lane mask read as data";
 /// A mask with lanes outside EXEC where it is written, read as a number where the lanes that
 /// run that block are not all of the wave.
+/// A console wave64 program that only runs in 64-lane waves, on a host of 32-lane waves.
+pub(super) const WAVE64_ON_32: Why = "a console wave of 64 lanes that 32-lane host waves cannot hold";
 pub(super) const MASK_ELSEWHERE: Why = "a lane mask holding lanes elsewhere read as data";
 
 /// Instructions that read a lane mask (not EXEC implicitly, not a lane's
