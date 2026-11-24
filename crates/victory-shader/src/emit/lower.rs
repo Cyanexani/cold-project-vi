@@ -1262,6 +1262,7 @@ impl<'a> Lower<'a> {
                 let n = i.name();
                 n.starts_with("ds_swizzle")
                     || n.contains("permute")
+                    || n.starts_with("v_permlane")
                     || n.starts_with("v_mbcnt")
                     || matches!(n, "v_readlane_b32" | "v_writelane_b32")
                     || matches!(&i.fields, Fields::Valu(v) if v.dpp.is_some())
@@ -6976,6 +6977,105 @@ impl<'a> Lower<'a> {
                 };
                 let r = self.s.m.cast(c, op, a, self.s.t.i32);
                 int(self, r)
+            }
+            "v_permlanex16_b32" | "v_permlane16_b32" => {
+                // Each lane of a 32-lane row reads lane `sel` of the row's
+                // other 16-lane half (permlanex16) or of its own (permlane16),
+                // `sel` being nibble (lane & 15) of src1 (lanes 0-7) or src2
+                // (8-15). Within a row of 32: a host wave of 32 or 64 holds it.
+                // shortcut: a source lane outside EXEC is read as the host has
+                // it (the console's FI and bound-control bits are not
+                // followed: it would read the old destination or 0).
+                self.cross_lane(false)?;
+                let x = s(self, 0)?;
+                let (lo, hi) = (s(self, 1)?, s(self, 2)?);
+                let i32t = self.s.t.i32;
+                let me = self.s.op(c, "waveGetLaneIndex", Attr::ReadOnly, i32t, 111, &[]);
+                let k = |l: &mut Self, v: u32| l.s.m.i32(v);
+                let (k15, k8, k4, k7) = (k(self, 15), k(self, 8), k(self, 4), k(self, 7));
+                let j = self.s.m.bin(c, Bin::And, me, k15);
+                let upper = self.s.m.cmp(c, pred::IUGE, j, k8);
+                let word = self.s.m.select(c, upper, hi, lo);
+                let jj = self.s.m.bin(c, Bin::And, j, k7);
+                let sh = self.s.m.bin(c, Bin::Mul, jj, k4);
+                let sel = self.s.m.bin(c, Bin::LShr, word, sh);
+                let sel = self.s.m.bin(c, Bin::And, sel, k15);
+                // The row's first lane, and the half read.
+                let not15 = k(self, !15);
+                let half = self.s.m.bin(c, Bin::And, me, not15);
+                let half = if name == "v_permlanex16_b32" {
+                    let k16 = k(self, 16);
+                    self.s.m.bin(c, Bin::Xor, half, k16)
+                } else {
+                    half
+                };
+                let src = self.s.m.bin(c, Bin::Or, half, sel);
+                let r = self.read_lane(x, src);
+                int(self, r)
+            }
+            "v_cvt_f32_f64" => {
+                // The double's bits in an i64 (DXIL doubles are not used),
+                // rounded to the nearest f32, ties to even, in integer
+                // arithmetic. Inline float constants are doubles here.
+                // shortcut: results below the f32 normal range are 0 (the
+                // console's default mode flushes f32 denormals).
+                let op = *v.src.first().ok_or("a missing operand")?;
+                if let Operand::Const(k @ 240..=248) = op {
+                    let x: f32 = [0.5, -0.5, 1.0, -1.0, 2.0, -2.0, 4.0, -4.0, 0.159_154_94][usize::from(k - 240)];
+                    let r = self.s.m.f32(x.to_bits());
+                    return float(self, r);
+                }
+                let bits = self.src64(inst, 0)?;
+                let m = &mut self.s.m;
+                let i64t = m.int(64);
+                let k = |m: &mut crate::emit::bitcode::Module, x: i64| m.int_const(i64t, x);
+                let (k63, k52, k29, k31, k23) = (k(m, 63), k(m, 52), k(m, 29), k(m, 31), k(m, 23));
+                let sign = m.bin(c, Bin::LShr, bits, k63);
+                let sign = m.bin(c, Bin::Shl, sign, k31);
+                let e = m.bin(c, Bin::LShr, bits, k52);
+                let x7ff = k(m, 0x7ff);
+                let e = m.bin(c, Bin::And, e, x7ff);
+                let mmask = k(m, (1 << 52) - 1);
+                let mant = m.bin(c, Bin::And, bits, mmask);
+                // Inf and NaN (a NaN keeps its top payload, made quiet).
+                let special = m.cmp(c, pred::EQ, e, x7ff);
+                let zero = k(m, 0);
+                let is_nan = m.cmp(c, pred::NE, mant, zero);
+                let top = m.bin(c, Bin::LShr, mant, k29);
+                let quiet = k(m, 0x40_0000);
+                let nan_m = m.bin(c, Bin::Or, top, quiet);
+                let sm = m.select(c, is_nan, nan_m, zero);
+                let inf = k(m, 0x7f80_0000);
+                let special_r = m.bin(c, Bin::Or, inf, sm);
+                // Normal: rebias, cut the mantissa to 23 bits, round.
+                let rebias = k(m, 1023 - 127);
+                let fe = m.bin(c, Bin::Sub, e, rebias);
+                let fm = m.bin(c, Bin::LShr, mant, k29);
+                let rmask = k(m, (1 << 29) - 1);
+                let rest = m.bin(c, Bin::And, mant, rmask);
+                let half = k(m, 1 << 28);
+                let over = m.cmp(c, pred::IUGT, rest, half);
+                let tie = m.cmp(c, pred::EQ, rest, half);
+                let one = k(m, 1);
+                let odd = m.bin(c, Bin::And, fm, one);
+                let odd = m.cmp(c, pred::NE, odd, zero);
+                let tie_up = m.bin(c, Bin::And, tie, odd);
+                let up = m.bin(c, Bin::Or, over, tie_up);
+                let up = m.cast(c, Cast::ZExt, up, i64t);
+                let fe_bits = m.bin(c, Bin::Shl, fe, k23);
+                let normal = m.bin(c, Bin::Or, fe_bits, fm);
+                // A carry out of the mantissa raises the exponent, up to inf.
+                let normal = m.bin(c, Bin::Add, normal, up);
+                let k255 = k(m, 255);
+                let big = m.cmp(c, pred::SGE, fe, k255);
+                let normal = m.select(c, big, inf, normal);
+                let small = m.cmp(c, pred::SLE, fe, zero);
+                let normal = m.select(c, small, zero, normal);
+                let r = m.select(c, special, special_r, normal);
+                let r = m.bin(c, Bin::Or, r, sign);
+                let r = m.cast(c, Cast::Trunc, r, self.s.t.i32);
+                let r = self.s.m.cast(c, Cast::Bitcast, r, self.s.t.f32);
+                float(self, r)
             }
             "v_cvt_f32_i32" | "v_cvt_f32_u32" | "v_cvt_f32_ubyte0" | "v_cvt_f32_ubyte1"
             | "v_cvt_f32_ubyte2" | "v_cvt_f32_ubyte3" => {

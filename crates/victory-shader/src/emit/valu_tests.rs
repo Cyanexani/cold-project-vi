@@ -1259,3 +1259,82 @@ fn v_cmp_class_f16_matches_rdna2() {
         );
     });
 }
+
+#[test]
+fn v_cvt_f32_f64_rounds_to_nearest_even() {
+    // v_cvt_f32_f64 v0, v[1:2] (VOP1 opcode 0x00f): the double's low dword
+    // in v1, its high dword in v2.
+    let shader = build_valu_cs(&[vop1(0x00f, 0, vgpr(1))]);
+    let doubles = [
+        0.0,
+        -0.0,
+        1.0,
+        -2.5,
+        std::f64::consts::PI,
+        1.0e-3,
+        -123_456.789,
+        // Ties: even below, odd rounds up.
+        1.0 + 2f64.powi(-24),
+        1.0 + 2f64.powi(-23) + 2f64.powi(-24),
+        // Just past the f32 range rounds to inf; far past is inf.
+        3.402_823_567_797_336_6e38,
+        1.0e300,
+        // Below the f32 normal range: flushed to 0.
+        1.0e-300,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NAN,
+    ];
+    let inputs: Vec<[u32; 4]> = doubles
+        .iter()
+        .map(|d| {
+            let b = d.to_bits();
+            [b as u32, (b >> 32) as u32, 0, 0]
+        })
+        .collect();
+    run_cases(&shader, &inputs, |backend, i, _, got| {
+        let d = doubles[i];
+        let want = d as f32;
+        if want.is_nan() {
+            assert!(f32::from_bits(got).is_nan(), "{backend}: v_cvt_f32_f64({d:e}) = {got:#010x}, want NaN");
+        } else {
+            let want = if want != 0.0 && want.abs() < f32::MIN_POSITIVE { 0.0f32.copysign(want) } else { want };
+            assert_eq!(got, want.to_bits(), "{backend}: v_cvt_f32_f64({d:e}) = {:e}, want {want:e}", f32::from_bits(got));
+        }
+    });
+}
+
+#[test]
+fn v_permlanex16_reads_the_other_half_of_the_row() {
+    // 32 lanes, v0 = lane. v5 = v_permlanex16_b32(v0, s0, s1); each lane
+    // compares it with the lane it should have read and stores the XOR:
+    // every lane stores 0 when all are right.
+    const AND: u16 = 0x11b;
+    const OR: u16 = 0x11c;
+    const XOR: u16 = 0x11d;
+    const K16: u16 = 128 + 16;
+    let permute = vop3(0x378, 5, vgpr(0), sgpr(0), sgpr(1));
+    // The same selector k in every nibble: lane (half ^ 16) | k.
+    let uniform: Vec<u32> = [
+        permute,
+        vop3(AND, 6, vgpr(0), K16, 0),
+        vop3(XOR, 6, vgpr(6), K16, 0),
+        vop3(OR, 6, vgpr(6), vgpr(3), 0),
+        vop3(XOR, 0, vgpr(5), vgpr(6), 0),
+    ]
+    .concat();
+    // The program declares WaveSize(32), which WARP's pipeline creation
+    // refuses: hardware only.
+    let card = &[("hardware", false)];
+    let shader = build_cs(&uniform, 32, 0);
+    let cases: Vec<[u32; 4]> = (0..16u32).map(|k| [k * 0x1111_1111, k * 0x1111_1111, k, 0]).collect();
+    run_cases_on(&shader, &cases, card, |backend, i, _, got| {
+        assert_eq!(got, 0, "{backend}: selector {i} in every nibble: a lane read the wrong lane ({got:#x})");
+    });
+    // The identity selectors: each lane reads lane ^ 16.
+    let identity: Vec<u32> = [permute, vop3(XOR, 6, vgpr(0), K16, 0), vop3(XOR, 0, vgpr(5), vgpr(6), 0)].concat();
+    let shader = build_cs(&identity, 32, 0);
+    run_cases_on(&shader, &[[0x7654_3210, 0xfedc_ba98, 0, 0]], card, |backend, _, _, got| {
+        assert_eq!(got, 0, "{backend}: identity selectors: a lane read the wrong lane ({got:#x})");
+    });
+}
