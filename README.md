@@ -1,5 +1,7 @@
 # victory-gta6
 
+> Avancement en français : [LISEZMOI.md](LISEZMOI.md).
+
 A work-in-progress fork of [VIctory](https://github.com/Marvisak/VIctory), the
 compatibility layer that runs the Xbox Series build of Grand Theft Auto VI
 natively on Windows from files the user supplies. This fork follows upstream
