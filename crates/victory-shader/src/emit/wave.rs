@@ -34,6 +34,11 @@ pub(crate) enum Op {
     Or,
     And,
     Xor,
+    /// One dword of a sum of doubles (`v_add_f64` on register pairs): `high` for the upper
+    /// dword, `other` the value before the section that holds the other dword of each
+    /// lane's term. Lowered as a sum of the terms rounded to f32, which is exact for small
+    /// integers (the volumetric water programs count their lanes with a sum of 1.0).
+    AddD { high: bool, other: Value },
 }
 
 impl Op {
@@ -60,7 +65,7 @@ impl Op {
     /// Whether `k` leaves the other operand unchanged.
     fn identity(self, k: u32) -> bool {
         match self {
-            Op::AddU | Op::AddH | Op::Or | Op::Xor | Op::MaxU => k == 0,
+            Op::AddU | Op::AddH | Op::Or | Op::Xor | Op::MaxU | Op::AddD { .. } => k == 0,
             Op::AddF => k == 0 || k == 0x8000_0000,
             Op::MinU | Op::And => k == u32::MAX,
             Op::MinI => k == 0x7FFF_FFFF,
@@ -72,7 +77,7 @@ impl Op {
 
     /// Counting a lane twice changes the result.
     fn counts(self) -> bool {
-        matches!(self, Op::AddU | Op::AddF | Op::AddH | Op::Xor)
+        matches!(self, Op::AddU | Op::AddF | Op::AddH | Op::Xor | Op::AddD { .. })
     }
 }
 
@@ -305,6 +310,17 @@ fn simulate(insts: &[Inst], wave: u32, saved: Value) -> HashMap<Value, Shape> {
             {
                 masked.push(w);
             }
+            // a copy of a value read off a lane (`s_mov_b32 s12, s8` after the readlanes of a
+            // 64-bit sum) keeps what that value is
+            if name == "s_mov_b32"
+                && let Some(&Operand::Scalar { code, .. }) = src.first()
+                && code != NULL
+                && let Some(x) = inst.read(Reg::S(code))
+                && let Some(&(_, w)) = inst.writes.iter().find(|w| matches!(w.0, Reg::S(_)))
+            {
+                uni.insert(w, uni.get(&x).copied().unwrap_or(Sym::Uni(x)));
+                continue;
+            }
             for &(_, w) in &inst.writes {
                 uni.entry(w).or_insert(Sym::Unknown);
             }
@@ -357,6 +373,10 @@ fn simulate(insts: &[Inst], wave: u32, saved: Value) -> HashMap<Value, Shape> {
                     .unwrap_or(Sym::Unknown);
                 uni.insert(w, s);
             }
+            continue;
+        }
+        if name == "v_add_f64" {
+            add_f64(inst, v, wave, exec, all, &mut vec, &uni);
             continue;
         }
         let Some(Operand::Vector { reg: dreg, .. }) = v.dst else {
@@ -515,6 +535,76 @@ fn simulate(insts: &[Inst], wave: u32, saved: Value) -> HashMap<Value, Shape> {
         vec.insert(dst, merged);
     }
     shapes(vec, uni, wave)
+}
+
+/// `v_add_f64` of two register pairs in every lane: each dword of the result is the
+/// [`Op::AddD`] combination of the operands' dwords, where both operands' lanes are
+/// reductions of the same pair of values (the other dword of a term is named by the op).
+fn add_f64(
+    inst: &Inst,
+    v: &crate::gfx10::Valu,
+    wave: u32,
+    exec: u64,
+    all: u64,
+    vec: &mut HashMap<Value, Vec<Sym>>,
+    uni: &HashMap<Value, Sym>,
+) {
+    let unknown = |vec: &mut HashMap<Value, Vec<Sym>>| {
+        for &(_, w) in &inst.writes {
+            vec.insert(w, vec![Sym::Unknown; wave as usize]);
+        }
+    };
+    let modifiers = v.abs != 0 || v.neg != 0 || v.clamp || v.omod != 0 || v.dpp.is_some();
+    let Some(Operand::Vector { reg: d, .. }) = v.dst else { return unknown(vec) };
+    if modifiers || exec != all {
+        return unknown(vec);
+    }
+    // An operand's two dwords, per lane.
+    let pair = |op: &Operand| -> Option<[Vec<Sym>; 2]> {
+        let half = |r: Reg| -> Vec<Sym> {
+            match inst.read(r) {
+                Some(x) => match r {
+                    Reg::V(_) => vec
+                        .get(&x)
+                        .cloned()
+                        .unwrap_or_else(|| (0..wave).map(|_| Sym::Own(x)).collect()),
+                    _ => vec![uni.get(&x).copied().unwrap_or(Sym::Uni(x)); wave as usize],
+                },
+                None => vec![Sym::Unknown; wave as usize],
+            }
+        };
+        match *op {
+            Operand::Vector { reg, .. } => Some([half(Reg::V(reg)), half(Reg::V(reg + 1))]),
+            Operand::Scalar { code, .. } if code != NULL => Some([half(Reg::S(code)), half(Reg::S(code + 1))]),
+            _ => None,
+        }
+    };
+    let (Some(a), Some(b)) = (v.src.first().and_then(pair), v.src.get(1).and_then(pair)) else {
+        return unknown(vec);
+    };
+    // The values of a lane's term: the source of each dword's reduction.
+    let term = |lo: Sym, hi: Sym| match (lo, hi) {
+        (Sym::Red { src: x, mask: m, .. }, Sym::Red { src: y, mask: n, .. }) if m == n => Some((x, y)),
+        _ => None,
+    };
+    let mut out = [Vec::with_capacity(wave as usize), Vec::with_capacity(wave as usize)];
+    for l in 0..wave as usize {
+        let t = term(a[0][l], a[1][l]).or_else(|| term(b[0][l], b[1][l]));
+        let Some((x, y)) = t else {
+            out[0].push(Sym::Unknown);
+            out[1].push(Sym::Unknown);
+            continue;
+        };
+        out[0].push(combine(Op::AddD { high: false, other: y }, a[0][l], b[0][l]));
+        out[1].push(combine(Op::AddD { high: true, other: x }, a[1][l], b[1][l]));
+    }
+    let [lo, hi] = out;
+    if let Some(w) = inst.write(Reg::V(d)) {
+        vec.insert(w, lo);
+    }
+    if let Some(w) = inst.write(Reg::V(d + 1)) {
+        vec.insert(w, hi);
+    }
 }
 
 fn constant(inst: &Inst) -> Option<u64> {

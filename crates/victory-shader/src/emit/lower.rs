@@ -1832,8 +1832,29 @@ impl<'a> Lower<'a> {
             .get(&mask)
             .ok_or("a wave reduction's untracked mask")?;
         let on = self.boolean(m, c)?;
-        let x = self.i32_of(src)?;
-        let id = self.s.m.i32(ident);
+        // A sum of doubles: each lane's term rounded to f32 and summed as floats (exact
+        // for the small integers the title counts with), the total made a double again.
+        let (op, double) = match op {
+            Op::AddD { high, .. } => (Op::AddF, Some(high)),
+            op => (op, None),
+        };
+        let x = match (double, shape) {
+            (Some(high), Shape::Active(Op::AddD { other, .. }, ..) | Shape::Prefix(Op::AddD { other, .. }, ..)) => {
+                let (a, b) = (self.i32_of(src)?, self.i32_of(other)?);
+                let (lo, hi) = if high { (b, a) } else { (a, b) };
+                let i64t = self.s.m.int(64);
+                self.s.flags |= flags::INT64;
+                let lo = self.s.m.cast(c, Cast::ZExt, lo, i64t);
+                let hi = self.s.m.cast(c, Cast::ZExt, hi, i64t);
+                let k32 = self.s.m.int_const(i64t, 32);
+                let hi = self.s.m.bin(c, Bin::Shl, hi, k32);
+                let bits = self.s.m.bin(c, Bin::Or, lo, hi);
+                let f = self.f64_bits_to_f32(bits);
+                self.as_int(f)
+            }
+            _ => self.i32_of(src)?,
+        };
+        let id = self.s.m.i32(if double.is_some() { 0 } else { ident });
         let x = self.s.m.select(c, on, x, id);
         self.s.flags |= flags::WAVE_OPS;
         if op == Op::AddH {
@@ -1955,6 +1976,18 @@ impl<'a> Lower<'a> {
         } else {
             r
         };
+        if let Some(high) = double {
+            let d = self.f32_to_f64_bits(r);
+            let c = self.cur;
+            let i64t = self.s.m.int(64);
+            let d = if high {
+                let k32 = self.s.m.int_const(i64t, 32);
+                self.s.m.bin(c, Bin::LShr, d, k32)
+            } else {
+                d
+            };
+            return Ok(self.s.m.cast(c, Cast::Trunc, d, self.s.t.i32));
+        }
         Ok(if float { self.as_int(r) } else { r })
     }
 
@@ -7234,55 +7267,7 @@ impl<'a> Lower<'a> {
                     return float(self, r);
                 }
                 let bits = self.src64(inst, 0)?;
-                let m = &mut self.s.m;
-                let i64t = m.int(64);
-                let k = |m: &mut crate::emit::bitcode::Module, x: i64| m.int_const(i64t, x);
-                let (k63, k52, k29, k31, k23) = (k(m, 63), k(m, 52), k(m, 29), k(m, 31), k(m, 23));
-                let sign = m.bin(c, Bin::LShr, bits, k63);
-                let sign = m.bin(c, Bin::Shl, sign, k31);
-                let e = m.bin(c, Bin::LShr, bits, k52);
-                let x7ff = k(m, 0x7ff);
-                let e = m.bin(c, Bin::And, e, x7ff);
-                let mmask = k(m, (1 << 52) - 1);
-                let mant = m.bin(c, Bin::And, bits, mmask);
-                // Inf and NaN (a NaN keeps its top payload, made quiet).
-                let special = m.cmp(c, pred::EQ, e, x7ff);
-                let zero = k(m, 0);
-                let is_nan = m.cmp(c, pred::NE, mant, zero);
-                let top = m.bin(c, Bin::LShr, mant, k29);
-                let quiet = k(m, 0x40_0000);
-                let nan_m = m.bin(c, Bin::Or, top, quiet);
-                let sm = m.select(c, is_nan, nan_m, zero);
-                let inf = k(m, 0x7f80_0000);
-                let special_r = m.bin(c, Bin::Or, inf, sm);
-                // Normal: rebias, cut the mantissa to 23 bits, round.
-                let rebias = k(m, 1023 - 127);
-                let fe = m.bin(c, Bin::Sub, e, rebias);
-                let fm = m.bin(c, Bin::LShr, mant, k29);
-                let rmask = k(m, (1 << 29) - 1);
-                let rest = m.bin(c, Bin::And, mant, rmask);
-                let half = k(m, 1 << 28);
-                let over = m.cmp(c, pred::IUGT, rest, half);
-                let tie = m.cmp(c, pred::EQ, rest, half);
-                let one = k(m, 1);
-                let odd = m.bin(c, Bin::And, fm, one);
-                let odd = m.cmp(c, pred::NE, odd, zero);
-                let tie_up = m.bin(c, Bin::And, tie, odd);
-                let up = m.bin(c, Bin::Or, over, tie_up);
-                let up = m.cast(c, Cast::ZExt, up, i64t);
-                let fe_bits = m.bin(c, Bin::Shl, fe, k23);
-                let normal = m.bin(c, Bin::Or, fe_bits, fm);
-                // A carry out of the mantissa raises the exponent, up to inf.
-                let normal = m.bin(c, Bin::Add, normal, up);
-                let k255 = k(m, 255);
-                let big = m.cmp(c, pred::SGE, fe, k255);
-                let normal = m.select(c, big, inf, normal);
-                let small = m.cmp(c, pred::SLE, fe, zero);
-                let normal = m.select(c, small, zero, normal);
-                let r = m.select(c, special, special_r, normal);
-                let r = m.bin(c, Bin::Or, r, sign);
-                let r = m.cast(c, Cast::Trunc, r, self.s.t.i32);
-                let r = self.s.m.cast(c, Cast::Bitcast, r, self.s.t.f32);
+                let r = self.f64_bits_to_f32(bits);
                 float(self, r)
             }
             "v_cvt_f32_i32" | "v_cvt_f32_u32" | "v_cvt_f32_ubyte0" | "v_cvt_f32_ubyte1"
@@ -7633,6 +7618,94 @@ impl<'a> Lower<'a> {
     }
 
     /// A 64-bit source (a register pair; inline constants sign-extend).
+    /// The double whose bits are the i64 `bits`, rounded to the nearest f32 (ties to even)
+    /// in integer arithmetic (DXIL doubles are not used); results below the f32 normal
+    /// range are 0 (the console's default mode flushes f32 denormals).
+    fn f64_bits_to_f32(&mut self, bits: V) -> V {
+        let c = self.cur;
+        let m = &mut self.s.m;
+        let i64t = m.int(64);
+        let k = |m: &mut crate::emit::bitcode::Module, x: i64| m.int_const(i64t, x);
+        let (k63, k52, k29, k31, k23) = (k(m, 63), k(m, 52), k(m, 29), k(m, 31), k(m, 23));
+        let sign = m.bin(c, Bin::LShr, bits, k63);
+        let sign = m.bin(c, Bin::Shl, sign, k31);
+        let e = m.bin(c, Bin::LShr, bits, k52);
+        let x7ff = k(m, 0x7ff);
+        let e = m.bin(c, Bin::And, e, x7ff);
+        let mmask = k(m, (1 << 52) - 1);
+        let mant = m.bin(c, Bin::And, bits, mmask);
+        // Inf and NaN (a NaN keeps its top payload, made quiet).
+        let special = m.cmp(c, pred::EQ, e, x7ff);
+        let zero = k(m, 0);
+        let is_nan = m.cmp(c, pred::NE, mant, zero);
+        let top = m.bin(c, Bin::LShr, mant, k29);
+        let quiet = k(m, 0x40_0000);
+        let nan_m = m.bin(c, Bin::Or, top, quiet);
+        let sm = m.select(c, is_nan, nan_m, zero);
+        let inf = k(m, 0x7f80_0000);
+        let special_r = m.bin(c, Bin::Or, inf, sm);
+        // Normal: rebias, cut the mantissa to 23 bits, round.
+        let rebias = k(m, 1023 - 127);
+        let fe = m.bin(c, Bin::Sub, e, rebias);
+        let fm = m.bin(c, Bin::LShr, mant, k29);
+        let rmask = k(m, (1 << 29) - 1);
+        let rest = m.bin(c, Bin::And, mant, rmask);
+        let half = k(m, 1 << 28);
+        let over = m.cmp(c, pred::IUGT, rest, half);
+        let tie = m.cmp(c, pred::EQ, rest, half);
+        let one = k(m, 1);
+        let odd = m.bin(c, Bin::And, fm, one);
+        let odd = m.cmp(c, pred::NE, odd, zero);
+        let tie_up = m.bin(c, Bin::And, tie, odd);
+        let up = m.bin(c, Bin::Or, over, tie_up);
+        let up = m.cast(c, Cast::ZExt, up, i64t);
+        let fe_bits = m.bin(c, Bin::Shl, fe, k23);
+        let normal = m.bin(c, Bin::Or, fe_bits, fm);
+        // A carry out of the mantissa raises the exponent, up to inf.
+        let normal = m.bin(c, Bin::Add, normal, up);
+        let k255 = k(m, 255);
+        let big = m.cmp(c, pred::SGE, fe, k255);
+        let normal = m.select(c, big, inf, normal);
+        let small = m.cmp(c, pred::SLE, fe, zero);
+        let normal = m.select(c, small, zero, normal);
+        let r = m.select(c, special, special_r, normal);
+        let r = m.bin(c, Bin::Or, r, sign);
+        let r = m.cast(c, Cast::Trunc, r, self.s.t.i32);
+        self.s.m.cast(c, Cast::Bitcast, r, self.s.t.f32)
+    }
+
+    /// The f32 `f` as the bits of a double (an i64), exactly: zeros and denormals give a
+    /// signed zero (flushed, as above), infinities and NaNs keep their kind.
+    fn f32_to_f64_bits(&mut self, f: V) -> V {
+        let c = self.cur;
+        let x = self.as_int(f);
+        let m = &mut self.s.m;
+        let i64t = m.int(64);
+        self.s.flags |= flags::INT64;
+        let x = m.cast(c, Cast::ZExt, x, i64t);
+        let k = |m: &mut crate::emit::bitcode::Module, v: i64| m.int_const(i64t, v);
+        let (k31, k23, k63, k52, k29) = (k(m, 31), k(m, 23), k(m, 63), k(m, 52), k(m, 29));
+        let sign = m.bin(c, Bin::LShr, x, k31);
+        let sign = m.bin(c, Bin::Shl, sign, k63);
+        let e = m.bin(c, Bin::LShr, x, k23);
+        let xff = k(m, 0xff);
+        let e = m.bin(c, Bin::And, e, xff);
+        let mm = k(m, (1 << 23) - 1);
+        let mant = m.bin(c, Bin::And, x, mm);
+        let mant = m.bin(c, Bin::Shl, mant, k29);
+        let rebias = k(m, 1023 - 127);
+        let de = m.bin(c, Bin::Add, e, rebias);
+        let x7ff = k(m, 0x7ff);
+        let special = m.cmp(c, pred::EQ, e, xff);
+        let de = m.select(c, special, x7ff, de);
+        let de = m.bin(c, Bin::Shl, de, k52);
+        let normal = m.bin(c, Bin::Or, de, mant);
+        let zero = k(m, 0);
+        let tiny = m.cmp(c, pred::EQ, e, zero);
+        let r = m.select(c, tiny, zero, normal);
+        m.bin(c, Bin::Or, r, sign)
+    }
+
     fn src64(&mut self, inst: &Inst, k: usize) -> Result<V, Why> {
         let Fields::Valu(v) = &inst.fields else {
             unreachable!()

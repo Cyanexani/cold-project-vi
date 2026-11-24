@@ -81,6 +81,11 @@ boucle** sont découpés « à l'échelle de la vague » pour tourner en vagues 
 32. Le fork l'avait coupé partout parce que deux programmes de particules à
 barrières **dans des boucles** bloquaient la carte ; ceux-là restent exclus.
 
+**Volumes d'eau** : les 2 programmes CS_TransmissionVolumetrics (somme
+64 bits sur la vague, maintenant suivie) se traduisent avec
+`$env:VICTORY_WAVE_WIDE = '1'` seulement : leurs branches élargies sont dans
+des boucles, le cas qui avait gelé la carte.
+
 **Transparence, cheveux, silhouettes** : 4 programmes de calcul en vagues
 de 64 (dont CS_AlphTransmissionPrefilterMip, la transparence) restent
 refusés par défaut. Avec `$env:VICTORY_WAVE_WIDE = '1'`, 2 d'entre eux se
