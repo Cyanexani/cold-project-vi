@@ -577,6 +577,9 @@ fn create() -> windows::core::Result<Host> {
             tracing::info!(min = o1.WaveLaneCountMin, max = o1.WaveLaneCountMax, "host wave lanes");
             victory_shader::emit::set_host_max_wave(o1.WaveLaneCountMax);
         }
+        // `VICTORY_PROFILE`: the sampling profiler (diagnostics builds).
+        #[cfg(feature = "diagnostics")]
+        crate::profile::start();
         let messages = debug
             .then(|| device.cast::<ID3D12InfoQueue>().ok())
             .flatten();
