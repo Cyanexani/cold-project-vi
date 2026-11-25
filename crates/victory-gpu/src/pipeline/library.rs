@@ -726,13 +726,7 @@ pub(crate) fn save(now: bool) {
     // used title pipelines; offline precompilation leaves `USED` untouched and
     // must preserve any existing early list on disk.
     let (early_count, written) = if write_early {
-        let used: Vec<String> = USED
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .iter()
-            .flatten()
-            .cloned()
-            .collect();
+        let used: Vec<String> = used().iter().flatten().cloned().collect();
         let len = used.len();
         let res = library_written
             .and_then(|()| write_atomically(&dir.join(EARLY_FILE), used.join("\n").as_bytes()));

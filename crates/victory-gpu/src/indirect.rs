@@ -36,7 +36,8 @@ cbuffer Record : register(b0) {
     uint args_offset;
     // Bit 0: a count buffer bounds the records. Bit 1: the records are a
     // window clamped ahead of their draws: one that asks for more than can
-    // run is left empty and costs nothing.
+    // run is left empty and costs nothing. Bit 2: one dispatch, written as
+    // SPLIT records of at most 65,535 groups in x each.
     uint has_count;
     uint count_offset;
 };
@@ -49,11 +50,13 @@ RWByteAddressBuffer budget : register(u1);
 static const uint BUDGET = 1u << 27;
 // Groups of one dispatch; more run empty.
 static const uint GROUPS = 1u << 20;
+static const uint SPLIT = 2;
 [RootSignature(RS)]
 [numthreads(64, 1, 1)]
 void main(uint3 id : SV_DispatchThreadID) {
     uint eff_count = records;
     bool ahead = (has_count & 2u) != 0;
+    bool split = (has_count & 4u) != 0;
     if ((has_count & 1u) != 0) {
         eff_count = min(eff_count, count_buf.Load(count_offset));
     }
@@ -74,7 +77,13 @@ void main(uint3 id : SV_DispatchThreadID) {
         cost = count * instances;
         draw_counts = uint2(count, instances);
     } else if (kind == 2) {
-        uint3 g = min(src_args.Load3(src_at), uint3(65535u, 65535u, 65535u));
+        uint3 asked = src_args.Load3(src_at);
+        uint3 g = min(asked, uint3(65535u, 65535u, 65535u));
+        // In parts: one dimension, and not the garbage of an argument
+        // nothing wrote.
+        if (split && g.y <= 1u && g.z <= 1u && asked.x <= SPLIT * 65535u) {
+            g.x = asked.x;
+        }
         // x * y fits 32 bits; the whole count may not.
         if (g.z != 0 && g.x * g.y > GROUPS / g.z) {
             g = uint3(0, 0, 0);
@@ -124,6 +133,14 @@ void main(uint3 id : SV_DispatchThreadID) {
     } else {
         if (over) {
             groups = uint3(0, 0, 0);
+        }
+        if (split) {
+            for (uint part = 0; part < SPLIT; part++) {
+                uint before = part * 65535u;
+                uint x = groups.x > before ? min(groups.x - before, 65535u) : 0u;
+                dst_args.Store3(dst_at + part * 12u, uint3(x, groups.yz));
+            }
+            return;
         }
         dst_args.Store3(dst_at, groups);
         for (uint off = 12; off < stride; off += 4) {
@@ -326,7 +343,7 @@ pub(crate) fn bound(
     let bytes = validate_layout(spec, src.1, count.map(|(_, off)| off))?;
     let (c, budget, dst) = (clamp()?, list.budget()?, list.indirect_scratch(bytes)?);
     let waits = clamp_waits(list, own);
-    let recorded = record_clamp_waits(c, &list.list, &dst, budget, src, count, spec, false, waits);
+    let recorded = record_clamp_waits(c, &list.list, &dst, budget, src, count, spec, 0, waits);
     clamp_recorded(list, waits, recorded);
     recorded.then_some(dst)
 }
@@ -350,10 +367,43 @@ pub(crate) fn bound_ahead(
     let bytes = validate_layout(spec, src.1, None)?;
     let (c, budget, dst) = (clamp()?, list.budget()?, list.indirect_scratch(bytes)?);
     let waits = clamp_waits(list, own);
-    let recorded = record_clamp_waits(c, &list.list, &dst, budget, src, None, spec, true, waits);
+    let recorded = record_clamp_waits(c, &list.list, &dst, budget, src, None, spec, AHEAD, waits);
     clamp_recorded(list, waits, recorded);
     recorded.then_some(dst)
 }
+
+/// The parts [`bound_split`] makes of a dispatch, the most groups of each,
+/// and the bytes between them.
+pub(crate) const SPLIT: u32 = 2;
+pub(crate) const PART: u32 = 65_535;
+pub(crate) const PART_BYTES: u64 = 12;
+
+/// [`bound`] for one dispatch that a program with a group base runs
+/// (`victory_shader::emit::USER_GROUP_BASE`): [`SPLIT`] records follow each
+/// other in the scratch buffer, of which the first has the first [`PART`]
+/// groups in x and the next the ones after (empty if there are none). The
+/// console runs 115,200 groups in one dispatch (the title's final gather of
+/// indirect light: 8 for each 16x16 tile of 2560x1440); clamped to what the
+/// host runs, the tiles at the bottom of the screen kept what they showed
+/// before.
+pub(crate) fn bound_split(
+    list: &HostList,
+    src: (&ID3D12Resource, u64),
+    own: bool,
+) -> Option<ID3D12Resource> {
+    let spec = (2, 12, 1);
+    validate_layout(spec, src.1, None)?;
+    let (c, budget) = (clamp()?, list.budget()?);
+    let dst = list.indirect_scratch(u64::from(SPLIT) * PART_BYTES)?;
+    let waits = clamp_waits(list, own);
+    let recorded = record_clamp_waits(c, &list.list, &dst, budget, src, None, spec, IN_PARTS, waits);
+    clamp_recorded(list, waits, recorded);
+    recorded.then_some(dst)
+}
+
+/// Bits of the clamp's `has_count`.
+const AHEAD: u32 = 2;
+const IN_PARTS: u32 = 4;
 
 #[cfg(test)]
 fn record_clamp(
@@ -365,7 +415,7 @@ fn record_clamp(
     count: Option<(&ID3D12Resource, u64)>,
     spec: (u32, u32, u32),
 ) -> bool {
-    record_clamp_waits(c, l, dst, budget, src, count, spec, false, Waits::ALL)
+    record_clamp_waits(c, l, dst, budget, src, count, spec, 0, Waits::ALL)
 }
 
 /// [`record_clamp`]; `ahead`: the records are a window clamped ahead of
@@ -382,7 +432,7 @@ fn record_clamp_as(
     spec: (u32, u32, u32),
     ahead: bool,
 ) -> bool {
-    record_clamp_waits(c, l, dst, budget, src, count, spec, ahead, Waits::ALL)
+    record_clamp_waits(c, l, dst, budget, src, count, spec, if ahead { AHEAD } else { 0 }, Waits::ALL)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -394,7 +444,7 @@ fn record_clamp_waits(
     (src, src_offset): (&ID3D12Resource, u64),
     count: Option<(&ID3D12Resource, u64)>,
     (kind, stride, records): (u32, u32, u32),
-    ahead: bool,
+    how: u32,
     Waits { before, after, scoped }: Waits,
 ) -> bool {
     let Some(bytes) = validate_layout(
@@ -440,7 +490,7 @@ fn record_clamp_waits(
         }
         None => (src_gpu, 0u32, 0u32),
     };
-    let constants = [kind, stride, records, args_offset, has_count | (u32::from(ahead) << 1), count_offset];
+    let constants = [kind, stride, records, args_offset, has_count | how, count_offset];
     // SAFETY: an open list; our root signature and pipeline; live source,
     // count, scratch destination, and budget buffers. `src` and `count` stay
     // in `COMMON` / `GENERIC_READ` via implicit buffer promotion while `dst`
@@ -1504,7 +1554,7 @@ void main() {
             (&src, 0),
             None,
             (2, 12, 1),
-            false,
+            0,
             Waits {
                 before: true,
                 after: false,
