@@ -1,6 +1,8 @@
 ﻿# Menu de lancement de VIctory : choisir un mode, le jeu demarre avec ses reglages.
 # Le journal de la partie va dans logs\partie-<mode>-<date>.txt.
-$ErrorActionPreference = 'Stop'
+# Pas 'Stop' : PowerShell 5.1 prend chaque ligne qu'un programme écrit sur
+# sa sortie d'erreur pour une erreur, et le script (et le jeu) s'arrêtaient.
+$ErrorActionPreference = 'Continue'
 Set-Location $PSScriptRoot
 $exe = Join-Path $PSScriptRoot 'target\diag\victory.exe'
 if (-not (Test-Path $exe)) {
@@ -52,7 +54,7 @@ $choice = Read-Host '   Ton choix'
 if ($choice -match '^[qQ]$') { exit 0 }
 if ($choice -match '^[pP]$') {
     Write-Host 'Préchauffage des shaders : quelques minutes la première fois.'
-    & $exe translate --cache
+    & $exe translate --cache 2>&1 | Out-Host
     Read-Host 'Entrée pour fermer'; exit 0
 }
 $n = 0
@@ -72,7 +74,12 @@ Write-Host ''
 Write-Host ("Lancement : {0}" -f $mode.Nom) -ForegroundColor Green
 foreach ($k in $mode.Env.Keys) { Write-Host ("  {0}={1}" -f $k, $mode.Env[$k]) -ForegroundColor DarkGray }
 Write-Host "À l'écran titre : A (ou Entrée). Journal : $log"
-& $exe run $game --execute --console $mode.Console 2> $log
+# Lancé à part, le journal écrit par Windows : PowerShell 5.1 arrêtait le
+# script à la première ligne du jeu sur sa sortie d'erreur (et le jeu avec).
+$ErrorActionPreference = 'Continue'
+$p = Start-Process -FilePath $exe -ArgumentList 'run', ('"{0}"' -f $game), '--execute', '--console', $mode.Console `
+    -WorkingDirectory $PSScriptRoot -RedirectStandardError $log -RedirectStandardOutput ($log + '.out') -NoNewWindow -PassThru
+$p.WaitForExit()
 Write-Host ''
 Write-Host "Le jeu est fermé. Journal : $log"
 Read-Host 'Entrée pour fermer'
