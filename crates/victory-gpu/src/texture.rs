@@ -389,7 +389,71 @@ impl Drop for Staging {
         use std::sync::atomic::Ordering::Relaxed;
         STAGED[0].fetch_sub(1, Relaxed);
         STAGED[1].fetch_sub(self.bytes, Relaxed);
+        // Nothing holds it any more (the lists that uploaded from it are reset): kept for
+        // the next texture of its size class.
+        give_back(self.buffer.clone(), self.data, self.bytes);
     }
+}
+
+/// Staging buffers no texture holds, by size (a power of two), for the next texture of
+/// that size: making one is a committed upload resource the system allocates and zeroes,
+/// and the pass over the heap made and dropped one per texture, 192 MB a frame of them at
+/// every cut, its 250 ms a frame of making textures (run of 2026-11-25, a 16 GB PC whose
+/// memory was full). At most `POOL_MB` of them are kept, the oldest given up first.
+/// `VICTORY_STAGING_POOL_MB=0`: none kept, as before (default 384).
+struct Pooled(ID3D12Resource, usize);
+// SAFETY: an upload buffer and its mapping, used by one texture at a time.
+unsafe impl Send for Pooled {}
+
+static POOL: Mutex<Option<HashMap<u64, Vec<Pooled>>>> = Mutex::new(None);
+static POOL_BYTES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Staging buffers taken from the pool, and made anew, since the start.
+pub(crate) static POOL_USE: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
+
+fn pool_limit() -> u64 {
+    static LIMIT: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *LIMIT.get_or_init(|| {
+        std::env::var("VICTORY_STAGING_POOL_MB")
+            .ok()
+            .and_then(|v| v.trim().parse::<u64>().ok())
+            .unwrap_or(384)
+            << 20
+    })
+}
+
+/// The size class of a staging buffer of `size` bytes.
+fn size_class(size: u64) -> u64 {
+    size.max(64 << 10).next_power_of_two()
+}
+
+fn give_back(buffer: ID3D12Resource, data: *mut u8, bytes: u64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    if bytes != size_class(bytes) || POOL_BYTES.load(Relaxed) + bytes > pool_limit() {
+        return;
+    }
+    let mut pool = POOL.lock().unwrap_or_else(|e| e.into_inner());
+    pool.get_or_insert_with(HashMap::new).entry(bytes).or_default().push(Pooled(buffer, data as usize));
+    POOL_BYTES.fetch_add(bytes, Relaxed);
+}
+
+/// A staging buffer of `class` bytes: one kept, else a new one.
+fn take_upload(host: &crate::host::Host, class: u64) -> Option<(ID3D12Resource, *mut u8)> {
+    use std::sync::atomic::Ordering::Relaxed;
+    if pool_limit() > 0 {
+        let mut pool = POOL.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(p) = pool.as_mut().and_then(|m| m.get_mut(&class)).and_then(Vec::pop) {
+            POOL_BYTES.fetch_sub(class, Relaxed);
+            POOL_USE[0].fetch_add(1, Relaxed);
+            drop(pool);
+            // Zeros, as a new one holds: a texture whose memory is all zero (not streamed
+            // yet) is not detiled, and would show the last texture's texels.
+            // SAFETY: the buffer's own mapping, `class` bytes, used by no list any more.
+            unsafe { std::ptr::write_bytes(p.1 as *mut u8, 0, class as usize) };
+            return Some((p.0, p.1 as *mut u8));
+        }
+    }
+    POOL_USE[1].fetch_add(1, Relaxed);
+    host.upload_buffer(class)
 }
 
 /// For the memory line: staging buffers alive, their bytes, and how many
@@ -1027,7 +1091,9 @@ fn staging(resource: This, texture: &ID3D12Resource) -> Option<Arc<Staging>> {
             Some(&mut total),
         );
     }
-    let (buffer, data) = host.upload_buffer(total)?;
+    // A size class, so that the buffer serves the next texture of that class too.
+    let total = if pool_limit() > 0 { size_class(total) } else { total };
+    let (buffer, data) = take_upload(host, total)?;
     crate::host::name(&buffer, || {
         format!(
             "staging of {resource:?} {}x{}x{} f{}",

@@ -101,6 +101,15 @@ une texture inutilisée est libérée après 1 s et 2 images (5 s et 4 images
 sinon). Si des textures disparaissent puis reviennent :
 `$env:VICTORY_TEXTURE_SWEEP = '0'` pour comparer.
 
+**Tampons de textures recyclés** : chaque texture avait son propre tampon
+d'envoi, créé puis détruit (250 ms par image à créer des textures dans
+l'essai du 25/11). Ils sont maintenant gardés (384 Mo au plus) et réutilisés.
+À regarder : la vitesse des débuts de plan, et des textures fausses (la
+texture d'un autre objet). Ancien comportement :
+`$env:VICTORY_STAGING_POOL_MB = '0'`.
+
+**Textures sur plusieurs cœurs** : `VICTORY_WIDE_TEXTURES=0` pour comparer.
+
 **Volumes d'eau** : les 2 programmes CS_TransmissionVolumetrics (somme
 64 bits sur la vague, maintenant suivie) se traduisent avec
 `$env:VICTORY_WAVE_WIDE = '1'` seulement : leurs branches élargies sont dans
