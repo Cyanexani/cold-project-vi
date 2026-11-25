@@ -2,7 +2,7 @@
 
 <img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=Un%20jeu%20Xbox%20Series%20sur%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
 
-<a href="#où-en-est-le-jeu"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=Le+prologue+se+joue+%3A+on+dirige+l%27h%C3%A9ro%C3%AFne;3%2C7+images%2Fs+aujourd'hui%2C+plafond+mesur%C3%A9+%3A+20;Un+lanceur+en+Rust+avec+pr%C3%A9sence+Discord;Modes+de+test+%3A+sans+textures%2C+sans+dessin" alt="animation"/></a>
+<a href="#où-en-est-le-jeu"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=Le+prologue+se+joue+%3A+on+dirige+l%27h%C3%A9ro%C3%AFne;4%2C2+images%2Fs+aujourd'hui%2C+plafond+mesur%C3%A9+%3A+20;Un+lanceur+en+Rust+avec+pr%C3%A9sence+Discord;Modes+de+test+%3A+sans+textures%2C+sans+dessin" alt="animation"/></a>
 
 <p>
   <a href="README.md"><img src="https://img.shields.io/badge/English-read-C8102E?style=for-the-badge" alt="English"/></a>
@@ -13,7 +13,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/avancement-60%25-ffc371?style=flat-square" alt="avancement 60 %"/>
-  <img src="https://img.shields.io/badge/images%2Fs-3%2C7%20(max%20mesur%C3%A9%2020)-ff5f6d?style=flat-square" alt="images/s"/>
+  <img src="https://img.shields.io/badge/images%2Fs-4%2C2%20(max%20mesur%C3%A9%2020)-ff5f6d?style=flat-square" alt="images/s"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
   <img src="https://img.shields.io/badge/carte-RTX%2020%2B%20%2F%20mesh%20shaders-76B900?style=flat-square&logo=nvidia" alt="RTX 20+"/>
   <img src="https://img.shields.io/badge/Rust-1.98-B7410E?style=flat-square&logo=rust" alt="Rust"/>
@@ -97,7 +97,7 @@ preuve (une vidéo).
 | Jouable (on dirige un personnage) | 50 | ✅ l'héroïne bouge dans le prologue |
 | Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
 | Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
-| Vitesse (10 points : images/s ÷ 30) | environ 1,2 | ❌ 3,6 à 3,7 images/s (partie de 10 minutes, nuit du 25/11) ; objectif 15 |
+| Vitesse (10 points : images/s ÷ 30) | environ 1,4 | ❌ 4,0 à 4,4 images/s (partie de 10 minutes, nuit du 25/11) ; objectif 15 |
 | Stabilité (10 points) | environ 2,5 | ⚠️ pas encore mesurée sur une longue partie |
 
 ### Détail
@@ -109,7 +109,7 @@ preuve (une vidéo).
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
-| Images par seconde dans le monde | ❌ 3,6 à 3,7 (270 ms par image : préparation 115, carte 137, recopie 107) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
+| Images par seconde dans le monde | ❌ 4,0 à 4,4 (230 à 250 ms par image : préparation 125, carte 85-100, recopie 55-70) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
 | Mémoire | ⚠️ 22 à 25 Go réservés sur un PC de 16 Go. Le côté processeur des copies qui vivent sur la carte est maintenant de la mémoire ordinaire que Windows peut mettre sur le disque (avant : 3 à 4,5 Go bloqués pour la carte) : à la fin d'une partie de 10 minutes, le jeu garde environ 5 Go en RAM au lieu de moins de 1 Go |
 | Stabilité | ⚠️ une partie complète de 10 minutes dans le monde sans arrêt (25/11 au soir), là où le jeu s'arrêtait net vers 9 minutes. `VICTORY_HOLD=71B6330:1` met en pause le chien de garde du jeu et `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` agrandit deux réserves d'objets qui se vidaient (idées de Tejvardhan-717) ; un fichier d'échange de 32 Go au moins aide encore. Un débordement de pile est rapporté au lieu de fermer la fenêtre en silence |
 
@@ -241,10 +241,11 @@ vers 5 images/s. Il faut diviser chacun des trois morceaux par 3 à 7.
 
 ### Le 25/11 : ce qui a aidé, ce qui a perdu
 
-De 2,2 à **2,33 images/s** le 25/11 (431 ms : préparation 135, carte 207, recopie 50), puis **3,6 à 3,7 images/s** dans la nuit (270 ms : préparation 115, carte 137, recopie 107).
+De 2,2 à **2,33 images/s** le 25/11 (431 ms : préparation 135, carte 207, recopie 50), puis **3,6 à 3,7** et **4,0 à 4,4 images/s** dans la nuit (230 à 250 ms : préparation 125, carte 85-100, recopie 55-70).
 
 | Essai | Résultat | Gardé ? |
 |---|---|---|
+| Ces rapatriements sur une file de copie à part, au lieu d'attendre derrière tout ce qui a été envoyé entre-temps (`VICTORY_FETCH_QUEUE`) | attente des rapatriements 75 → 7 ms par image ; **3,6-3,7 → 4,0-4,4 images/s** | ✅ par défaut (nuit du 25/11) |
 | Morceaux changés des copies sur la carte rapatriés par une copie, et non plus écrits par notre shader de comparaison dans la RAM du PC (`VICTORY_CARD_INLINE_FETCH` désormais coupé) | passes de comparaison 340-520 → 2,6 ms (mesure) ; dans le monde 450 → 270 ms par image, **2,2 → 3,6-3,7 images/s**, et les murs et la lumière de la cellule s'affichent | ✅ par défaut (nuit du 25/11) |
 | Côté processeur des copies sur la carte en mémoire ordinaire paginable (`VICTORY_CARD_PAGEABLE`) | une partie complète de 10 minutes au lieu d'un arrêt net vers 9 minutes | ✅ par défaut |
 | Copies sur place (`crate::plaincopy`, repris de fxceless `a253706`) | copies 140 → 105 ms | ✅ par défaut |
@@ -327,7 +328,7 @@ vidanges entre les passes.
 
 | Fork | Carte | Images/s annoncées | Ce qui peut servir ici |
 |---|---|---|---|
-| Ici (25/11) | RTX 3060, 16 Go | **3,7** (mesuré) | — |
+| Ici (25/11) | RTX 3060, 16 Go | **4,2** (mesuré) | — |
 | [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) v0.2.1 | RTX 3060, 32 Go conseillés | environ 4 | recopie limitée aux tampons relus, attentes de lecture 156 → 26 ms. **Essayé ici le 25/11** avec leurs réglages : écran noir à l'intro, 0,4 à 0,8 image/s, 1 400 à 3 300 draws sautés faute de pipelines (leur préparation `warm` + `precompile-graphics` dure plus de 20 min, coupée) |
 | [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1,03 (ville) | ray tracing qui tourne vraiment dans la ville (Radeon) ; suivi précis des écritures des shaders (`bc3cd4b`) |
 | [VItoriaBr](https://github.com/uiliannn/VItoriaBr) | RTX 5060 Ti, 40 Go | 3,5 à 6 | leur carte ne passe que 50 à 65 ms par image : la différence avec nous vient de nos comparaisons dans la mémoire de la carte et de la RAM (40 Go) |

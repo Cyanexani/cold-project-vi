@@ -2,7 +2,7 @@
 
 <img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=An%20Xbox%20Series%20game%20on%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
 
-<a href="#where-the-game-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=The+prologue+is+playable%3A+you+control+the+heroine;3.7+fps+today%2C+measured+ceiling%3A+20;A+Rust+launcher+with+Discord+presence;Test+modes%3A+no+textures%2C+no+drawing" alt="animation"/></a>
+<a href="#where-the-game-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=The+prologue+is+playable%3A+you+control+the+heroine;4.2+fps+today%2C+measured+ceiling%3A+20;A+Rust+launcher+with+Discord+presence;Test+modes%3A+no+textures%2C+no+drawing" alt="animation"/></a>
 
 <p>
   <a href="README.md"><img src="https://img.shields.io/badge/English-current-C8102E?style=for-the-badge" alt="English"/></a>
@@ -13,7 +13,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/progress-60%25-ffc371?style=flat-square" alt="progress 60%"/>
-  <img src="https://img.shields.io/badge/fps-3.7%20(measured%20max%2020)-ff5f6d?style=flat-square" alt="fps"/>
+  <img src="https://img.shields.io/badge/fps-4.2%20(measured%20max%2020)-ff5f6d?style=flat-square" alt="fps"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
   <img src="https://img.shields.io/badge/GPU-RTX%2020%2B%20%2F%20mesh%20shaders-76B900?style=flat-square&logo=nvidia" alt="RTX 20+"/>
   <img src="https://img.shields.io/badge/Rust-1.98-B7410E?style=flat-square&logo=rust" alt="Rust"/>
@@ -70,7 +70,7 @@ them only with proof (a video).
 | Playable (you control a character) | 50 | ✅ the heroine moves in the prologue |
 | Story (17.5 points) | 0 | ⏳ still in the opening; finishing the prologue is worth about 3 |
 | Picture (12.5 points) | about 6 | ⚠️ lit, but big effects are missing (shadows, ray tracing) |
-| Speed (10 points: fps ÷ 30) | about 1.2 | ❌ 3.6-3.7 fps (10-minute run, 25/11 night); goal 15 |
+| Speed (10 points: fps ÷ 30) | about 1.4 | ❌ 4.0-4.4 fps (10-minute run, 25/11 night); goal 15 |
 | Stability (10 points) | about 2.5 | ⚠️ not measured over a long session yet |
 
 | Step | State |
@@ -80,7 +80,7 @@ them only with proof (a video).
 | Saves | ✅ the game saves and reloads a checkpoint |
 | Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
 | Light in the shade | ⚠️ fallback light by default: interiors and faces are lit, but some night cutscenes stay almost black (the game's ray tracing does not run yet) |
-| Frame rate in the world | ❌ 3.6-3.7 fps (270 ms a frame: preparing 115, GPU 137, copy-back 107) on an RTX 3060 with 16 GB of RAM; 30 in the menus |
+| Frame rate in the world | ❌ 4.0-4.4 fps (230-250 ms a frame: preparing 125, GPU 85-100, copy-back 55-70) on an RTX 3060 with 16 GB of RAM; 30 in the menus |
 | Memory | ⚠️ about 22-25 GB committed on a 16 GB PC. The CPU side of the copies that live on the GPU is now ordinary memory Windows can page out (it was 3-4.5 GB locked for the GPU): at the end of a 10-minute run the game still has about 5 GB in RAM instead of under 1 GB |
 | Stability | ⚠️ a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
 
@@ -225,6 +225,7 @@ What this says:
 
 | Change | Result | Kept? |
 |---|---|---|
+| Those fetches on a copy queue of their own, not behind everything queued since (`VICTORY_FETCH_QUEUE`) | fetch waits 75 → 7 ms a frame; **3.6-3.7 → 4.0-4.4 fps** | ✅ default (25/11 night) |
 | Changed pieces of GPU-side copies fetched by a copy, not written by our compare shader into PC memory (`VICTORY_CARD_INLINE_FETCH` now off) | compare passes 340-520 → 2.6 ms (timing run); in the world 450 → 270 ms a frame, **2.2 → 3.6-3.7 fps**, and the cell's walls and light draw | ✅ default (25/11 night) |
 | CPU side of GPU-side copies in ordinary, pageable memory (`VICTORY_CARD_PAGEABLE`) | a full 10-minute run instead of a silent stop about 9 minutes in | ✅ default |
 | In-place copies (`crate::plaincopy`, from fxceless `a253706`) | copies 140 → 105 ms | ✅ default |
@@ -254,7 +255,7 @@ passes.
 
 | Fork | GPU | fps | Of use here |
 |---|---|---|---|
-| This one (25/11) | RTX 3060, 16 GB | **3.7** (measured) | — |
+| This one (25/11) | RTX 3060, 16 GB | **4.2** (measured) | — |
 | [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) | RTX 3060, 32 GB advised | about 4 | copy-back for read-back buffers only, read waits 156 → 26 ms; tried here: under 1 fps |
 | [VItoriaBr](https://github.com/uiliannn/VItoriaBr) | RTX 5060 Ti, 40 GB | 3.5 to 6 | their GPU takes 50 to 65 ms a frame |
 | [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1.03 | ray tracing that really runs (Radeon); precise tracking of shader writes |

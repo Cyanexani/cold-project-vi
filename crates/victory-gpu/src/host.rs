@@ -1709,6 +1709,17 @@ pub(crate) const CARD_INLINE_STRIDE: usize = 65536 + 64;
 /// 2048 slots ~= 128 MiB of L0 system RAM, 0 bytes of VRAM).
 pub(crate) const CARD_INLINE_SLOTS: u32 = 2048;
 
+/// Whether the relay fetches pieces of copies in the card's memory on a copy
+/// queue of its own (the default; `VICTORY_FETCH_QUEUE=main` puts them
+/// behind everything sent on the main queue since, as before). Runs of
+/// 25/11 night (RTX 3060): the fetches' waits went from about 75 to 7 ms a
+/// frame, and the frame from about 270 to 230-250 ms (3.6-3.7 to 4.0-4.4
+/// fps); the picture stayed the same over two runs.
+fn fetch_queue() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_FETCH_QUEUE").is_none_or(|v| v != "main"))
+}
+
 /// Whether `CARD_COMPARE` copies changed 64 KiB pieces inline into a shared
 /// L0 ring buffer on the GPU (`VICTORY_CARD_INLINE_FETCH=1`; off by default).
 /// It avoids the per-landing `CopyBufferRegion` + `WaitForSingleObject`
@@ -2736,6 +2747,8 @@ fn relay_wait(why: usize, done: impl Fn(&Line) -> bool) {
 /// behind the submission lock), and the memory the pieces come down to.
 struct RelayFetch {
     list: Prelude,
+    /// With [`fetch_queue`]: a copy queue of the fetches' own, and its list.
+    copy: Option<(ID3D12CommandQueue, Prelude)>,
     fence: ID3D12Fence,
     event: HANDLE,
     /// The last value signalled on `fence`.
@@ -3791,8 +3804,22 @@ impl Host {
         unsafe {
             let fence: ID3D12Fence = self.device.CreateFence(0, D3D12_FENCE_FLAG_NONE).ok()?;
             let event = CreateEventW(None, false, false, None).ok()?;
+            let copy = fetch_queue()
+                .then(|| -> windows::core::Result<(ID3D12CommandQueue, Prelude)> {
+                    let queue: ID3D12CommandQueue = self.device.CreateCommandQueue(&D3D12_COMMAND_QUEUE_DESC {
+                        Type: D3D12_COMMAND_LIST_TYPE_COPY,
+                        ..Default::default()
+                    })?;
+                    let allocator: ID3D12CommandAllocator = self.device.CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY)?;
+                    let list: ID3D12GraphicsCommandList =
+                        self.device.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, &allocator, None)?;
+                    list.Close()?;
+                    Ok((queue, (allocator, list)))
+                })
+                .and_then(|made| made.map_err(|e| tracing::warn!(error = %e, "no copy queue for fetches")).ok());
             Some(RelayFetch {
                 list,
+                copy,
                 fence,
                 event,
                 sent: 0,
@@ -4007,7 +4034,11 @@ impl Host {
                 fail(format_args!("no memory to fetch what shaders wrote to the card's memory ({fallback_total} bytes, VICTORY_RELAY=1)"));
             };
             f.sent += 1;
-            let ((allocator, list), fence, event, sent) = (f.list.clone(), f.fence.clone(), f.event, f.sent);
+            let ((allocator, list), fence, event, sent) = match &f.copy {
+                Some((_, copy_list)) => (copy_list.clone(), f.fence.clone(), f.event, f.sent),
+                None => (f.list.clone(), f.fence.clone(), f.event, f.sent),
+            };
+            let copy_queue = f.copy.as_ref().map(|(q, _)| q.clone());
             let waiting = std::time::Instant::now();
             // SAFETY: the list's last run was waited for by this thread; live
             // buffers (the copies are held by the plans); the fence and the
@@ -4024,11 +4055,19 @@ impl Host {
                     // In the order of the queue: the sends of title bytes so
                     // far are ahead of this fetch, every later one behind it.
                     let order = QUEUE_ORDER.lock().unwrap_or_else(|e| e.into_inner());
-                    self.queue.ExecuteCommandLists(&lists);
+                    // With a queue of its own the fetch does not wait behind
+                    // what was sent since: these plans' submissions have run
+                    // already, and later ones may be running as it copies (a
+                    // later flight's bytes it brings, that flight's landing
+                    // finds merged, as with the main queue).
+                    let queue = copy_queue.as_ref().unwrap_or(&self.queue);
+                    queue.ExecuteCommandLists(&lists);
                     let after = *order;
                     drop(order);
-                    self.card_sent();
-                    self.queue.Signal(&fence, sent)?;
+                    if copy_queue.is_none() {
+                        self.card_sent();
+                    }
+                    queue.Signal(&fence, sent)?;
                     fence.SetEventOnCompletion(sent, event)?;
                     WaitForSingleObject(event, INFINITE);
                     Ok(after)
