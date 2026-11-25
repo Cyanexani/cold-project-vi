@@ -97,6 +97,27 @@ fn writable_to(va: usize, end: usize) -> Option<usize> {
     Some(to.min(end))
 }
 
+/// Rewrites the `len` bytes at `rip` (one instruction) as `start` followed by NOPs.
+///
+/// # Safety
+/// `rip` is the start of an instruction of `len` bytes in mapped code.
+unsafe fn patch_in_place(rip: usize, len: usize, start: &[u8]) {
+    use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtect};
+    if start.len() > len {
+        return;
+    }
+    let mut old = 0u32;
+    // SAFETY: the instruction's own bytes, made writable for the patch and restored.
+    unsafe {
+        if VirtualProtect(rip as *const _, len, PAGE_EXECUTE_READWRITE, &mut old) != 0 {
+            let bytes = std::slice::from_raw_parts_mut(rip as *mut u8, len);
+            bytes.fill(0x90);
+            bytes[..start.len()].copy_from_slice(start);
+            VirtualProtect(rip as *const _, len, old, &mut old);
+        }
+    }
+}
+
 /// An illegal instruction at `ctx.Rip`: a console-only one is emulated and stepped over
 /// (`CONTINUE_EXECUTION`); anything else returns 0 (the crash report and the title's handlers
 /// see it).
@@ -139,18 +160,23 @@ pub(crate) unsafe fn emulate(ctx: &mut CONTEXT) -> i32 {
         ConsoleOnly::Ud2 => return 0,
         ConsoleOnly::Clwb => {
             // nothing to write back on the PC: patched to NOPs, no exception next time
-            use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtect};
-            let mut old = 0u32;
-            // SAFETY: the instruction's own bytes, made writable for the patch and restored.
-            unsafe {
-                if VirtualProtect(rip as *const _, len, PAGE_EXECUTE_READWRITE, &mut old) != 0 {
-                    std::slice::from_raw_parts_mut(rip as *mut u8, len).fill(0x90);
-                    VirtualProtect(rip as *const _, len, old, &mut old);
-                }
-            }
+            // SAFETY: the instruction's own `len` bytes at `rip`.
+            unsafe { patch_in_place(rip, len, &[]) };
         }
-        ConsoleOnly::Monitorx => {}
-        ConsoleOnly::Mwaitx => std::hint::spin_loop(),
+        // Wait hints in the title's spin loops, which test their condition
+        // again after them: patched once (after Tejvardhan-717's fork), so
+        // they stop raising an exception on every turn. MONITORX only arms
+        // the wait: NOPs. MWAITX waits: PAUSE (F3 90), then NOPs.
+        ConsoleOnly::Monitorx => {
+            std::hint::spin_loop();
+            // SAFETY: as above.
+            unsafe { patch_in_place(rip, len, &[]) };
+        }
+        ConsoleOnly::Mwaitx => {
+            std::hint::spin_loop();
+            // SAFETY: as above.
+            unsafe { patch_in_place(rip, len, &[0xF3, 0x90]) };
+        }
         ConsoleOnly::Clzero => {
             // with an address-size prefix (0x67) the line is at EAX, zero-extended
             let a32 = code[..len - 3].contains(&0x67);

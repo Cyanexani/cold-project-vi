@@ -41,6 +41,8 @@ pub fn run(
     drop(original);
     victory_hle::runtime::set_main_image(image.base());
     victory_hle::runtime::set_image_path(image.base(), exe);
+    hold(image.base(), image.info().size_of_image as usize);
+    patch(image.base(), image.info().size_of_image as usize);
     println!(
         "mapped at      {:#x} (preferred {:#x})",
         image.base(),
@@ -185,6 +187,89 @@ fn watch(base: usize, size: usize) {
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    });
+}
+
+/// `VICTORY_PATCH=<rva>:<expected hex>:<new hex>,...`: bytes of the title's
+/// code replaced in memory before it runs, each only if the code there is
+/// the expected bytes (another build of the title is left alone); the game
+/// files are not touched. From Tejvardhan-717's fork: two of the title's
+/// object pools are sized by a configuration call; at our frame rates they
+/// run empty during cutscenes and the title stops on an `int 3` (title+
+/// 0x5149aec, then title+0x1fa88e4). `5AD8E60:E8DB605FFF:B800000100,
+/// 5ABB240:E8FB3C61FF:B800000100` replace those calls with `mov eax,
+/// 0x10000` (65,536 entries each).
+#[cfg(windows)]
+fn patch(base: usize, size: usize) {
+    let Ok(list) = std::env::var("VICTORY_PATCH") else {
+        return;
+    };
+    let bytes = |h: &str| -> Option<Vec<u8>> {
+        let h = h.trim();
+        if h.len() % 2 != 0 {
+            return None;
+        }
+        (0..h.len()).step_by(2).map(|i| u8::from_str_radix(h.get(i..i + 2)?, 16).ok()).collect()
+    };
+    for item in list.split(',').filter(|i| !i.trim().is_empty()) {
+        let mut parts = item.split(':');
+        let parsed = match (parts.next(), parts.next(), parts.next()) {
+            (Some(rva), Some(old), Some(new)) => {
+                match (usize::from_str_radix(rva.trim().trim_start_matches("0x"), 16), bytes(old), bytes(new)) {
+                    (Ok(rva), Some(old), Some(new)) => Some((rva, old, new)),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        let Some((rva, old, new)) = parsed else {
+            eprintln!("VIctory: patch {item:?} not understood");
+            continue;
+        };
+        if rva.checked_add(new.len()).is_none_or(|end| end > size) {
+            eprintln!("VIctory: patch at title+{rva:#x} outside the image");
+            continue;
+        }
+        let done = victory_loader::patch_code(base + rva, &old, &new);
+        eprintln!(
+            "VIctory: patch at title+{rva:#x}: {}",
+            if done { "applied" } else { "not applied (the code there differs)" }
+        );
+    }
+}
+
+/// `VICTORY_HOLD=<rva>:<byte>,...` (hex) keeps the byte at each title+rva at
+/// that value, rewritten every 100 ms: a title switch held on or off. From
+/// Tejvardhan-717's fork: `71B6330:1` pauses the title's hang watchdog,
+/// which otherwise ends the game when frames take seconds (a null write at
+/// title+0x23cf683, seen here too).
+#[cfg(windows)]
+fn hold(base: usize, size: usize) {
+    let Ok(list) = std::env::var("VICTORY_HOLD") else {
+        return;
+    };
+    let hex = |s: &str| usize::from_str_radix(s.trim().trim_start_matches("0x"), 16).ok();
+    let held: Vec<(usize, u8)> = list
+        .split(',')
+        .filter_map(|r| r.split_once(':'))
+        .filter_map(|(rva, v)| Some((hex(rva)?, u8::try_from(hex(v)?).ok()?)))
+        .filter(|&(rva, _)| rva < size)
+        .collect();
+    if held.is_empty() {
+        return;
+    }
+    for &(rva, value) in &held {
+        eprintln!("VIctory: holding title+{rva:#x} at {value:#x}");
+    }
+    std::thread::spawn(move || {
+        loop {
+            for &(rva, value) in &held {
+                // SAFETY: one byte inside the mapped image, checked above;
+                // the title reads it as a plain flag.
+                unsafe { ((base + rva) as *mut u8).write_volatile(value) };
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     });
 }
