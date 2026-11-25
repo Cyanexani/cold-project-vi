@@ -449,6 +449,12 @@ unsafe fn thrown(p: &[usize]) -> String {
 
 /// # Safety
 /// See [`report_unhandled`].
+/// A note another part of the layer adds to a crash report, given the
+/// faulting thread's sixteen general registers (rax, rbx, rcx, rdx, rsi,
+/// rdi, rsp, rbp, r8-r15): the GPU side names what it last wrote into title
+/// memory near them (`VICTORY_BACK_TRACE=1`).
+pub static CRASH_NOTE: std::sync::OnceLock<fn(&[u64; 16]) -> String> = std::sync::OnceLock::new();
+
 unsafe fn report(what: &str, info: *const EXCEPTION_POINTERS, to_file: bool) {
     // SAFETY: the system passes valid exception pointers.
     let (record, context) = unsafe { (&*(*info).ExceptionRecord, &*(*info).ContextRecord) };
@@ -508,6 +514,15 @@ unsafe fn report(what: &str, info: *const EXCEPTION_POINTERS, to_file: bool) {
     ));
     for (i, pc) in unwind(*context).into_iter().enumerate() {
         line(format!("  #{i:<2} {}", locate(pc as usize)));
+    }
+    if let Some(note) = CRASH_NOTE.get() {
+        let regs = [
+            context.Rax, context.Rbx, context.Rcx, context.Rdx, context.Rsi, context.Rdi, context.Rsp, context.Rbp,
+            context.R8, context.R9, context.R10, context.R11, context.R12, context.R13, context.R14, context.R15,
+        ];
+        for l in note(&regs).lines() {
+            line(format!("  {l}"));
+        }
     }
     if to_file {
         let said = title_output();

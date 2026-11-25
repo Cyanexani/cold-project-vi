@@ -1965,6 +1965,7 @@ impl Shadow {
                     *h = merged;
                 }
                 if differs != 0 {
+                    back_trace(start + at, n);
                     crate::watch::writing(start + at, n);
                     crate::host::write_mapped((start + at) as *mut u8, title.as_ptr(), n);
                     written += n;
@@ -3307,4 +3308,85 @@ pub(crate) fn near(va: u64) -> String {
         ));
     }
     text
+}
+
+/// `VICTORY_BACK_TRACE=1`: the last shader writes put back into title
+/// memory (address, bytes, frame, when in microseconds), for a crash report
+/// to name those near the faulting thread's registers ([`crash_note`]): the
+/// ray-tracing builder's runs ended with title objects holding floats.
+static BACK_RING: Mutex<std::collections::VecDeque<(u64, u64, u64, u64)>> = Mutex::new(std::collections::VecDeque::new());
+const BACK_RING_LEN: usize = 1 << 16;
+
+fn back_trace_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_BACK_TRACE").is_some_and(|v| v == "1"))
+}
+
+fn back_trace(address: usize, len: usize) {
+    if !back_trace_on() {
+        return;
+    }
+    let mut ring = BACK_RING.lock().unwrap_or_else(|e| e.into_inner());
+    if ring.len() == BACK_RING_LEN {
+        ring.pop_front();
+    }
+    ring.push_back((address as u64, len as u64, crate::frame::current(), crate::host::now_us()));
+}
+
+/// For a crash report: the puts-back of [`BACK_RING`] that touched the
+/// memory around the registers (each register's first 0x100 bytes, and the
+/// 0x40 bytes at the pointers held at its +0x00, +0x08 and +0x10).
+pub fn crash_note(regs: &[u64; 16]) -> String {
+    const NAMES: [&str; 16] = ["rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rsp", "rbp", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"];
+    if !back_trace_on() {
+        return String::new();
+    }
+    let Ok(ring) = BACK_RING.try_lock() else {
+        return "back trace: busy".to_owned();
+    };
+    let title = |v: u64| (0x1_0000_0000..0x100_0000_0000).contains(&v);
+    let mut spots: Vec<(String, u64, u64)> = Vec::new();
+    for (name, &v) in NAMES.iter().zip(regs) {
+        if !title(v) {
+            continue;
+        }
+        spots.push((format!("{name}"), v, 0x100));
+        for off in [0u64, 8, 0x10] {
+            let mut q = [0u8; 8];
+            if crate::host::read_into((v + off) as *const u8, &mut q) {
+                let p = u64::from_le_bytes(q);
+                if title(p) {
+                    spots.push((format!("[{name}+{off:#x}]={p:#x}"), p, 0x40));
+                }
+            }
+        }
+    }
+    let now = crate::host::now_us();
+    let mut out = format!(
+        "back trace: {} puts-back kept, frame now {}; around the registers:
+",
+        ring.len(),
+        crate::frame::current()
+    );
+    let mut found = 0;
+    for (what, at, len) in &spots {
+        for &(a, n, frame, when) in ring.iter().rev() {
+            if a < at + len && *at < a + n {
+                out += &format!(
+                    "  {what} ({at:#x}+{len:#x}) put back at {a:#x}+{n:#x}, frame {frame}, {:.1} ms ago
+",
+                    now.saturating_sub(when) as f64 / 1000.0
+                );
+                found += 1;
+                if found >= 40 {
+                    return out;
+                }
+            }
+        }
+    }
+    if found == 0 {
+        out += "  none
+";
+    }
+    out
 }
