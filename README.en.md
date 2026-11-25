@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=VIctory%20FR&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=GTA%20VI%20(Xbox%20Series)%20on%20PC&descAlignY=58&animation=fadeIn" alt="VIctory FR" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=An%20Xbox%20Series%20game%20on%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
 
-<a href="#where-the-game-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=The+prologue+is+playable%3A+you+control+Lucia;2.3+fps+today%2C+measured+ceiling%3A+20;A+Rust+launcher+with+Discord+presence;Test+modes%3A+no+textures%2C+no+drawing" alt="animation"/></a>
+<a href="#where-the-game-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=The+prologue+is+playable%3A+you+control+the+heroine;2.3+fps+today%2C+measured+ceiling%3A+20;A+Rust+launcher+with+Discord+presence;Test+modes%3A+no+textures%2C+no+drawing" alt="animation"/></a>
 
 <p>
   <a href="README.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-lire-0055A4?style=for-the-badge" alt="Français"/></a>
@@ -30,9 +30,9 @@
 </div>
 
 A working version of [VIctory](https://github.com/Marvisak/VIctory), which runs
-the Xbox Series build of Grand Theft Auto VI natively on Windows from game
+the Xbox Series build of an open-world game natively on Windows from game
 files you supply yourself. It starts from
-[fxceless/victory-gta6](https://github.com/fxceless/victory-gta6) (up to
+[fxceless/victory-fork](https://github.com/fxceless/victory-fork) (up to
 `4e17478`), with the view map of [Xeltax/VIcky](https://github.com/Xeltax/VIcky)
 and work from many other forks (credited in the commits). The French
 [README](README.md) has every measurement in full; this page is the summary.
@@ -40,12 +40,12 @@ and work from many other forks (credited in the commits). The French
 > [!IMPORTANT]
 > **This repository contains no game files**: no executable, data or extracted
 > shaders. You need your own copy of the game. Not affiliated with or endorsed
-> by Rockstar Games or Take-Two Interactive.
+> by the game's developer or publisher.
 
 ## Where the game stands
 
 **About 59 % on [PortWatch VI](https://portwatch-vi.xyz/#method)'s scale:
-playable** (you control Lucia in the prologue).
+playable** (you control the heroine in the prologue).
 
 | Step | State |
 |---|---|
@@ -88,7 +88,7 @@ and mesh shaders (NVIDIA RTX 20 series or newer), 16 GB of RAM or more and a
   variables;
 - **live fps** while playing (ms a frame, draws, world or menus, play time,
   last log lines); the full log goes to `logs\partie-lanceur-<date>.txt`;
-- **Discord presence**: "Playing Grand Theft Auto VI", from the entry Discord
+- **Discord presence**: "Playing" and the game's name, from the entry Discord
   already has in its public list of games (nothing to create), with where you
   are, the fps, the mode and the elapsed time;
 - **saves by place**: keep the current state under a name (cell, cafeteria,
@@ -175,7 +175,7 @@ as-is (black intro, under 1 fps here), upstream's page-marked copy-back
 
 [VIctory](https://github.com/Marvisak/VIctory) by Marvisak and contributors is
 the base of everything (GPL-3.0-or-later, like this repository, see
-`LICENSE`); [victory-gta6](https://github.com/fxceless/victory-gta6) by
+`LICENSE`); [victory-fork](https://github.com/fxceless/victory-fork) by
 fxceless; [VIcky](https://github.com/Xeltax/VIcky) by Xeltax; and the many
 forks whose commits are taken here, named in each commit. Developed with
 [Claude Code](https://claude.com/claude-code).

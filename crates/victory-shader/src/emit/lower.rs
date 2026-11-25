@@ -6864,7 +6864,7 @@ impl<'a> Lower<'a> {
     /// ([`super::shader::set_view_heap_map`]): below the identity window
     /// `window`, itself; past it, the slot the heap map gives. A host view
     /// heap capped below the title's slots (NVIDIA takes 1,000,000 views,
-    /// Grand Theft Auto VI's heap has 1,245,184) mirrors title slots below
+    /// the title's heap has 1,245,184) mirrors title slots below
     /// the window at their own index and gives each one past it that holds
     /// a view a slot of its own; the heap map, a raw buffer at view heap
     /// slot `slot`, holds per title slot from the window on that slot's

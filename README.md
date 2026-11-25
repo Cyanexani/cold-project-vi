@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=VIctory%20FR&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=GTA%20VI%20(Xbox%20Series)%20sur%20PC&descAlignY=58&animation=fadeIn" alt="VIctory FR" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=Un%20jeu%20Xbox%20Series%20sur%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
 
-<a href="#où-en-est-le-jeu"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=Le+prologue+se+joue+%3A+on+dirige+Lucia;2%2C3+images%2Fs+aujourd'hui%2C+plafond+mesur%C3%A9+%3A+20;Un+lanceur+en+Rust+avec+pr%C3%A9sence+Discord;Modes+de+test+%3A+sans+textures%2C+sans+dessin" alt="animation"/></a>
+<a href="#où-en-est-le-jeu"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=Le+prologue+se+joue+%3A+on+dirige+l%27h%C3%A9ro%C3%AFne;2%2C3+images%2Fs+aujourd'hui%2C+plafond+mesur%C3%A9+%3A+20;Un+lanceur+en+Rust+avec+pr%C3%A9sence+Discord;Modes+de+test+%3A+sans+textures%2C+sans+dessin" alt="animation"/></a>
 
 <p>
   <a href="README.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-actuel-0055A4?style=for-the-badge" alt="Français"/></a>
@@ -31,9 +31,9 @@
 </div>
 
 Version de travail de [VIctory](https://github.com/Marvisak/VIctory), qui fait
-tourner la version Xbox Series de Grand Theft Auto VI directement sous Windows,
+tourner la version Xbox Series d'un jeu en monde ouvert directement sous Windows,
 à partir des fichiers du jeu que l'utilisateur fournit. Elle part du fork
-[fxceless/victory-gta6](https://github.com/fxceless/victory-gta6) (commit
+[fxceless/victory-fork](https://github.com/fxceless/victory-fork) (commit
 `578d459`) et de ses commits suivants, jusqu'à `4e17478`, plus la « carte des
 vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
 `fx-heapmap`).
@@ -47,7 +47,7 @@ vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
 > [!IMPORTANT]
 > **Ce dépôt ne contient aucun fichier du jeu** : ni exécutable, ni données, ni
 > shaders extraits. Il faut sa propre copie du jeu. Ce projet n'est ni affilié à
-> Rockstar Games ou Take-Two Interactive, ni approuvé par eux.
+> son développeur ni son éditeur, ni approuvé par eux.
 
 Mis à jour le 25/11/2026 au soir (lanceur, modes de test, mesures du jeu
 seul, FSR expérimental).
@@ -58,7 +58,7 @@ seul, FSR expérimental).
   contributeurs, est la base de tout : le chargeur, les services du système,
   le rendu Direct3D 12 et le recompilateur de shaders. Licence
   GPL-3.0-or-later, comme ce dépôt (voir `LICENSE`).
-- **[victory-gta6](https://github.com/fxceless/victory-gta6)**, par fxceless :
+- **[victory-fork](https://github.com/fxceless/victory-fork)**, par fxceless :
   le fork dont part ce travail (rendu du monde, ray tracing en cours).
 - **[VIcky](https://github.com/Xeltax/VIcky)**, par Xeltax : la carte des vues
   pour la limite d'un million de vues des cartes NVIDIA.
@@ -72,7 +72,7 @@ seul, FSR expérimental).
 
 ### Avancement du portage : environ 59 %
 
-`████████████░░░░░░░░` **environ 59 % : jouable** (on dirige Lucia dans le prologue)
+`████████████░░░░░░░░` **environ 59 % : jouable** (on dirige l'héroïne dans le prologue)
 
 Mesuré avec le barème de [PortWatch VI](https://portwatch-vi.xyz/#method) :
 jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, le
@@ -87,7 +87,7 @@ preuve (une vidéo).
 | Première image (logos, intro) | 20 | ✅ |
 | Menu principal | 30 | ✅ |
 | Dans le monde (le prologue se charge et s'affiche) | 40 | ✅ |
-| Jouable (on dirige un personnage) | 50 | ✅ Lucia bouge dans le prologue |
+| Jouable (on dirige un personnage) | 50 | ✅ l'héroïne bouge dans le prologue |
 | Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
 | Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
 | Vitesse (10 points : images/s ÷ 30) | environ 0,8 | ❌ 2,3 images/s (meilleur essai du 25/11) ; objectif 15 |
@@ -100,7 +100,7 @@ preuve (une vidéo).
 | Démarrage, menus, écran titre | ✅ fonctionne |
 | Cinématique d'intro | ✅ se joue en entier et s'affiche correctement (vérifié en jeu le 25/11) |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
-| Premier passage jouable (prologue) | ✅ on dirige Lucia ; s'affiche : personnages, textures, ciel, extérieur au soleil |
+| Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
 | Images par seconde dans le monde | ❌ 2,3 (431 ms par image) sur RTX 3060 et 16 Go de RAM, carte occupée à 82 % ; 30 dans les menus |
 | Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
@@ -144,7 +144,7 @@ Une fenêtre en Rust (`apps/lanceur`) pour jouer sans PowerShell :
 - **images/s en direct** pendant la partie (ms par image, dessins, monde ou
   menus, temps de jeu, dernières lignes du journal) ; le journal complet va
   dans `logs\partie-lanceur-<date>.txt` ;
-- **présence Discord** : « Joue à Grand Theft Auto VI », d'après la fiche
+- **présence Discord** : « Joue à » + le nom du jeu, d'après la fiche
   que Discord a déjà dans sa liste publique de jeux (rien à créer), avec
   l'endroit (monde ou menus), les images/s, le mode et le temps de jeu ;
 - **sauvegardes par endroit** : « Garder l'état actuel » sous un nom

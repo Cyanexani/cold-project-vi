@@ -21,9 +21,9 @@ fn main() -> eframe::Result<()> {
     let fenetre = egui::ViewportBuilder::default()
         .with_inner_size([760.0, 640.0])
         .with_min_inner_size([560.0, 480.0])
-        .with_title("VIctory — lanceur");
+        .with_title("Cold Project VI — lanceur");
     eframe::run_native(
-        "VIctory — lanceur",
+        "Cold Project VI — lanceur",
         eframe::NativeOptions { viewport: fenetre, ..Default::default() },
         Box::new(|_| Ok(Box::new(Lanceur::new()))),
     )
@@ -149,7 +149,7 @@ impl eframe::App for Lanceur {
 
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading(format!("{} — VIctory", self.r.titre));
+                ui.heading(self.r.titre.as_str());
                 self.vue_partie(ui);
                 ui.separator();
                 ui.add_enabled_ui(!en_cours, |ui| {
@@ -367,7 +367,7 @@ impl Lanceur {
                 ui.end_row();
                 ui.label("Présence Discord");
                 ui.horizontal(|ui| {
-                    ui.checkbox(&mut self.r.discord, "« Joue à Grand Theft Auto VI »");
+                    ui.checkbox(&mut self.r.discord, "« Joue à » le jeu (sa fiche Discord)");
                     if !self.r.discord {
                         ui.weak("coupée");
                     } else if self.discord_relie {

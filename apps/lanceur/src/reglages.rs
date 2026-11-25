@@ -206,7 +206,7 @@ impl Default for Reglages {
             .unwrap_or_default();
         let jeu = racine.as_deref().and_then(jeu_de_victory_toml).unwrap_or_default();
         Reglages {
-            titre: "GTA VI".into(),
+            titre: "Cold Project VI".into(),
             discord: true,
             discord_id: String::new(),
             exe,
@@ -218,7 +218,7 @@ impl Default for Reglages {
 }
 
 /// La fiche du jeu dans la liste publique des jeux que Discord reconnaît
-/// (`/api/v9/applications/detectable`) : « Joue à Grand Theft Auto VI »,
+/// (`/api/v9/applications/detectable`) : « Joue à » et son nom,
 /// avec son icône, sans application à créer.
 pub const DISCORD_JEU: &str = "1445160676522856458";
 

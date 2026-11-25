@@ -168,7 +168,7 @@ struct HeapMap {
 /// and its null guard slot last, where they were without a map.
 ///
 /// On NVIDIA a shader-visible view heap holds at most 1,000,000 views
-/// ([`PORTABLE_VIEWS`]); Grand Theft Auto VI's has 1,245,184 slots, some
+/// ([`PORTABLE_VIEWS`]); the title's has 1,245,184 slots, some
 /// 650,000-700,000 of them holding views, about 335,000 of those past the
 /// 737,855 title slots a capped heap kept in place (their bindless reads
 /// gave the null slot).
@@ -3960,7 +3960,7 @@ mod tests {
         assert_eq!(heap.dynamic(40), Some(4 + heap.dynamic - 41));
     }
 
-    /// Grand Theft Auto VI's view heap on NVIDIA's 1,000,000 views with a
+    /// The title's view heap on NVIDIA's 1,000,000 views with a
     /// heap map: title slots below 131,072 at their own index, 606,782 pool
     /// slots, the map at 737,854, and the fork's dynamic slots (from
     /// 737,855) and guard slot (999,999, the translator's limit) where they

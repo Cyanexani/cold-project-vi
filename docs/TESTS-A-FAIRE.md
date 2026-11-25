@@ -148,7 +148,7 @@ texture d'un autre objet). Ancien comportement :
 
 **Cache disque des textures (éteint par défaut ; essayé actif le 26/11 : textures bien plus lentes à préparer sur ce SSD SATA)** : `$env:VICTORY_TEXTURE_DISK = '1'`. Plafond : 32 Go écrits au total, comptés dans `written.bytes` du dossier.
 Les textures détuilées sont écrites dans
-`D:\GTA6 - Propre copie\victory-cache\textures` (tout le cache est maintenant dans le dossier du jeu, plus sur C) (8 Go au plus par partie) et relues
+`<dossier du jeu>\victory-cache\textures` (tout le cache est maintenant dans le dossier du jeu, plus sur C) (8 Go au plus par partie) et relues
 au lancement suivant. Le premier lancement écrit (plus lent), le deuxième
 relit : c'est lui qu'il faut comparer. Le journal dit « detiled textures on
 disk since the start: N read, M written ».
@@ -213,7 +213,7 @@ Dans l'ordre, chacun dans son lancement :
 Avec le constructeur allumé, la lumière de secours s'éteint toute seule.
 Ne pas ajouter `VICTORY_RT_MISS=1`.
 
-## 6. Logo Rockstar et murs invisibles
+## 6. Logo de l'éditeur et murs invisibles
 
 À observer, et me signaler avec le journal :
 - le logo de l'intro est-il toujours mal éclairé ? Avec `VICTORY_RT_MISS=1` ?

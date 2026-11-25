@@ -39,7 +39,7 @@ $modes = @(
 
 Clear-Host
 Write-Host ''
-Write-Host '   VIctory - GTA VI (Xbox Series) sur PC' -ForegroundColor Yellow
+Write-Host '   Cold Project VI' -ForegroundColor Yellow
 Write-Host '   ------------------------------------' -ForegroundColor Yellow
 Write-Host ''
 for ($i = 0; $i -lt $modes.Count; $i++) {
