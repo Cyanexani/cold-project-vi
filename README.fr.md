@@ -245,6 +245,7 @@ De 2,2 à **2,33 images/s** le 25/11 (431 ms : préparation 135, carte 207, reco
 
 | Essai | Résultat | Gardé ? |
 |---|---|---|
+| Fenêtres de mémoire du jeu écrites par le processeur directement dans la mémoire de la carte (Resizable BAR, `VICTORY_REBAR=1`, désormais par défaut quand la carte le permet) | 4,06 → 4,19 images/s en moyenne ; mémoire partagée avec la carte 6,1 → 3,9 Go, 2,1 Go de RAM libre au lieu de moins de 0,6 | ✅ par défaut (nuit du 25/11) |
 | Ces rapatriements sur une file de copie à part, au lieu d'attendre derrière tout ce qui a été envoyé entre-temps (`VICTORY_FETCH_QUEUE`) | attente des rapatriements 75 → 7 ms par image ; **3,6-3,7 → 4,0-4,4 images/s** | ✅ par défaut (nuit du 25/11) |
 | Morceaux changés des copies sur la carte rapatriés par une copie, et non plus écrits par notre shader de comparaison dans la RAM du PC (`VICTORY_CARD_INLINE_FETCH` désormais coupé) | passes de comparaison 340-520 → 2,6 ms (mesure) ; dans le monde 450 → 270 ms par image, **2,2 → 3,6-3,7 images/s**, et les murs et la lumière de la cellule s'affichent | ✅ par défaut (nuit du 25/11) |
 | Côté processeur des copies sur la carte en mémoire ordinaire paginable (`VICTORY_CARD_PAGEABLE`) | une partie complète de 10 minutes au lieu d'un arrêt net vers 9 minutes | ✅ par défaut |

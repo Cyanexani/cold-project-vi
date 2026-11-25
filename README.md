@@ -225,6 +225,7 @@ What this says:
 
 | Change | Result | Kept? |
 |---|---|---|
+| Windows of game memory written by the CPU straight into the GPU's memory (Resizable BAR, `VICTORY_REBAR=1`, now the default where the GPU has it) | 4.06 → 4.19 fps on average; memory shared with the GPU 6.1 → 3.9 GB, 2.1 GB of RAM left free instead of under 0.6 | ✅ default (25/11 night) |
 | Those fetches on a copy queue of their own, not behind everything queued since (`VICTORY_FETCH_QUEUE`) | fetch waits 75 → 7 ms a frame; **3.6-3.7 → 4.0-4.4 fps** | ✅ default (25/11 night) |
 | Changed pieces of GPU-side copies fetched by a copy, not written by our compare shader into PC memory (`VICTORY_CARD_INLINE_FETCH` now off) | compare passes 340-520 → 2.6 ms (timing run); in the world 450 → 270 ms a frame, **2.2 → 3.6-3.7 fps**, and the cell's walls and light draw | ✅ default (25/11 night) |
 | CPU side of GPU-side copies in ordinary, pageable memory (`VICTORY_CARD_PAGEABLE`) | a full 10-minute run instead of a silent stop about 9 minutes in | ✅ default |

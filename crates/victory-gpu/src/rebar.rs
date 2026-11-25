@@ -1,4 +1,4 @@
-//! `VICTORY_REBAR` (opt-in, off by default): host copies of title memory in
+//! `VICTORY_REBAR` (level 1 by default since 25/11, `0` turns it off): host copies of title memory in
 //! the card's own memory that the CPU maps (Resizable BAR, D3D12's GPU
 //! upload heap, `D3D12_HEAP_TYPE_GPU_UPLOAD`).
 //!
@@ -104,9 +104,14 @@ pub(crate) fn decide(ask: &Ask) -> Decision {
     Decision::Rebar
 }
 
-/// `VICTORY_REBAR`: 0 (unset, or anything else), 1 or 2.
+/// `VICTORY_REBAR`: 1 when unset (windows there, where the heap exists),
+/// 0, 1 or 2 when set (anything else: 0). Run rebar-1 (25/11 night, RTX 3060,
+/// 16 GB): 4.19 fps on average against 4.06, and the PC's memory shared
+/// with the card went from about 6.1 to 3.9 GB in use, the game from 24 to
+/// 21 GB committed and the PC from under 0.6 to 2.1 GB free.
 pub(crate) fn level_of(value: Option<&str>) -> u8 {
     match value.map(str::trim) {
+        None => 1,
         Some("1") => 1,
         Some("2") => 2,
         _ => 0,
@@ -258,7 +263,7 @@ mod tests {
 
     #[test]
     fn the_switch_reads_only_one_and_two() {
-        assert_eq!(level_of(None), 0);
+        assert_eq!(level_of(None), 1);
         assert_eq!(level_of(Some("0")), 0);
         assert_eq!(level_of(Some(" 1 ")), 1);
         assert_eq!(level_of(Some("2")), 2);
