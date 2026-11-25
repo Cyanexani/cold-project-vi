@@ -6716,6 +6716,24 @@ struct Presenter {
     meter: Meter,
 }
 
+/// The process's memory in RAM and committed, and the PC's free RAM, in
+/// bytes (for the counter in the caption).
+fn memory_now() -> (u64, u64, u64) {
+    use windows_sys::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+    use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+    let mut c = PROCESS_MEMORY_COUNTERS { cb: size_of::<PROCESS_MEMORY_COUNTERS>() as u32, ..Default::default() };
+    // SAFETY: plain data the calls fill in, our own process.
+    let mut m: MEMORYSTATUSEX = unsafe { std::mem::zeroed() };
+    m.dwLength = size_of::<MEMORYSTATUSEX>() as u32;
+    // SAFETY: sized structures.
+    unsafe {
+        K32GetProcessMemoryInfo(GetCurrentProcess(), &mut c, c.cb);
+        GlobalMemoryStatusEx(&mut m);
+    }
+    (c.WorkingSetSize as u64, c.PagefileUsage as u64, m.ullAvailPhys)
+}
+
 /// The frame rate, shown in the window's caption every second and logged
 /// every few seconds.
 struct Meter {
@@ -6961,7 +6979,32 @@ impl Meter {
             self.caption = Some(buffer);
         }
         let Some(caption) = &self.caption else { return };
-        let text = format!(" | VIctory {fps:.0} fps {ms:.1} ms/frame {draws:.0} draws/frame");
+        // The counter: frame rate, then where a frame's time goes (our
+        // preparation on the CPU, the wait for the card, the copy back),
+        // the process's memory (committed, and of it in RAM), the PC's free
+        // RAM, and the card's memory in use of its budget.
+        let gb = |b: u64| b as f64 / (1u64 << 30) as f64;
+        let (in_ram, committed, free) = memory_now();
+        let shaders = crate::shader_cache::counts();
+        let pipelines = crate::pipeline::made();
+        crate::hud::set(&[
+            format!("FPS {fps:.1}   {ms:.0} MS/IMAGE   {draws:.0} DESSINS"),
+            format!("CPU {cpu:.0} MS  GPU {gpu:.0} MS  RECOPIE {back_ms:.0} MS"),
+            format!("RAM JEU {:.1} GO ({:.1} EN RAM) LIBRE {:.1}", gb(committed), gb(in_ram), gb(free)),
+            host()
+                .and_then(|h| h.video_memory())
+                .map(|[budget, used, _, shared]| format!("VRAM {:.1}/{:.1} GO  PARTAGEE {:.1} GO", gb(used), gb(budget), gb(shared)))
+                .unwrap_or_else(|| "VRAM ?".into()),
+            format!("SHADERS {} ({} TRADUITS)", shaders.0 + shaders.1, shaders.1),
+            format!(
+                "PIPELINES {} +{}  TEXTURES {} {:.1}GO",
+                pipelines.0 + pipelines.1,
+                crate::pipeline::making(),
+                crate::resource::HOST_TEXTURES[0].load(Ordering::Relaxed),
+                gb(crate::resource::HOST_TEXTURES[1].load(Ordering::Relaxed))
+            ),
+        ]);
+        let text = format!(" | VIctory {fps:.1} fps {ms:.0} ms/frame {draws:.0} draws/frame");
         let mut text: Vec<u16> = caption.iter().copied().chain(text.encode_utf16()).collect();
         text.push(0);
         // Setting the text waits for the window's thread (a title thread,
@@ -7108,6 +7151,16 @@ impl Host {
                     D3D12_RESOURCE_STATE_RENDER_TARGET
                 }
                 None => D3D12_RESOURCE_STATE_COPY_DEST,
+            };
+            // The counter over the picture, last (`crate::hud`).
+            let back_now = if crate::hud::on() {
+                if back_now != D3D12_RESOURCE_STATE_RENDER_TARGET {
+                    list.ResourceBarrier(&[transition(&back, back_now, D3D12_RESOURCE_STATE_RENDER_TARGET)]);
+                }
+                crate::hud::draw(self, list, &back, p.format, (p.width, p.height));
+                D3D12_RESOURCE_STATE_RENDER_TARGET
+            } else {
+                back_now
             };
             #[cfg(feature = "diagnostics")]
             let capture = crate::capture::wanted(frame)

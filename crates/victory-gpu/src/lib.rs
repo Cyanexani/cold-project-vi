@@ -30,6 +30,8 @@ pub mod frame;
 #[cfg(windows)]
 mod compose;
 #[cfg(windows)]
+mod hud;
+#[cfg(windows)]
 pub mod upscale;
 #[cfg(windows)]
 mod host;
