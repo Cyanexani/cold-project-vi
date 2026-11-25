@@ -758,10 +758,15 @@ mod tests {
         assert!(ready(&p).is_none());
         assert_ne!(p.queue_state.load(Ordering::Relaxed), NOT_QUEUED);
         let started = Instant::now();
-        while p.made.get().is_none() && started.elapsed() < Duration::from_secs(10) {
+        // A failure is not kept in `made` (721732d): it counts an attempt.
+        while p.made.get().is_none()
+            && p.failures.load(Ordering::Relaxed) == 0
+            && started.elapsed() < Duration::from_secs(10)
+        {
             std::thread::yield_now();
         }
-        assert!(matches!(p.made.get(), Some(None)));
+        assert!(p.made.get().is_none());
+        assert!(p.failures.load(Ordering::Relaxed) >= 1);
     }
 
     #[test]

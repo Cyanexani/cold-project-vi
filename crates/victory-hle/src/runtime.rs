@@ -206,6 +206,13 @@ pub fn use_console_timers() {
     }
 }
 
+/// Crash reports name what the GPU side last put back into title memory
+/// near the faulting thread's registers (`VICTORY_BACK_TRACE=1`).
+pub fn note_gpu_on_crash() {
+    #[cfg(windows)]
+    let _ = victory_loader::CRASH_NOTE.set(victory_gpu::crash_note);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,11 +230,4 @@ mod tests {
         assert_eq!(t.store_id, "9&C");
         assert_eq!(Title::from_manifest("").storage_bytes, 0);
     }
-}
-
-/// Crash reports name what the GPU side last put back into title memory
-/// near the faulting thread's registers (`VICTORY_BACK_TRACE=1`).
-pub fn note_gpu_on_crash() {
-    #[cfg(windows)]
-    let _ = victory_loader::CRASH_NOTE.set(victory_gpu::crash_note);
 }

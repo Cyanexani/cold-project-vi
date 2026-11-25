@@ -926,10 +926,9 @@ extern "system" fn copy_buffer_region(
     if let Some(list) = host_list_rec(this)
         && let Some(to) = buffer_range(dst, dst_offset, len)
         && let Some(from) = buffer_range(src, src_offset, len)
+        && !gpu_copy(list, to as u64, from as u64, len)
     {
-        if !gpu_copy(list, to as u64, from as u64, len) {
-            list.defer_copy(to, from, len as usize);
-        }
+        list.defer_copy(to, from, len as usize);
     }
     #[cfg(not(windows))]
     let _ = (this, dst, dst_offset, src, src_offset, len);

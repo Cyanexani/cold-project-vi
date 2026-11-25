@@ -207,7 +207,7 @@ fn patch(base: usize, size: usize) {
     };
     let bytes = |h: &str| -> Option<Vec<u8>> {
         let h = h.trim();
-        if h.len() % 2 != 0 {
+        if !h.len().is_multiple_of(2) {
             return None;
         }
         (0..h.len()).step_by(2).map(|i| u8::from_str_radix(h.get(i..i + 2)?, 16).ok()).collect()

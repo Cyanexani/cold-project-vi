@@ -3632,7 +3632,7 @@ pub fn crash_note(regs: &[u64; 16]) -> String {
         if !title(v) {
             continue;
         }
-        spots.push((format!("{name}"), v, 0x100));
+        spots.push((name.to_string(), v, 0x100));
         for off in [0u64, 8, 0x10] {
             let mut q = [0u8; 8];
             if crate::host::read_into((v + off) as *const u8, &mut q) {

@@ -3535,6 +3535,37 @@ fn null_view(at: D3D12_CPU_DESCRIPTOR_HANDLE) {
     };
 }
 
+/// Whether the pass over records copied in as bytes also mirrors slots
+/// that draws read through tables lately (`VICTORY_HEAP_SYNC_TABLES=1`;
+/// off by default: [`HostHeap::mirror_copied`]).
+fn sync_tables() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_HEAP_SYNC_TABLES").is_some_and(|v| v == "1"))
+}
+
+/// Since the last frame line: slots on changed heap pages that
+/// [`HostHeap::mirror_copied`] left to their draws (tables' slots).
+pub(crate) static COPIED_TABLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A 64-bit fingerprint of a descriptor record's bytes (16 or 32 of them):
+/// equal records give equal prints, and two different records the same
+/// print about once in 2^64. Not a hash anyone can attack: the records
+/// are our own.
+fn record_print(record: &[u8]) -> u64 {
+    const K: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut h = K ^ record.len() as u64;
+    let mut words = record.chunks_exact(8);
+    for word in &mut words {
+        let w = u64::from_le_bytes(word.try_into().unwrap_or([0; 8]));
+        h = (h ^ w).wrapping_mul(K);
+        h ^= h >> 29;
+    }
+    for &b in words.remainder() {
+        h = (h ^ u64::from(b)).wrapping_mul(K);
+    }
+    h ^ (h >> 32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4203,35 +4234,4 @@ mod tests {
         let c = heap.dynamic(4).unwrap();
         assert!(c == 14 || c >= 20, "{c}");
     }
-}
-
-/// Whether the pass over records copied in as bytes also mirrors slots
-/// that draws read through tables lately (`VICTORY_HEAP_SYNC_TABLES=1`;
-/// off by default: [`HostHeap::mirror_copied`]).
-fn sync_tables() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VICTORY_HEAP_SYNC_TABLES").is_some_and(|v| v == "1"))
-}
-
-/// Since the last frame line: slots on changed heap pages that
-/// [`HostHeap::mirror_copied`] left to their draws (tables' slots).
-pub(crate) static COPIED_TABLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-/// A 64-bit fingerprint of a descriptor record's bytes (16 or 32 of them):
-/// equal records give equal prints, and two different records the same
-/// print about once in 2^64. Not a hash anyone can attack: the records
-/// are our own.
-fn record_print(record: &[u8]) -> u64 {
-    const K: u64 = 0x9e37_79b9_7f4a_7c15;
-    let mut h = K ^ record.len() as u64;
-    let mut words = record.chunks_exact(8);
-    for word in &mut words {
-        let w = u64::from_le_bytes(word.try_into().unwrap_or([0; 8]));
-        h = (h ^ w).wrapping_mul(K);
-        h ^= h >> 29;
-    }
-    for &b in words.remainder() {
-        h = (h ^ u64::from(b)).wrapping_mul(K);
-    }
-    h ^ (h >> 32)
 }

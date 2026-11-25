@@ -213,10 +213,10 @@ mod tests {
         use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
         // SAFETY: our own executable.
         let base = unsafe { GetModuleHandleW(std::ptr::null()) } as usize;
-        let f = function_at as usize - base;
+        let f = function_at as *const () as usize - base;
         // SAFETY: our own mapped image.
         let (b, e) = unsafe { function_at(base, f as u32) }.expect("own function in .pdata");
-        assert_eq!(b, function_at as usize);
+        assert_eq!(b, function_at as *const () as usize);
         assert!(e > b);
     }
 

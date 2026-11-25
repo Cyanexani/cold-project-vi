@@ -5402,7 +5402,7 @@ impl HostList {
         let barriers: Vec<_> = rooms
             .iter()
             .map(|room| {
-                transition(&room, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT)
+                transition(room, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT)
             })
             .collect();
         // SAFETY: an open list and live buffers in `UNORDERED_ACCESS`.
