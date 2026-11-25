@@ -40,7 +40,7 @@ Mis à jour le 25/11/2026.
 | Premier passage jouable (prologue) | ⚠️ s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore) |
 | Images par seconde dans le monde | ❌ environ 2 (500 à 570 ms par image), sans aucune option |
-| Mémoire | ❌ 18 à 23 Go après 3 à 5 minutes, trop pour un PC de 16 Go |
+| Mémoire | ❌ 24 Go réservés, 5,8 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; carte à 10 Go sur 11, 5,2 Go débordent dans la RAM |
 | Stabilité | ⚠️ sans options, 5 minutes sans plantage ; avec les options mémoire, plantage entre 2 et 3 minutes |
 
 ```mermaid
@@ -65,9 +65,13 @@ Les options de vitesse d'avant (`VICTORY_TEXTURE_NO_WAIT`,
 `VICTORY_CARD_BUFFERS_MIN_MB`, `VICTORY_CARD_BUFFERS_MB`) sont maintenant
 actives par défaut : la commande ci-dessus suffit.
 
-Après une mise à jour **du traducteur de shaders**, le premier lancement les
-retraduit : image noire ou cassée pendant plusieurs minutes. Le lancement
-suivant les recharge. Recompiler le reste de `victory.exe` ne vide plus ce
+**Avant de jouer, et après chaque mise à jour du traducteur de shaders** :
+double-cliquer sur `Prechauffer.bat` (ou `victory.exe translate --cache`).
+Il traduit d'avance tous les shaders du jeu (25 674 sur environ 26 000)
+dans le cache, comme une partie le ferait, pour que le jeu ne le fasse pas
+en pleine partie : quelques minutes la première fois. Sans lui, le premier
+lancement les traduit au fil de l'eau : image noire ou cassée pendant
+plusieurs minutes. Recompiler le reste de `victory.exe` ne vide plus ce
 cache (il ne dépend plus que du code du traducteur). Ce qui reste à essayer en jeu est décrit dans
 [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md).
 
@@ -99,6 +103,38 @@ xychart-beta
 | Carte graphique | 390 à 440 ms | 300 à 340 ms |
 | Préparation (copies de la mémoire du jeu) | 230 à 280 ms | 130 à 160 ms |
 | Recopie vers le jeu | 90 à 120 ms | 57 à 70 ms |
+
+### Les modes essayés pour que la carte n'attende plus
+
+La carte reste inactive environ 40 % du temps : le fil qui lui envoie le
+travail attend qu'elle ait fini chaque envoi (environ 30 fois par image)
+avant de préparer le suivant. Le fork d'origine a des modes qui envoient la
+suite sans attendre. Sur ce PC (16 Go), ils sont plus lents : le travail en
+vol demande plus de mémoire, qui déborde déjà.
+
+```mermaid
+xychart-beta
+    title "Temps par image à la cellule (ms), plus bas = mieux"
+    x-axis ["Normal", "VICTORY_LATE_WAIT=3", "VICTORY_RELAY=2 + WIDE_BACK"]
+    y-axis "ms" 0 --> 1000
+    bar [540, 850, 900]
+```
+
+| Par image | Normal | Attente tardive | Relais |
+|---|---|---|---|
+| Recopie vers le jeu | ~70 ms | 170 à 300 ms | 270 à 700 ms |
+| Menus | 30 fps | — | 2 à 3 fps |
+
+Ils restent éteints par défaut.
+
+### Les débuts de plan
+
+À chaque changement de plan, des centaines de nouvelles textures arrivent :
+la passe qui les crée et les envoie à la carte coûte alors de 150 à
+1 600 ms par image (35 ms une fois la scène chargée). C'est ce qui donne les
+personnages en basse qualité et les blocs pixelisés des premières secondes.
+Leur préparation (lecture, empreinte, détuilage) tourne maintenant sur
+plusieurs cœurs (`VICTORY_WIDE_TEXTURES=0` : sur un seul, comme avant).
 
 Ce qui a changé : une image n'attend plus des pipelines qui ne seront pas
 prêts à temps, les pipelines se fabriquent à la priorité du jeu, le cache des
@@ -207,21 +243,36 @@ pie showData
 
 ## Image
 
-### Shaders encore refusés par le traducteur
+### Shaders
 
-Mesuré en jeu le 25/11 (scène de la cellule) : 10 refusés sur environ 2 000
-utilisés, contre 12 la veille. Les 2 programmes de flaques se traduisent
-maintenant. Sur tout le jeu (26 084 programmes), 25 572 se traduisent hors
-du jeu.
+Le jeu contient environ 26 000 shaders ; une scène en utilise environ 2 000.
+
+```mermaid
+xychart-beta
+    title "Shaders traduits sur tout le jeu, par sorte (%)"
+    x-axis ["Sommets et pixels", "Calcul", "Mesh"]
+    y-axis "%" 95 --> 100
+    bar [99.7, 98.8, 99.97]
+```
+
+| Sorte | Traduits | Au total |
+|---|---|---|
+| Sommets et pixels | 14 201 | 14 247 |
+| Calcul | 2 650 | 2 682 |
+| Mesh | 8 762 | 8 765 |
+
+Débloqués les 24 et 25/11 : flaques (2), simulation d'eau (1), transparence
+(2), personnages à section ordonnée POPS (10, cheveux et cils), volumes
+d'eau (2, avec `VICTORY_WAVE_WIDE=1` seulement).
+
+Encore refusés dans la scène de la cellule :
 
 ```mermaid
 pie showData
-    title Shaders refusés en jeu (10)
-    "Calcul en vagues de 64 avec mémoire partagée (transparence)" : 4
-    "Section whole-wave (eau)" : 2
-    "Surfaces (interpolation, se dessinent mal si forcées)" : 2
-    "Échange de masque de lanes (ombres)" : 1
-    "Adresse d'un descripteur lue (simulation d'eau)" : 1
+    title Shaders refusés à la cellule (7)
+    "Groupes de plusieurs vagues de 64 (ombres, transparence)" : 3
+    "Surfaces (dessinent de travers si forcées)" : 2
+    "Volumes d'eau (VICTORY_WAVE_WIDE=1 seulement)" : 2
 ```
 
 À cela s'ajoute **1 pipeline refusé par le pilote NVIDIA** (« Paramètre
@@ -236,17 +287,23 @@ d'ombre et de tracé se traduisent, et le test rayon/boîte et rayon/triangle du
 matériel est émulé. La perte de la carte graphique de ces versions venait
 d'une forme « wave64 » des shaders de particules, qui met des barrières de
 groupe dans des branches et des boucles. Elle est maintenant active par défaut
-pour les programmes **sans boucle** seulement (`VICTORY_WAVE_WIDE=1` : partout,
-`0` : nulle part).
-Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails :
+pour les programmes **sans boucle**, et pour ceux dont les branches élargies
+sont toutes hors des boucles (`VICTORY_WAVE_WIDE=1` : partout, `0` : nulle
+part).
+Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Tant
+qu'il l'est, une **lumière de secours** est active : le test rayon/nœud
+répond « rien touché », ce qui éclaire les zones à l'ombre sans ombres de
+ray tracing (`VICTORY_RT_MISS=0` la coupe). Les cinématiques de nuit restent
+très sombres : leurs visages ne sont éclairés que par les contours. Détails :
 [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
 
 ## Ce qui reste à faire
 
-1. Mesurer le temps de chaque programme sur la carte (`VICTORY_GPU_TIMING=1`)
-   et réduire les plus coûteux (vitesse : objectif 15 images/s).
-2. Traduire les shaders encore refusés (descripteurs lus comme des données,
-   programmes wave64 avec boucles).
+1. Vitesse : réduire la passe des débuts de plan, les copies et la recopie,
+   et la mémoire de la carte ; garder sur le disque les textures préparées
+   d'une partie à l'autre si elles coûtent (objectif 10 images/s).
+2. Traduire les shaders encore refusés : groupes de plusieurs vagues de 64,
+   surfaces, volumes d'eau sans risque de blocage.
 3. Faire tourner le ray tracing dans le jeu.
 4. Réduire le travail de la carte graphique (vitesse).
 5. Réduire la mémoire : fenêtres à trous qui ne suivent pas une seule section
@@ -269,7 +326,11 @@ Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Détails
 | `VICTORY_PIPELINE_LOW_PRIORITY=1` | fabrique les pipelines en priorité basse, comme avant |
 | `VICTORY_SHADER_KEY_EXE=1` | cache des shaders lié à tout l'exécutable, comme avant |
 | `VICTORY_GPU_TIMING=1` | temps de chaque commande sur la carte, par programme |
+| `VICTORY_TEXTURE_SWEEP=0` | ne libère jamais les textures inutilisées |
 | `VICTORY_SKIP_PIPELINES=<hash>,...` | saute les dessins des programmes listés (pour comparer) |
+| `VICTORY_WIDE_TEXTURES=0` | prépare les textures sur un seul cœur, comme avant |
+| `VICTORY_WIDE_REFRESH=1` | copies de la mémoire du jeu sur plusieurs cœurs (en essai) |
+| `VICTORY_RELAY=2`, `VICTORY_LATE_WAIT=3` | envoi sans attendre la carte : plus lent sur un PC de 16 Go |
 | `VICTORY_MISSING_LOG=1` | `translate` : dit quelle instruction n'a pas de valeur et pourquoi |
 | `VICTORY_D3D12_DEBUG=1` | couche de débogage Direct3D (build `diag`), nomme les erreurs |
 | `VICTORY_BVH_BUILDER=1` | active la construction des structures de ray tracing |
