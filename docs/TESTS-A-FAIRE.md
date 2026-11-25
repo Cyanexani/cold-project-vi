@@ -58,6 +58,14 @@ beaucoup plus vite). Me donner le journal :
 target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute 2> logs\essai-vitesse.txt
 ```
 
+## Relais (VICTORY_RELAY=2, VICTORY_WIDE_BACK=1) : essayé, à ne pas utiliser
+
+Essai du 25/11 à la cellule : bien plus lent. La recopie vers le jeu passe
+de ~65 à 270-700 ms par image, les passes sur le tas de vues de ~36 à
+400-1 180 ms, et les menus tombent de 30 à 2-3 fps. Il reste éteint par
+défaut. Attention : une option posée avec `$env:` reste active dans la
+fenêtre PowerShell jusqu'à sa fermeture.
+
 ## 0 bis. Avant tout : laisser le cache se remplir
 
 Après une mise à jour du traducteur, le premier lancement recompile presque
