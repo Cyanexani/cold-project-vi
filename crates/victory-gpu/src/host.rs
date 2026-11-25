@@ -905,6 +905,130 @@ fn lazy_prelude() -> bool {
 #[cfg(feature = "diagnostics")]
 const STAMPS: u32 = 4096;
 
+/// With `VICTORY_GPU_TIMING`: two lists of one timestamp each, sent before
+/// and after every timed submission, and where the stamps are read back,
+/// so a whole submission is timed (preludes and our passes too, which no
+/// note covers). Each timed submission is waited for, so the two lists
+/// are recorded anew for each.
+#[cfg(feature = "diagnostics")]
+struct GroupStamps {
+    heap: ID3D12QueryHeap,
+    back: ID3D12Resource,
+    lists: [(ID3D12CommandAllocator, ID3D12GraphicsCommandList); 3],
+    /// Our own fence, to wait between the title's lists and our compare.
+    fence: ID3D12Fence,
+    value: std::sync::atomic::AtomicU64,
+    event: HANDLE,
+}
+
+// SAFETY: free-threaded D3D12 objects and an event handle, used under a lock.
+#[cfg(feature = "diagnostics")]
+unsafe impl Send for GroupStamps {}
+
+#[cfg(feature = "diagnostics")]
+impl GroupStamps {
+    fn new(device: &ID3D12Device) -> Option<Self> {
+        let readback = D3D12_HEAP_PROPERTIES { Type: D3D12_HEAP_TYPE_READBACK, ..Default::default() };
+        let desc = D3D12_RESOURCE_DESC {
+            Dimension: D3D12_RESOURCE_DIMENSION_BUFFER,
+            Width: 24,
+            Height: 1,
+            DepthOrArraySize: 1,
+            MipLevels: 1,
+            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            Layout: D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+            ..Default::default()
+        };
+        let mut heap: Option<ID3D12QueryHeap> = None;
+        let mut back: Option<ID3D12Resource> = None;
+        // SAFETY: plain object creation.
+        unsafe {
+            device
+                .CreateQueryHeap(
+                    &D3D12_QUERY_HEAP_DESC { Type: D3D12_QUERY_HEAP_TYPE_TIMESTAMP, Count: 3, NodeMask: 0 },
+                    &mut heap,
+                )
+                .ok()?;
+            device
+                .CreateCommittedResource(&readback, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, None, &mut back)
+                .ok()?;
+            let one = || -> Option<(ID3D12CommandAllocator, ID3D12GraphicsCommandList)> {
+                let allocator: ID3D12CommandAllocator = device.CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT).ok()?;
+                let list: ID3D12GraphicsCommandList =
+                    device.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, &allocator, None).ok()?;
+                list.Close().ok()?;
+                Some((allocator, list))
+            };
+            let fence: ID3D12Fence = device.CreateFence(0, D3D12_FENCE_FLAG_NONE).ok()?;
+            let event = CreateEventW(None, false, false, None).ok()?;
+            Some(Self {
+                heap: heap?,
+                back: back?,
+                lists: [one()?, one()?, one()?],
+                fence,
+                value: std::sync::atomic::AtomicU64::new(0),
+                event,
+            })
+        }
+    }
+
+    /// Records the three lists afresh (the last submission was waited for):
+    /// before the group, before our compare list (or after the group), after.
+    fn record(&self) -> Option<[ID3D12CommandList; 3]> {
+        let mut out = Vec::with_capacity(3);
+        for (i, (allocator, list)) in self.lists.iter().enumerate() {
+            // SAFETY: the lists' last submission finished (timed submissions are waited for).
+            unsafe {
+                allocator.Reset().ok()?;
+                list.Reset(allocator, None).ok()?;
+                // A wait for all earlier work first: NVIDIA writes a stamp
+                // when the command processor reaches it, so without it the
+                // stamp after the title's list comes before that list's end.
+                let barrier = D3D12_RESOURCE_BARRIER {
+                    Type: D3D12_RESOURCE_BARRIER_TYPE_UAV,
+                    Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                    Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                        UAV: std::mem::ManuallyDrop::new(D3D12_RESOURCE_UAV_BARRIER { pResource: std::mem::ManuallyDrop::new(None) }),
+                    },
+                };
+                list.ResourceBarrier(&[barrier]);
+                list.EndQuery(&self.heap, D3D12_QUERY_TYPE_TIMESTAMP, i as u32);
+                if i == 2 {
+                    list.ResolveQueryData(&self.heap, D3D12_QUERY_TYPE_TIMESTAMP, 0, 3, &self.back, 0);
+                }
+                list.Close().ok()?;
+            }
+            out.push(list.cast().ok()?);
+        }
+        out.try_into().ok()
+    }
+
+    /// Waits until `queue` has run everything sent to it so far.
+    fn drain(&self, queue: &ID3D12CommandQueue) {
+        let v = self.value.fetch_add(1, Ordering::Relaxed) + 1;
+        // SAFETY: our fence and event.
+        unsafe {
+            if queue.Signal(&self.fence, v).is_ok() && self.fence.SetEventOnCompletion(v, self.event).is_ok() {
+                WaitForSingleObject(self.event, INFINITE);
+            }
+        }
+    }
+
+    /// The three stamps, after the submission finished.
+    fn read(&self) -> Option<[u64; 3]> {
+        let mut data = std::ptr::null_mut();
+        let range = D3D12_RANGE { Begin: 0, End: 24 };
+        // SAFETY: a read-back buffer the finished list resolved into.
+        unsafe {
+            self.back.Map(0, Some(&range), Some(&mut data)).ok()?;
+            let s = std::slice::from_raw_parts(data.cast::<u64>(), 3);
+            let out = [s[0], s[1], s[2]];
+            self.back.Unmap(0, None);
+            Some(out)
+        }
+    }
+}
+
 /// A marker's text and the host range its command reads (diagnostics).
 #[cfg(feature = "diagnostics")]
 type Note = (String, Option<(u64, u64)>);
@@ -4622,9 +4746,45 @@ impl Host {
         #[cfg(not(feature = "diagnostics"))]
         let groups = [&lists[..]];
         submitting(2, runs.len());
+        #[cfg(feature = "diagnostics")]
+        static GROUP_STAMPS: OnceLock<Option<Mutex<GroupStamps>>> = OnceLock::new();
+        #[cfg(feature = "diagnostics")]
+        let group_stamps = if timing() {
+            GROUP_STAMPS.get_or_init(|| GroupStamps::new(&self.device).map(Mutex::new)).as_ref()
+        } else {
+            None
+        };
         for (i, group) in groups.iter().enumerate() {
             *submitted += 1;
             let started = std::time::Instant::now();
+            // With timing on: a stamp list before the group and one after.
+            #[cfg(feature = "diagnostics")]
+            let stamped: Option<Vec<Option<ID3D12CommandList>>> = group_stamps.and_then(|g| {
+                let [a, m, b] = g.lock().unwrap_or_else(|e| e.into_inner()).record()?;
+                // Our compare list, the last of the last group, after `m`.
+                let checked = i + 1 == groups.len() && card.as_ref().is_some_and(|c| c.check.is_some()) && !group.is_empty();
+                let (body, tail) = if checked { group.split_at(group.len() - 1) } else { (&group[..], &[][..]) };
+                Some([Some(a)].into_iter().chain(body.iter().cloned()).chain([Some(m)]).chain(tail.iter().cloned()).chain([Some(b)]).collect())
+            });
+            #[cfg(feature = "diagnostics")]
+            let group: &[Option<ID3D12CommandList>] = stamped.as_deref().unwrap_or(group);
+            // With timing on, the title's lists and stamp `m` go first and
+            // are waited for, so our compare after them is timed alone.
+            #[cfg(feature = "diagnostics")]
+            let group: &[Option<ID3D12CommandList>] = match (group_stamps, stamped.is_some()) {
+                (Some(g), true) if group.len() >= 3 => {
+                    // `m` goes with the second part: NVIDIA writes a stamp
+                    // when its command processor reaches it, before the
+                    // draws ahead of it are done (barriers or not).
+                    let tail = if i + 1 == groups.len() && card.as_ref().is_some_and(|c| c.check.is_some()) { 3 } else { 2 };
+                    let (head, rest) = group.split_at(group.len() - tail);
+                    // SAFETY: closed lists.
+                    unsafe { self.queue.ExecuteCommandLists(head) };
+                    g.lock().unwrap_or_else(|e| e.into_inner()).drain(&self.queue);
+                    rest
+                }
+                _ => group,
+            };
             // SAFETY: closed lists; the fence and event are ours.
             unsafe {
                 self.queue.ExecuteCommandLists(group);
@@ -4652,6 +4812,29 @@ impl Host {
                 let frequency = unsafe { self.queue.GetTimestampFrequency() }.unwrap_or(1);
                 for (ms, op) in runs[i].slowest(frequency, usize::MAX) {
                     crate::copystat::command_took(&op, ms);
+                }
+                if let Some([a, m, b]) = group_stamps.and_then(|g| g.lock().unwrap_or_else(|e| e.into_inner()).read()) {
+                    let us = |ticks: u64| ticks * 1_000_000 / frequency.max(1);
+                    let first = runs[i].first_stamp().map_or(0, |f| us(f.saturating_sub(a)));
+                    let whole = us(b.saturating_sub(a));
+                    let compare = us(b.saturating_sub(m));
+                    crate::copystat::group_took(whole, first, compare);
+                    // Where the card's time outside the noted commands goes.
+                    let noted: f64 = runs[i].slowest(frequency, usize::MAX).iter().map(|t| t.0).sum();
+                    let outside = whole as f64 / 1e3 - noted;
+                    if outside > 3.0 {
+                        let notes = runs[i].notes.lock().unwrap_or_else(|e| e.into_inner());
+                        tracing::info!(
+                            outside_ms = format!("{outside:.1}"),
+                            whole_ms = format!("{:.1}", whole as f64 / 1e3),
+                            first_ms = format!("{:.1}", first as f64 / 1e3),
+                            compare_ms = format!("{:.1}", compare as f64 / 1e3),
+                            commands = notes.len(),
+                            last = notes.last().map(|n| n.0.chars().take(160).collect::<String>()).unwrap_or_default(),
+                            check = (i + 1 == groups.len() && card.as_ref().is_some_and(|c| c.check.is_some())),
+                            "timed submission: card time outside its noted commands"
+                        );
+                    }
                 }
             }
             // A submission of one list was never named here (`groups.len()
@@ -4977,6 +5160,47 @@ impl HostList {
             .as_ref()
     }
 
+    /// With `VICTORY_GPU_TIMING=2`: a wait for every earlier command before
+    /// a timestamp, so each noted command's time is its whole time on the
+    /// card. NVIDIA writes a timestamp when the command processor reaches
+    /// it, not when earlier draws are done: run claude-timing3's list of 550
+    /// commands took 108 ms on the card and its noted commands 1.2 ms.
+    #[cfg(feature = "diagnostics")]
+    fn timing_fence(&self) {
+        static SERIAL: OnceLock<bool> = OnceLock::new();
+        if !*SERIAL.get_or_init(|| std::env::var("VICTORY_GPU_TIMING").is_ok_and(|v| v == "2")) {
+            return;
+        }
+        let barrier = D3D12_RESOURCE_BARRIER {
+            Type: D3D12_RESOURCE_BARRIER_TYPE_UAV,
+            Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+            Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                UAV: std::mem::ManuallyDrop::new(D3D12_RESOURCE_UAV_BARRIER { pResource: std::mem::ManuallyDrop::new(None) }),
+            },
+        };
+        // SAFETY: an open list; a UAV barrier on no resource.
+        unsafe { self.list.ResourceBarrier(&[barrier]) };
+    }
+
+    /// The stamp before the list's first noted command, if it has one
+    /// (diagnostics, timing on, after the list ran).
+    #[cfg(feature = "diagnostics")]
+    fn first_stamp(&self) -> Option<u64> {
+        if self.notes.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
+            return None;
+        }
+        let (_, back) = self.stamps()?;
+        let mut data = std::ptr::null_mut();
+        let range = D3D12_RANGE { Begin: 0, End: 8 };
+        // SAFETY: a read-back buffer the finished list resolved into.
+        unsafe {
+            back.Map(0, Some(&range), Some(&mut data)).ok()?;
+            let first = *data.cast::<u64>();
+            back.Unmap(0, None);
+            Some(first)
+        }
+    }
+
     /// The noted commands that took longest on the GPU, longest first, as
     /// (milliseconds, text) (diagnostics, timing on, after the list ran).
     #[cfg(feature = "diagnostics")]
@@ -5012,6 +5236,7 @@ impl HostList {
         #[cfg(feature = "diagnostics")]
         if let Some((heap, back)) = self.stamps() {
             let count = (self.notes.lock().unwrap_or_else(|e| e.into_inner()).len() as u32).min(STAMPS - 1);
+            self.timing_fence();
             // SAFETY: an open list, our heap and read-back buffer.
             unsafe {
                 self.list.EndQuery(heap, D3D12_QUERY_TYPE_TIMESTAMP, count);
@@ -5416,6 +5641,7 @@ impl HostList {
             let started = std::time::Instant::now();
             let at = self.notes.lock().unwrap_or_else(|e| e.into_inner()).len() as u32;
             if let Some((heap, _)) = self.stamps() && at < STAMPS - 1 {
+                self.timing_fence();
                 // SAFETY: an open list and our query heap.
                 unsafe { self.list.EndQuery(heap, D3D12_QUERY_TYPE_TIMESTAMP, at) };
             }

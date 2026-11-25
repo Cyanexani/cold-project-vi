@@ -178,6 +178,19 @@ static COMMANDS_BY_WORK: Mutex<Option<HashMap<String, (u64, u64, u64)>>> = Mutex
 
 /// A command took `ms` on the card (timing run). `op` is its note: the
 /// kind and size first, then the pipeline in brackets, then what it binds.
+/// With `VICTORY_GPU_TIMING`: whole submissions timed, their microseconds
+/// on the card, and the microseconds before their first noted command.
+pub(crate) static GROUPS_TIMED: [AtomicU64; 4] = [const { AtomicU64::new(0) }; 4];
+
+/// A whole submission took `us` on the card, `first` of it before its first
+/// noted command (`VICTORY_GPU_TIMING`).
+pub(crate) fn group_took(us: u64, first: u64, compare: u64) {
+    GROUPS_TIMED[3].fetch_add(compare, Relaxed);
+    GROUPS_TIMED[0].fetch_add(1, Relaxed);
+    GROUPS_TIMED[1].fetch_add(us, Relaxed);
+    GROUPS_TIMED[2].fetch_add(first, Relaxed);
+}
+
 pub(crate) fn command_took(op: &str, ms: f64) {
     let us = (ms * 1e3) as u64;
     let mut by = COMMANDS_BY_WORK.lock().unwrap_or_else(|e| e.into_inner());
@@ -1260,6 +1273,19 @@ pub(crate) fn log(frames: f64) {
             by.len(),
             all as f64 / 1e3 / frames,
             text.join(", ")
+        );
+        // Whole submissions, timed from a stamp before their first list to
+        // one after their last: what the noted commands leave out (preludes,
+        // the commands before a list's first note, our compare passes).
+        let [n, us, first, compare] = std::array::from_fn(|i| GROUPS_TIMED[i].swap(0, Relaxed));
+        tracing::info!(
+            "  the card's time by whole submission (timing run): {:.1} ms a frame in {:.0} submissions; \
+             {:.1} ms of it before the first noted command of each, {:.1} ms in our compare passes after them; \n             the noted commands {:.1} ms",
+            us as f64 / 1e3 / frames,
+            n as f64 / frames,
+            first as f64 / 1e3 / frames,
+            compare as f64 / 1e3 / frames,
+            all as f64 / 1e3 / frames
         );
     }
     for (what, (n, us, longest)) in by.into_iter().take(40) {
