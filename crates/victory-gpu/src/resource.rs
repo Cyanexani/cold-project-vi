@@ -1662,9 +1662,12 @@ pub(crate) fn let_go_idle() {
     // queue stood still 20-25 s each time (991 of some 4,500 frames' passes made
     // nothing), until copies idle for 5 s went. From 85% they go after 1 s now, and
     // from 80% after 5 s, so that the card seldom reaches the line.
+    // The PC's free memory: below 2 GB and 1 GB the same run made 35,300 copies
+    // again (24,000 without the rule); with a 24 GB page file the PC no longer froze,
+    // so the lines are 1 GB and 512 MB.
     let (idle_ms, idle_frames): (u64, u64) = match (share, free_mb) {
-        (85.., _) | (_, ..1024) => (1_000, 2),
-        (80..85, _) | (_, 1024..2048) => (5_000, 4),
+        (85.., _) | (_, ..512) => (1_000, 2),
+        (80..85, _) | (_, 512..1024) => (5_000, 4),
         _ => (30_000, 20),
     };
     // For the trail (`crate::host::trail`): how many went, their bytes,
