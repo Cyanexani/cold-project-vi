@@ -5758,6 +5758,16 @@ impl Meter {
                      hold still (the runtime remapping it); the rest is reading, hashing and detiling"
                 );
             }
+            let disk = crate::texture::DISK.each_ref().map(|d| d.load(Ordering::Relaxed));
+            if disk[0] + disk[2] > 0 {
+                tracing::info!(
+                    "detiled textures on disk since the start: {} read ({} MB), {} written ({} MB)",
+                    disk[0],
+                    disk[1] >> 20,
+                    disk[2],
+                    disk[3] >> 20
+                );
+            }
             let [through, left] = [0, 1].map(|i| crate::texture::UNLOCKED[i].swap(0, Ordering::Relaxed) as f64 / frames);
             if through + left > 0.0 {
                 tracing::info!(

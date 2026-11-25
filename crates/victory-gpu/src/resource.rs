@@ -1357,7 +1357,7 @@ pub(crate) fn host_made<'a>(
 /// Whether more host copies of textures the title fills may be made for
 /// shaders that pick textures by index (`draw.rs` `heap_textures`): always
 /// up to `FLOOR` bytes of them, beyond that while the card's memory in use
-/// by this process is under nine tenths of the budget the system gives it
+/// by this process is under 85% of the budget the system gives it
 /// (`VICTORY_TEXTURE_BUDGET_MB` sets a limit on those copies' bytes
 /// instead). Past the budget the system moves the card's memory into the
 /// PC's, which ended runs 20 and 24.
@@ -1379,7 +1379,9 @@ pub(crate) fn room() -> bool {
         return true;
     }
     match crate::host::host().and_then(|h| h.video_memory()) {
-        Some([budget, used, ..]) => used < budget / 10 * 9,
+        // Under 85% (it was 90%): past the budget the system moves the card's memory into
+        // the PC's, which a 16 GB PC then pages (run of 2026-11-25: 5.2 GB moved).
+        Some([budget, used, ..]) => used < budget / 20 * 17,
         None => filled < WITHOUT_BUDGET,
     }
 }
@@ -1414,13 +1416,13 @@ pub(crate) fn let_go_idle() {
     if !*ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_SWEEP").is_none_or(|v| v != "0")) {
         return;
     }
-    // Idle for 5 s and 4 frames; with the card's memory past nine tenths of its budget,
+    // Idle for 5 s and 4 frames; with the card's memory past 80% of its budget,
     // 1 s and 2 frames: at 2 frames a second the card ran at 10.0 of 11.0 GB with 5.2 GB
     // of it moved into a 16 GB PC's memory, which then paged (run of 2026-11-25, 7,162
     // page faults a frame). The other conditions stay: nothing else holds the copy.
     let tight = crate::host::host()
         .and_then(|h| h.video_memory())
-        .is_some_and(|[budget, used, ..]| used >= budget / 10 * 9);
+        .is_some_and(|[budget, used, ..]| used >= budget / 5 * 4);
     let (idle_ms, idle_frames): (u64, u64) = if tight { (1_000, 2) } else { (5_000, 4) };
     // For the trail (`crate::host::trail`): how many went, their bytes,
     // and the first one.

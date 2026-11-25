@@ -380,6 +380,33 @@ fn with_title<R>(memory: *const u8, size: usize, f: impl FnOnce(&[u8]) -> R) -> 
     })
 }
 
+/// The folder of detiled textures kept on disk (`VICTORY_TEXTURE_DISK=1`; off by default):
+/// a texture's staging contents, by the hash of its memory, its console layout and the
+/// host's footprints, read back the next time the same bytes are detiled, in this run or
+/// a later one. Set by [`use_texture_cache`].
+/// shortcut: an experiment. The texture's bytes are in memory already, so a read from disk
+/// pays only where detiling costs more than reading the file; the writes are capped at
+/// `DISK_MAX` a run and nothing is ever deleted (delete the folder to free the space).
+static DISK_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+/// Textures smaller than this are detiled as before.
+const DISK_MIN: usize = 256 << 10;
+/// Bytes written to disk in a run, at most.
+const DISK_MAX: u64 = 8 << 30;
+/// Since the start: textures read from disk and their bytes, written and their bytes.
+pub(crate) static DISK: [std::sync::atomic::AtomicU64; 4] = [const { std::sync::atomic::AtomicU64::new(0) }; 4];
+
+/// Keeps detiled textures in `dir` if `VICTORY_TEXTURE_DISK=1`.
+pub fn use_texture_cache(dir: std::path::PathBuf) {
+    if std::env::var_os("VICTORY_TEXTURE_DISK").is_some_and(|v| v == "1") {
+        tracing::info!(dir = %dir.display(), "detiled textures kept on disk (VICTORY_TEXTURE_DISK=1)");
+        let _ = DISK_DIR.set(dir);
+    }
+}
+
+fn disk_dir() -> Option<&'static std::path::Path> {
+    DISK_DIR.get().map(std::path::PathBuf::as_path)
+}
+
 /// Staging buffers alive (also those only a list still holds) and their
 /// bytes.
 static STAGED: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
@@ -400,7 +427,8 @@ impl Drop for Staging {
 /// and the pass over the heap made and dropped one per texture, 192 MB a frame of them at
 /// every cut, its 250 ms a frame of making textures (run of 2026-11-25, a 16 GB PC whose
 /// memory was full). At most `POOL_MB` of them are kept, the oldest given up first.
-/// `VICTORY_STAGING_POOL_MB=0`: none kept, as before (default 384).
+/// `VICTORY_STAGING_POOL_MB=0`: none kept, as before (default 128: the PC memory is
+/// what runs short).
 struct Pooled(ID3D12Resource, usize);
 // SAFETY: an upload buffer and its mapping, used by one texture at a time.
 unsafe impl Send for Pooled {}
@@ -416,7 +444,7 @@ fn pool_limit() -> u64 {
         std::env::var("VICTORY_STAGING_POOL_MB")
             .ok()
             .and_then(|v| v.trim().parse::<u64>().ok())
-            .unwrap_or(384)
+            .unwrap_or(128)
             << 20
     })
 }
@@ -696,7 +724,7 @@ impl Staging {
             // big pools is too slow to ask page by page.
             with_read(size, |read| {
                 crate::host::copy_mapped(read.as_mut_ptr(), self.memory, size, false);
-                self.detile(read);
+                self.detile(read, None);
             });
             #[cfg(feature = "diagnostics")]
             crate::copystat::add(crate::copystat::C::TexWatched, size as u64);
@@ -766,7 +794,7 @@ impl Staging {
                 if read.iter().all(|&b| b == 0) {
                     return false;
                 }
-                self.detile(read);
+                self.detile(read, Some(hash));
                 true
             });
             #[cfg(feature = "diagnostics")]
@@ -785,7 +813,7 @@ impl Staging {
                     return size;
                 }
                 last.hash = Some(hash);
-                self.detile(tiled);
+                self.detile(tiled, Some(hash));
                 #[cfg(feature = "diagnostics")]
                 crate::copystat::add(crate::copystat::C::TexChanged, size as u64);
                 size
@@ -801,7 +829,7 @@ impl Staging {
             return size;
         }
         last.hash = Some(hash);
-        self.detile(tiled);
+        self.detile(tiled, Some(hash));
         #[cfg(feature = "diagnostics")]
         crate::copystat::add(crate::copystat::C::TexChanged, size as u64);
         size
@@ -822,7 +850,7 @@ impl Staging {
             let hash = blake3::hash(read);
             if last.hash != Some(hash) {
                 last.hash = Some(hash);
-                self.detile(read);
+                self.detile(read, Some(hash));
             }
             true
         });
@@ -836,8 +864,66 @@ impl Staging {
         }
     }
 
+    /// Detiles `tiled` (the texture's memory, whose hash is `hash` if the caller took it)
+    /// into the staging buffer, or reads what an earlier detile of the same bytes left on
+    /// disk ([`disk_dir`]); a detile is written there for the next time.
+    fn detile(&self, tiled: &[u8], hash: Option<blake3::Hash>) {
+        let Some(dir) = disk_dir().filter(|_| tiled.len() >= DISK_MIN) else {
+            return self.detile_now(tiled);
+        };
+        use std::sync::atomic::Ordering::Relaxed;
+        let used = self.used_bytes();
+        let key = {
+            let mut h = blake3::Hasher::new();
+            h.update(hash.unwrap_or_else(|| blake3::hash(tiled)).as_bytes());
+            h.update(format!("{:?}", self.layout.desc).as_bytes());
+            for (f, rows) in self.footprints.iter().zip(&self.rows) {
+                let d = f.Footprint;
+                for x in [f.Offset, u64::from(d.RowPitch), u64::from(*rows), u64::from(d.Width), u64::from(d.Height), u64::from(d.Depth), u64::from(d.Format.0 as u32)] {
+                    h.update(&x.to_le_bytes());
+                }
+            }
+            h.finalize().to_hex()[..32].to_owned()
+        };
+        let path = dir.join(&key[..2]).join(&key);
+        // SAFETY: the staging buffer's mapping, at least `used` bytes, written only here
+        // (under the staging's lock, see `refresh_timed`).
+        let linear = unsafe { std::slice::from_raw_parts_mut(self.data, used) };
+        if let Ok(mut file) = std::fs::File::open(&path)
+            && file.metadata().is_ok_and(|m| m.len() == used as u64)
+            && std::io::Read::read_exact(&mut file, linear).is_ok()
+        {
+            self.dirty.store(true, Relaxed);
+            DISK[0].fetch_add(1, Relaxed);
+            DISK[1].fetch_add(used as u64, Relaxed);
+            return;
+        }
+        self.detile_now(tiled);
+        if DISK[3].load(Relaxed) + used as u64 > DISK_MAX {
+            return;
+        }
+        let _ = std::fs::create_dir_all(path.parent().unwrap_or(dir));
+        let tmp = path.with_extension("tmp");
+        if std::fs::write(&tmp, &linear[..]).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
+            DISK[2].fetch_add(1, Relaxed);
+            DISK[3].fetch_add(used as u64, Relaxed);
+        } else {
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
+    /// The bytes of the staging buffer its subresources take.
+    fn used_bytes(&self) -> usize {
+        self.footprints
+            .iter()
+            .zip(&self.rows)
+            .map(|(f, &rows)| f.Offset as usize + f.Footprint.RowPitch as usize * rows as usize * f.Footprint.Depth as usize)
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Detiles `tiled` (the texture's memory) into the staging buffer.
-    fn detile(&self, tiled: &[u8]) {
+    fn detile_now(&self, tiled: &[u8]) {
         self.dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         #[cfg(feature = "diagnostics")]
         if tiled.iter().all(|&b| b == 0) {

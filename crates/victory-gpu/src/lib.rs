@@ -55,6 +55,10 @@ mod shadow;
 pub mod signature;
 #[cfg(windows)]
 mod texture;
+/// Detiled textures kept on disk (`VICTORY_TEXTURE_DISK=1`).
+pub mod texture_cache {
+    pub use crate::texture::use_texture_cache;
+}
 #[cfg(windows)]
 mod watch;
 

@@ -108,6 +108,23 @@ l'essai du 25/11). Ils sont maintenant gardés (384 Mo au plus) et réutilisés.
 texture d'un autre objet). Ancien comportement :
 `$env:VICTORY_STAGING_POOL_MB = '0'`.
 
+**Cache disque des textures (en essai)** : `$env:VICTORY_TEXTURE_DISK = '1'`.
+Les textures détuilées sont écrites dans
+`%LOCALAPPDATA%ictory\cache	extures` (8 Go au plus par partie) et relues
+au lancement suivant. Le premier lancement écrit (plus lent), le deuxième
+relit : c'est lui qu'il faut comparer. Le journal dit « detiled textures on
+disk since the start: N read, M written ».
+
+**Moins de copies de la mémoire du jeu (en essai)** :
+`$env:VICTORY_WINDOW_KB = '1024'` et `$env:VICTORY_WINDOW_TAILS = '1'`. Les
+zones de mémoire hors des tampons sont copiées par morceaux de 1 Mo au lieu
+de 4 Mo : jusqu'à environ 1,5 Go de RAM en moins. À regarder : objets qui
+disparaissent ou clignotent.
+
+**Mémoire de la carte** : les nouvelles textures attendent dès 85 % du
+budget de la carte (avant : 90 %), et les textures inutilisées partent
+vite dès 80 %. La réserve de tampons recyclés est à 128 Mo.
+
 **Textures sur plusieurs cœurs** : `VICTORY_WIDE_TEXTURES=0` pour comparer.
 
 **Volumes d'eau** : les 2 programmes CS_TransmissionVolumetrics (somme
