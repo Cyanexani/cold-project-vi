@@ -1760,6 +1760,11 @@ impl Shadow {
             return;
         }
         let len = len.min(self.left(address));
+        // Testing switch: only the title's read-back buffers are copied back
+        // (`crate::readback`); the rest stays on the card.
+        if !crate::readback::copy_back(address, len) {
+            return;
+        }
         list.defer_gpu_write(self, address as usize, len as usize);
     }
 

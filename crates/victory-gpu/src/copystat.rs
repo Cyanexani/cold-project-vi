@@ -786,6 +786,16 @@ fn log_memory() {
     {
         let up: Vec<u64> = crate::host::UPLOAD_MADE.iter().map(|a| a.load(Relaxed)).collect();
         let pool: Vec<u64> = crate::texture::POOL_USE.iter().map(|a| a.load(Relaxed)).collect();
+        if crate::readback::enabled() {
+            let n: Vec<u64> = crate::readback::COUNTS.iter().map(|a| a.load(Relaxed)).collect();
+            tracing::info!(
+                "copy back of shader writes since the start (VICTORY_COPY_BACK_ONLY_READBACK=1): {} ranges copied back, {} kept on the card ({:.0} MB); {} read-back buffers alive",
+                n[0],
+                n[1],
+                n[2] as f64 / 1048576.0,
+                crate::readback::tagged(),
+            );
+        }
         tracing::info!(
             "upload buffers since the start: {:.0} ms making and mapping them; {} for one copy of a list, {} large scratch of a list;              texture staging buffers: {} taken from the pool, {} made anew (VICTORY_STAGING_POOL_MB)",
             up[0] as f64 / 1000.0,

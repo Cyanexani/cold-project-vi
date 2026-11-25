@@ -70,6 +70,14 @@ Ce qui change sans rien régler :
   `$env:VICTORY_STALE_TEXTURES = 'overlap'` (l'ancienne règle) et
   `$env:VICTORY_REUPLOAD_WHEN_FULL = '0'`. Trace des murs :
   `$env:VICTORY_WALLS_TRACE = '1'`.
+- **Recopie seulement des tampons relus (en essai, 26/11)** :
+  `$env:VICTORY_COPY_BACK_ONLY_READBACK = '1'`. Ce que la carte écrit n'est
+  recopié dans la mémoire du jeu que pour les tampons que le jeu relit
+  (repérés par sa fonction de création, adresse 0x1d40f90, vérifiée sur cet
+  exécutable : 22 appels). Reprise de ScarlettPort. À regarder : la colonne
+  « copying back » du journal (environ 120 ms par image avant) et le fps.
+  Si quelque chose casse (lumière, eau, particules, mise au point, objets
+  qui disparaissent), c'est ce réglage : le retirer.
 - **Copie de tampons sur la carte** : elle ne tourne plus avec
   `VICTORY_WINDOW_TAILS` / `VICTORY_WINDOW_KB` (les murs disparaissaient
   à la fenêtre). `$env:VICTORY_GPU_BUFFER_COPIES = '0'` la coupe partout.

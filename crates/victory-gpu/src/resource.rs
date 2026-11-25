@@ -2040,6 +2040,9 @@ fn hand_out_resource(
     if desc.dimension == BUFFER {
         let at = std::ptr::from_ref::<Resource>(&resource) as usize;
         crate::shadow::register(at, resource.data() as u64, desc.width);
+        if crate::readback::creating_readback() {
+            crate::readback::tag(resource.data() as u64, desc.width);
+        }
     }
     object::hand_out(RESOURCE, resource, iid, &RESOURCE_IIDS, out)
 }
@@ -2097,6 +2100,7 @@ impl Drop for Resource {
                 std::ptr::from_ref::<Resource>(self) as usize,
                 self.data() as u64,
             );
+            crate::readback::untag(self.data() as u64);
         }
     }
 }

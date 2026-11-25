@@ -850,7 +850,9 @@ fn gpu_copy(list: &crate::host::HostList, to: u64, from: u64, len: u64) -> bool 
         return false;
     }
     let Some(source) = crate::shadow::find_any(from, len) else { return false };
-    if source.in_place() || !source.pending_over(from, len) {
+    // With only read-back buffers copied back (`crate::readback`), what
+    // shaders wrote elsewhere is only on the card: copied there whatever.
+    if source.in_place() || !(source.pending_over(from, len) || crate::readback::enabled()) {
         return false;
     }
     let Some(target) = crate::shadow::find_any(to, len) else { return false };
