@@ -52,7 +52,7 @@ preuve (une vidéo).
 | Jouable (on dirige un personnage) | 50 | ✅ Lucia bouge dans le prologue |
 | Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
 | Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
-| Vitesse (10 points : images/s ÷ 30) | environ 0,7 | ❌ 2 à 2,4 images/s |
+| Vitesse (10 points : images/s ÷ 30) | environ 0,8 | ❌ environ 2,5 images/s |
 | Stabilité (10 points) | environ 2,5 | ⚠️ pas encore mesurée sur une longue partie |
 
 ### Détail
@@ -64,9 +64,9 @@ preuve (une vidéo).
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ✅ on dirige Lucia ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
-| Images par seconde dans le monde | ❌ 2 à 2,4 (environ 420 ms par image) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
+| Images par seconde dans le monde | ❌ environ 2,5 (400 ms par image) sur RTX 3060 et 16 Go de RAM, carte occupée à 79 % ; 30 dans les menus |
 | Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
-| Stabilité | ⚠️ essais 8 et 9 (25/11) : 3 à 5 minutes sans plantage. Quand le PC n'a plus de mémoire à engager, le jeu se ferme sans rapport : agrandir le fichier d'échange (40 Go) l'évite. Un débordement de pile est maintenant rapporté au lieu de fermer la fenêtre en silence |
+| Stabilité | ⚠️ essai 11 (25/11) : 10 minutes sans plantage. Quand le PC n'a plus de mémoire à engager, le jeu se ferme sans rapport : un fichier d'échange de 32 Go au moins l'évite. Un débordement de pile est maintenant rapporté au lieu de fermer la fenêtre en silence |
 
 ```mermaid
 pie showData
@@ -85,6 +85,25 @@ target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute
 
 Le chemin du jeu peut aussi être mis dans `victory.toml` (modèle :
 `victory.example.toml`).
+
+### Réglages conseillés (PC de 16 Go)
+
+- **Mode Series S** : ajouter `--console series-s` à la commande. Le jeu se
+  croit sur Xbox Series S et choisit ses réglages plus légers (résolution,
+  budgets de mémoire) : c'est le mode utilisé pour les essais récents.
+
+  ```powershell
+  target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute --console series-s
+  ```
+
+- **Fichier d'échange de 32 Go au moins** (Paramètres système avancés →
+  Performances → Mémoire virtuelle). Le jeu engage environ 21 Go : avec le
+  fichier d'échange par défaut, Windows n'a plus de mémoire à engager et le
+  jeu se ferme sans rapport.
+- **Lumière de secours** : active par défaut (`VICTORY_RT_MISS`), tant que le
+  ray tracing du jeu ne tourne pas. Elle éclaire les zones à l'ombre ;
+  `VICTORY_RT_MISS=0` la coupe pour comparer.
+- À l'écran titre, appuyer sur **A** (Entrée au clavier).
 
 Les options de vitesse d'avant (`VICTORY_TEXTURE_NO_WAIT`,
 `VICTORY_CARD_BUFFERS_MIN_MB`, `VICTORY_CARD_BUFFERS_MB`) sont maintenant
@@ -364,13 +383,17 @@ très sombres : leurs visages ne sont éclairés que par les contours. Détails 
 
 ## Ce qui reste à faire
 
-1. Vitesse : réduire la passe des débuts de plan, les copies et la recopie,
-   et la mémoire de la carte ; garder sur le disque les textures préparées
-   d'une partie à l'autre si elles coûtent (objectif 15 images/s).
-2. Traduire les shaders encore refusés : groupes de plusieurs vagues de 64,
-   surfaces, volumes d'eau sans risque de blocage.
-3. Faire tourner le ray tracing dans le jeu.
-4. Réduire le travail de la carte graphique (vitesse).
+1. Vitesse (de 2,5 à 15 images/s) : la carte est maintenant la limite
+   (occupée à 79 %). Baisser la résolution des ombres en cascade, accélérer
+   les programmes de 64 fils sur une carte à 32 voies, réduire nos propres
+   passes (environ 2 160 bornages, 700 barrières et 350 passes d'empreinte
+   par image), reprendre la recopie de VIctory qui ne compare que les pages
+   écrites (`cd94d35`).
+2. Traduire les shaders encore refusés (157 dans l'essai 11) : groupes de
+   plusieurs vagues de 64 qui partagent leur mémoire, surfaces, volumes d'eau.
+3. Faire tourner le ray tracing dans le jeu (pour l'instant, lumière de
+   secours seulement).
+4. Stabilité : tenir une longue partie (l'essai 11 a tenu 10 minutes).
 5. Réduire la mémoire (pour ne plus échanger avec le disque sur 16 Go) : fenêtres à trous qui ne suivent pas une seule section
    (2,6 Go encore copiés), textures côté PC (3 à 4,5 Go), buffers partagés
    avec la carte (environ 7 Go réservés).
