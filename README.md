@@ -58,10 +58,10 @@ rendu, la vitesse et la stabilité se partagent les 50 derniers points.
 | Cinématique d'intro | ⚠️ se joue en entier, mais le logo Rockstar est mal éclairé |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ⚠️ s'affiche : personnages, textures, ciel, extérieur au soleil |
-| Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore) |
+| Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
 | Images par seconde dans le monde | ❌ 2 à 2,4 (environ 420 ms par image) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
-| Mémoire | ❌ 24 Go réservés, 5,8 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; carte à 10 Go sur 11, 5,2 Go débordent dans la RAM |
-| Stabilité | ⚠️ depuis que les copies de textures suivent la mémoire que le PC peut encore engager, plus de mort silencieuse par manque de mémoire ; la marge reste mince sur 16 Go |
+| Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
+| Stabilité | ⚠️ essais 8 et 9 (25/11) : 3 à 5 minutes sans plantage. Quand le PC n'a plus de mémoire à engager, le jeu se ferme sans rapport : agrandir le fichier d'échange (40 Go) l'évite. Un débordement de pile est maintenant rapporté au lieu de fermer la fenêtre en silence |
 
 ```mermaid
 pie showData
@@ -123,6 +123,25 @@ xychart-beta
 | Carte graphique | 390 à 440 ms | 300 à 340 ms |
 | Préparation (copies de la mémoire du jeu) | 230 à 280 ms | 130 à 160 ms |
 | Recopie vers le jeu | 90 à 120 ms | 57 à 70 ms |
+
+### Profil du 25/11 (essai 9, dans le monde)
+
+2 à 2,5 images/s, 400 à 540 ms par image : carte graphique 100 à 220 ms,
+préparation 150 à 480 ms, recopie vers le jeu environ 300 ms (sur un autre
+fil, en parallèle). Le temps actif des processeurs se partage ainsi :
+
+| Qui | Part |
+|-----|------|
+| Le code du jeu lui-même | 58 % |
+| Copies de la mémoire du jeu vers ses copies côté PC (`Shadow::update`) | 14 % |
+| Recopie de ce que la carte a écrit (`relay_land`) | 10 % |
+| Surveillance des écritures (`watch::writes`) | 3,5 % |
+| Lecture des fichiers du jeu, son | environ 5 % |
+
+Nos copies passent presque toutes par le noyau de Windows, qui va chercher
+sur le disque les pages échangées : la mémoire freine aussi le processeur.
+Prochaine mesure : `VICTORY_GPU_TIMING=1`, pour savoir quelles commandes
+occupent la carte. Objectif : 15 images/s, soit moins de 66 ms par image.
 
 ### Les modes essayés pour que la carte n'attende plus
 
@@ -342,12 +361,12 @@ très sombres : leurs visages ne sont éclairés que par les contours. Détails 
 
 1. Vitesse : réduire la passe des débuts de plan, les copies et la recopie,
    et la mémoire de la carte ; garder sur le disque les textures préparées
-   d'une partie à l'autre si elles coûtent (objectif 10 images/s).
+   d'une partie à l'autre si elles coûtent (objectif 15 images/s).
 2. Traduire les shaders encore refusés : groupes de plusieurs vagues de 64,
    surfaces, volumes d'eau sans risque de blocage.
 3. Faire tourner le ray tracing dans le jeu.
 4. Réduire le travail de la carte graphique (vitesse).
-5. Réduire la mémoire : fenêtres à trous qui ne suivent pas une seule section
+5. Réduire la mémoire (pour ne plus échanger avec le disque sur 16 Go) : fenêtres à trous qui ne suivent pas une seule section
    (2,6 Go encore copiés), textures côté PC (3 à 4,5 Go), buffers partagés
    avec la carte (environ 7 Go réservés).
 6. Essayer en jeu le reste de [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
