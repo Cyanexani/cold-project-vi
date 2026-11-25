@@ -2839,7 +2839,10 @@ impl State {
                 .push((std::ptr::from_ref(heap) as usize, first, n));
             // The title's own slots of this table: what the draw reads of
             // them it brings up to date here, in the dynamic slots.
-            let title_first = heap.index(table).filter(|first| first + n <= host.count());
+            // Title slots up to the title's count: with a heap map the per-draw
+            // tables lie past the host's own slots (run essai-rt-12: none of
+            // the 99,000 records a frame the heap sync mirrored was stamped).
+            let title_first = heap.index(table).filter(|first| first + n <= host.title_count());
             // The whole range: a shader may index past the entries its
             // used-resource list names (descriptor arrays).
             for k in 0..n {
