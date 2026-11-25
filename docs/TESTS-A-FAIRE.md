@@ -70,7 +70,7 @@ Ce qui change sans rien régler :
   `$env:VICTORY_STALE_TEXTURES = 'overlap'` (l'ancienne règle) et
   `$env:VICTORY_REUPLOAD_WHEN_FULL = '0'`. Trace des murs :
   `$env:VICTORY_WALLS_TRACE = '1'`.
-- **Recopie seulement des tampons relus (en essai, 26/11)** :
+- **Recopie seulement des tampons relus (essayé le 26/11 : plus de 3D, à ne pas utiliser)** : nos copies sont remises à jour depuis la mémoire du jeu à chaque envoi, donc ce que la carte écrit sans être recopié est perdu à l'envoi suivant ; il faudrait d'abord garder ces écritures sur la carte entre deux envois. Ancienne description :
   `$env:VICTORY_COPY_BACK_ONLY_READBACK = '1'`. Ce que la carte écrit n'est
   recopié dans la mémoire du jeu que pour les tampons que le jeu relit
   (repérés par sa fonction de création, adresse 0x1d40f90, vérifiée sur cet
