@@ -591,6 +591,38 @@ pub(crate) struct Plane {
     token: u64,
     count: u32,
     resources: *const This,
+    /// The rest of a plane's description (not read yet): a Series S run
+    /// showed planes 72 bytes apart.
+    _rest: [u64; 6],
+}
+
+/// Which plane is shown alone (`VICTORY_PRESENT_PLANE=<n>`), for looking at
+/// one plane; by default the first plane is shown with the second drawn
+/// over it ([`crate::compose`]). A Series S title presents two: the game at
+/// 1920x1080 and its interface at 3840x2160 (the intro's video is there);
+/// the first alone stayed black through the intro.
+#[cfg(windows)]
+fn only_plane(planes: u32) -> Option<u32> {
+    static PLANE: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    let plane = *PLANE.get_or_init(|| std::env::var("VICTORY_PRESENT_PLANE").ok().and_then(|v| v.trim().parse().ok()));
+    plane.map(|p| p.min(planes.saturating_sub(1)))
+}
+
+/// The host texture of plane `index`'s first resource, and the title
+/// resource.
+#[cfg(windows)]
+fn plane_texture<'a>(
+    planes: *const Plane,
+    index: u32,
+) -> Option<(&'a windows::Win32::Graphics::Direct3D12::ID3D12Resource, This)> {
+    // SAFETY: the caller checked `index` against the title's plane count.
+    let plane = unsafe { planes.add(index as usize).as_ref() }?;
+    if plane.count == 0 || plane.resources.is_null() {
+        return None;
+    }
+    // SAFETY: the plane lists `count` resources.
+    let resource = unsafe { *plane.resources };
+    Some((crate::resource::host_resource(resource)?, resource))
 }
 /// Submission tagged with the frame it belongs to `(count, lists, frame
 /// token, flags)`; frames are paced elsewhere, so it runs as a plain one.
@@ -807,6 +839,48 @@ extern "system" fn present(
             tracing::info!(hits, misses, "shaders from the cache and translated so far");
         }
     }
+    // Diagnostics: what the title presents (planes, their words, the first
+    // resources' sizes), for the first frames and every 256th; a Series S
+    // run showed black with only the first plane's first resource shown.
+    #[cfg(all(windows, feature = "diagnostics"))]
+    if frame <= 4 || frame.is_multiple_of(256) {
+        let words = |at: *const u8, n: usize| -> Vec<u64> {
+            let mut bytes = vec![0u8; n * 8];
+            if at.is_null() || !crate::host::read_into(at, &mut bytes) {
+                return Vec::new();
+            }
+            bytes.as_chunks::<8>().0.iter().map(|c| u64::from_le_bytes(*c)).collect()
+        };
+        let plane_words = words(plane_parameters.cast(), 24);
+        let parameter_words = words(_parameters, 16);
+        let mut shown = Vec::new();
+        for p in 0..planes.min(4) as usize {
+            // SAFETY: the title passes `planes` plane descriptions.
+            let Some(plane) = (unsafe { plane_parameters.add(p).as_ref() }) else { break };
+            if plane.resources.is_null() {
+                continue;
+            }
+            for i in 0..plane.count.min(4) as usize {
+                // SAFETY: the plane lists `count` resources.
+                let r = unsafe { *plane.resources.add(i) };
+                if let Some(t) = crate::resource::host_resource(r) {
+                    // SAFETY: a live host resource.
+                    let d = unsafe { t.GetDesc() };
+                    shown.push(format!("plane {p}: {}x{} format {}", d.Width, d.Height, d.Format.0));
+                } else {
+                    shown.push(format!("plane {p}: no host resource"));
+                }
+            }
+        }
+        tracing::info!(
+            frame,
+            planes,
+            plane_words = format_args!("{plane_words:x?}"),
+            parameter_words = format_args!("{parameter_words:x?}"),
+            resources = format_args!("{shown:?}"),
+            "present: what the title presents"
+        );
+    }
     #[cfg(all(windows, feature = "diagnostics"))]
     {
         crate::capture::frame_drew(frame, crate::draw::drawn());
@@ -816,20 +890,28 @@ extern "system" fn present(
     }
     #[cfg(windows)]
     if planes > 0
-        // SAFETY: the title passes `planes` plane descriptions.
-        && let Some(plane) = unsafe { plane_parameters.as_ref() }
-        && plane.count > 0
-        && !plane.resources.is_null()
-        // SAFETY: the plane lists `count` resources.
-        && let resource = unsafe { *plane.resources }
-        && let Some(texture) = crate::resource::host_resource(resource)
+        && let Some((texture, resource)) = plane_texture(plane_parameters, only_plane(planes).unwrap_or(0))
         && let Some(host) = crate::host::host()
     {
         const COPY_SOURCE: u32 = 0x800;
+        const PIXEL_SHADER_RESOURCE: u32 = 0x80;
         let state = crate::resource::host_transition(resource, COPY_SOURCE)
             .map_or(COPY_SOURCE, |(_, before)| before);
-        let shown = host.present(texture, state, frame);
+        // The second plane, drawn over the first.
+        let overlay = (only_plane(planes).is_none() && planes >= 2)
+            .then(|| plane_texture(plane_parameters, 1))
+            .flatten()
+            .filter(|&(_, r)| r != resource)
+            .map(|(t, r)| {
+                let s = crate::resource::host_transition(r, PIXEL_SHADER_RESOURCE)
+                    .map_or(PIXEL_SHADER_RESOURCE, |(_, before)| before);
+                (t, r, s)
+            });
+        let shown = host.present(texture, state, frame, overlay.map(|(t, _, s)| (t, s)));
         crate::resource::host_transition(resource, state);
+        if let Some((_, r, s)) = overlay {
+            crate::resource::host_transition(r, s);
+        }
         #[cfg(feature = "diagnostics")]
         blinks(frame, resource, state, shown);
         #[cfg(not(feature = "diagnostics"))]

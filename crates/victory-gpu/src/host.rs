@@ -5995,9 +5995,17 @@ impl Meter {
 
 impl Host {
     /// Shows `texture`, which is in `state` (a host state) and stays in it,
-    /// as frame `frame` (saved if captures are on). `None` if nothing was
-    /// shown; else, in diagnostics builds, whether the frame was black.
-    pub(crate) fn present(&self, texture: &ID3D12Resource, state: u32, frame: u64) -> Option<bool> {
+    /// as frame `frame` (saved if captures are on), with `overlay` (a second
+    /// present plane, in its state, which it stays in) drawn over it
+    /// ([`crate::compose`]). `None` if nothing was shown; else, in
+    /// diagnostics builds, whether the frame was black.
+    pub(crate) fn present(
+        &self,
+        texture: &ID3D12Resource,
+        state: u32,
+        frame: u64,
+        overlay: Option<(&ID3D12Resource, u32)>,
+    ) -> Option<bool> {
         // SAFETY: a live resource.
         let desc = unsafe { texture.GetDesc() };
         let Some(format) = swap_format(desc.Format) else {
@@ -6072,6 +6080,29 @@ impl Host {
                 ),
             ]);
             list.CopyResource(&back, texture);
+            // The second plane over the first: the back buffer becomes a
+            // render target, the plane a shader resource, for the draw.
+            const PIXEL: D3D12_RESOURCE_STATES = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            let back_now = match overlay {
+                Some((plane, plane_state)) => {
+                    let plane_state = D3D12_RESOURCE_STATES(plane_state as i32);
+                    let mut barriers = vec![transition(
+                        &back,
+                        D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_STATE_RENDER_TARGET,
+                    )];
+                    if plane_state != PIXEL {
+                        barriers.push(transition(plane, plane_state, PIXEL));
+                    }
+                    list.ResourceBarrier(&barriers);
+                    crate::compose::overlay(self, list, &back, p.format, (p.width, p.height), plane);
+                    if plane_state != PIXEL {
+                        list.ResourceBarrier(&[transition(plane, PIXEL, plane_state)]);
+                    }
+                    D3D12_RESOURCE_STATE_RENDER_TARGET
+                }
+                None => D3D12_RESOURCE_STATE_COPY_DEST,
+            };
             #[cfg(feature = "diagnostics")]
             let capture = crate::capture::wanted(frame)
                 .then(|| crate::capture::read_back(&self.device, list, texture))
@@ -6082,11 +6113,7 @@ impl Host {
             let _ = frame;
             list.ResourceBarrier(&[
                 transition(texture, D3D12_RESOURCE_STATE_COPY_SOURCE, state),
-                transition(
-                    &back,
-                    D3D12_RESOURCE_STATE_COPY_DEST,
-                    D3D12_RESOURCE_STATE_PRESENT,
-                ),
+                transition(&back, back_now, D3D12_RESOURCE_STATE_PRESENT),
             ]);
             copy.close();
             match slot {

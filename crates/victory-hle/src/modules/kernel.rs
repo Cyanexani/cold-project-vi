@@ -321,7 +321,7 @@ fn find_module(path: &str, load: bool) -> Option<*mut c_void> {
     }
     // DLLs the host has too are real host modules, whatever `--strict` says.
     let host_dll = HostPolicy::default().allows(&file);
-    if !host_dll && let Some(m) = registry().iter().find(|m| m.serves(&file)) {
+    if !host_dll && let Some(m) = registry().iter().find(|m| m.replaces(&file)) {
         if load {
             tracing::info!(dll = file, "loaded as a pseudo module");
         }

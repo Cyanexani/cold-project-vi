@@ -28,6 +28,10 @@ pub mod dxgi;
 pub mod fence;
 pub mod frame;
 #[cfg(windows)]
+mod compose;
+#[cfg(windows)]
+pub mod upscale;
+#[cfg(windows)]
 mod host;
 #[cfg(windows)]
 mod indirect;
