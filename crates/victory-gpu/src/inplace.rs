@@ -1447,8 +1447,18 @@ mod tests {
             rig.store(&placed.buffer, placed.bias + 16, &[0xa5; 64]).unwrap();
             assert!(same((start + 16) as *const u8, &[0xa5; 64]), "the GPU's write is at the title's address");
             drop(placed);
-            // Half of it decommitted: turned down, the host not asked.
-            assert_ne!(mem::VirtualFree(base.add(2 * K64).cast(), K64, mem::MEM_DECOMMIT), 0);
+            // Half of it decommitted: turned down, the host not asked. The software
+            // adapter lets go of the placed pages a little after the buffer is dropped
+            // (under the load of the other tests it was still holding them in one run
+            // of four), so the decommit is tried again for up to a second.
+            let decommitted = (0..100).any(|_| {
+                mem::VirtualFree(base.add(2 * K64).cast(), K64, mem::MEM_DECOMMIT) != 0
+                    || {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        false
+                    }
+            });
+            assert!(decommitted, "the pages could be decommitted");
             assert!(matches!(place_part(&device, start, len), Err(None)));
             mem::VirtualFree(base.cast(), 0, mem::MEM_RELEASE);
         }
