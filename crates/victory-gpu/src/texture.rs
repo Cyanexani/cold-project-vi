@@ -412,7 +412,7 @@ pub fn use_texture_cache(dir: std::path::PathBuf) {
         tracing::info!(
             dir = %dir.display(),
             written_before_mb = before >> 20,
-            "detiled textures kept on disk (VICTORY_TEXTURE_DISK=0: off)"
+            "detiled textures kept on disk: on (VICTORY_TEXTURE_DISK=0 turns it off)"
         );
         let _ = DISK_DIR.set(dir);
     }
