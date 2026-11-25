@@ -756,9 +756,10 @@ mod tests {
     fn first_use_is_made_by_a_worker() {
         let p = Arc::new(Pending::new(Vec::new(), None));
         assert!(ready(&p).is_none());
-        assert_ne!(p.queue_state.load(Ordering::Relaxed), NOT_QUEUED);
         let started = Instant::now();
-        // A failure is not kept in `made` (721732d): it counts an attempt.
+        // A failure is not kept in `made` (721732d): it counts an attempt,
+        // and puts the pipeline back to `NOT_QUEUED` - so the queue state
+        // says nothing here, the attempt does (only a worker makes it).
         while p.made.get().is_none()
             && p.failures.load(Ordering::Relaxed) == 0
             && started.elapsed() < Duration::from_secs(10)
