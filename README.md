@@ -32,6 +32,26 @@ Mis à jour le 25/11/2026.
 
 ## Où en est le jeu
 
+### Avancement du portage : 40 %
+
+`████████░░░░░░░░░░░░` **40 % : dans le monde**
+
+Mesuré avec le barème de [PortWatch VI](https://portwatch-vi.xyz/#method) :
+jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, le
+rendu, la vitesse et la stabilité se partagent les 50 derniers points.
+
+| Palier | % | État |
+|--------|---|------|
+| Fondations (chargeur, bibliothèques, shaders, rendu D3D12) | 0-10 | ✅ |
+| L'exécutable tourne | 10 | ✅ |
+| Première image (logos, intro) | 20 | ✅ |
+| Menu principal | 30 | ✅ |
+| Dans le monde (le prologue se charge et s'affiche) | 40 | ✅ |
+| Jouable (on dirige un personnage) | 50 | ⏳ prochain palier |
+| Bien jouable (histoire, rendu, vitesse, stabilité) | 50-100 | ❌ |
+
+### Détail
+
 | Étape | État |
 |-------|------|
 | Démarrage, menus, écran titre | ✅ fonctionne |
@@ -39,9 +59,9 @@ Mis à jour le 25/11/2026.
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ⚠️ s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore) |
-| Images par seconde dans le monde | ❌ environ 2 (500 à 570 ms par image), sans aucune option |
+| Images par seconde dans le monde | ❌ 2 à 2,4 (environ 420 ms par image) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
 | Mémoire | ❌ 24 Go réservés, 5,8 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; carte à 10 Go sur 11, 5,2 Go débordent dans la RAM |
-| Stabilité | ⚠️ sans options, 5 minutes sans plantage ; avec les options mémoire, plantage entre 2 et 3 minutes |
+| Stabilité | ⚠️ depuis que les copies de textures suivent la mémoire que le PC peut encore engager, plus de mort silencieuse par manque de mémoire ; la marge reste mince sur 16 Go |
 
 ```mermaid
 pie showData
