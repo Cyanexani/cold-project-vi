@@ -1710,12 +1710,18 @@ pub(crate) const CARD_INLINE_STRIDE: usize = 65536 + 64;
 pub(crate) const CARD_INLINE_SLOTS: u32 = 2048;
 
 /// Whether `CARD_COMPARE` copies changed 64 KiB pieces inline into a shared
-/// L0 ring buffer on the GPU (`VICTORY_CARD_INLINE_FETCH=0` disables it).
-/// Avoids the per-landing `CopyBufferRegion` + `WaitForSingleObject` stall at
-/// the tail of `self.queue` in [`Host::relay_card_back`].
+/// L0 ring buffer on the GPU (`VICTORY_CARD_INLINE_FETCH=1`; off by default).
+/// It avoids the per-landing `CopyBufferRegion` + `WaitForSingleObject`
+/// stall at the tail of `self.queue` in [`Host::relay_card_back`], but a
+/// shader's own stores into the PC's memory cross the bus very slowly on
+/// NVIDIA: timing runs of 2026-11-25 put our compare passes at 340-520 ms a
+/// frame with it and 2.6 ms without; in the world (run sans-inline-normal,
+/// RTX 3060) the frame went from about 450 to 270 ms (2.2 to 3.6-3.7 fps,
+/// the GPU 245 to 137 ms, the copy-back 44 to 107 ms), and the cell drew its
+/// walls and light where it had stayed dark.
 fn card_inline_fetch() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VICTORY_CARD_INLINE_FETCH").is_none_or(|v| v != "0"))
+    *ON.get_or_init(|| std::env::var_os("VICTORY_CARD_INLINE_FETCH").is_some_and(|v| v == "1"))
 }
 
 /// What the host keeps for copies in the card's own memory
