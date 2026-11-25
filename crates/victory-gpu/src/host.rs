@@ -1,9 +1,8 @@
 //! The host GPU: one D3D12 device and direct queue (decision 0007), and a
 //! window to present on.
 //!
-//! shortcut: every submission is waited for, so CPU and GPU never overlap
-//! (unless `VICTORY_LATE_WAIT=1`, see [`late`]);
-//! overlap them with per-submission fences once more than clears run.
+//! Submissions go to the card without a wait for each by default (see
+//! [`late`]; `VICTORY_LATE_WAIT=0` waits for every one, so CPU and GPU never overlap).
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -1633,7 +1632,7 @@ impl Drop for Deferred {
 }
 
 /// Whether a queue's submissions go to the card without a wait for each
-/// (`VICTORY_LATE_WAIT=1`; off by default, and off in the timing run, which
+/// (stage 3 by default, `VICTORY_LATE_WAIT=0` turns it off; off in the timing run, which
 /// waits for every list on its own).
 ///
 /// Every submission was prepared, sent, waited for and copied back before
@@ -1694,9 +1693,11 @@ fn late_stage() -> u8 {
             Ok("1") => 1,
             Ok("2") => 2,
             Ok("3") => 3,
-            // The relay alone: on top of stage 3.
-            Err(_) if crate::shadow::relay() => 3,
-            _ => 0,
+            Ok("0") => 0,
+            // Stage 3 by default since the run of 2026-11-25 at the cell: 560-610 ms a
+            // frame became 450-480, the card 56% busy became 74%, the page faults as
+            // before. `VICTORY_LATE_WAIT=0` waits for every submission, as before.
+            _ => 3,
         }
     })
 }
