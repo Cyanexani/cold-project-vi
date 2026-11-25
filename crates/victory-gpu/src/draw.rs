@@ -1449,23 +1449,23 @@ impl State {
             ranges.clear();
             host.buffer_slots()
         } else {
-            // Incremental 1/16th rolling refresh per pass: visits and prunes
-            // every slot every 16 frames without a 140 ms spike from clearing
-            // and re-mirroring all 83,000 slots at once.
-            let bucket = (*passes % 16) as u32;
+            // Incremental 1/64th rolling refresh per pass: visits and prunes
+            // every slot over 64 frames (~1,300 slots/frame instead of 5,200),
+            // eliminating steady-state overhead and spikes.
+            let bucket = (*passes % 64) as u32;
             let mut batch: Vec<u32> = changed;
             let mut seen: std::collections::HashSet<u32> = batch.iter().copied().collect();
             let all = host.buffer_slots();
             let mut live_bucket = std::collections::HashSet::new();
             for index in all {
-                if index % 16 == bucket {
+                if index % 64 == bucket {
                     live_bucket.insert(index);
                     if seen.insert(index) {
                         batch.push(index);
                     }
                 }
             }
-            ranges.retain(|&index, _| index % 16 != bucket || live_bucket.contains(&index));
+            ranges.retain(|&index, _| index % 64 != bucket || live_bucket.contains(&index));
             batch
         };
         *passes += 1;
@@ -1551,11 +1551,11 @@ impl State {
             }
             shadow.refresh(list, *from, to - from);
         }
+        HEAP_BUFFER_PASSES.fetch_add(1, Ordering::Relaxed);
+        HEAP_BUFFER_MICROS.fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
         let textures = std::time::Instant::now();
         self.heap_textures(list, heap, host);
         HEAP_TEXTURE_MICROS.fetch_add(textures.elapsed().as_micros() as u64, Ordering::Relaxed);
-        HEAP_BUFFER_PASSES.fetch_add(1, Ordering::Relaxed);
-        HEAP_BUFFER_MICROS.fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
         static LOGGED: AtomicU64 = AtomicU64::new(0);
         // The first pass and every growth of the set by half.
         let seen = LOGGED.load(Ordering::Relaxed);
@@ -1807,14 +1807,14 @@ impl State {
         // The rest waits for the next frames, as it does past the bytes.
         static SPAN_MS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
         let span = std::time::Duration::from_millis(*SPAN_MS.get_or_init(|| {
-            std::env::var("VICTORY_TEXTURE_STAGE_MS").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(250)
+            std::env::var("VICTORY_TEXTURE_STAGE_MS").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(24)
         }));
-        // A long queue (the world's first minutes: over 20,000 slots) gets
-        // 512 MB and 1.5 s a pass while the run's allowance for catching up
-        // lasts (`catching_up`, `VICTORY_TEXTURE_GATE_S`, 60 s).
+        // A long queue (the world's first minutes) gets a bounded catch-up
+        // budget (`catching_up`, `VICTORY_TEXTURE_GATE_S`, 60 s) capped at
+        // 80 ms/pass so streaming never causes multi-second frame freezes.
         // `VICTORY_TEXTURE_CATCHUP=0` keeps the plain budget.
-        const PER_FRAME_CATCHING_UP: u64 = 512 << 20;
-        const SPAN_CATCHING_UP: std::time::Duration = std::time::Duration::from_millis(1500);
+        const PER_FRAME_CATCHING_UP: u64 = 128 << 20;
+        const SPAN_CATCHING_UP: std::time::Duration = std::time::Duration::from_millis(80);
         const LONG: u64 = 2_000;
         static CATCHUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
         let catchup = *CATCHUP.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_CATCHUP").is_none_or(|v| v != "0"));

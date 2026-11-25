@@ -1359,8 +1359,8 @@ impl HostHeap {
     /// many were unchanged and changed, and how many wait for a look.
     pub(crate) fn texture_slots_rechecked(&self, frame: u64) -> [u64; 3] {
         /// Looks per pass (each reads 48 KiB), and the time they may take.
-        const MOST: usize = 256;
-        const SPAN: std::time::Duration = std::time::Duration::from_millis(15);
+        const MOST: usize = 64;
+        const SPAN: std::time::Duration = std::time::Duration::from_millis(2);
         let (due, waiting) = {
             let textures = self.textures.lock().unwrap_or_else(|e| e.into_inner());
             (textures.rechecks_due(frame, MOST), textures.rechecks.len() as u64)
@@ -1487,8 +1487,8 @@ impl HostHeap {
     pub(crate) fn texture_sweep(&self, heap: &super::Heap, frame: u64) {
         use std::sync::atomic::Ordering::Relaxed;
         /// Slots looked at at a time, and the least time between.
-        const SLOTS: u32 = 1 << 15;
-        const EVERY_MS: u64 = 100;
+        const SLOTS: u32 = 1 << 13;
+        const EVERY_MS: u64 = 250;
         static MODE: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
         let mode = *MODE.get_or_init(|| match std::env::var("VICTORY_TEXTURE_SWEEP").as_deref() {
             Ok("0") => 0,

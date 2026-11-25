@@ -466,24 +466,6 @@ pub(crate) fn views_gone(at: usize, len: usize) {
     }
 }
 
-/// The title views that overlap `[start, end)`, as `(address, bytes)`.
-pub(crate) fn views_between(start: usize, end: usize) -> Vec<(usize, usize)> {
-    if start >= end {
-        return Vec::new();
-    }
-    let v = views();
-    let mut out = Vec::new();
-    if let Some((&base, &(bytes, _, _))) = v.views.range(..=start).next_back()
-        && base + bytes > start
-    {
-        out.push((base, bytes));
-    }
-    for (&base, &(bytes, _, _)) in v.views.range(start.saturating_add(1)..end) {
-        out.push((base, bytes));
-    }
-    out
-}
-
 /// The address of the 64 KiB page shown at `page` in every title view that
 /// shows it, `page`'s own address included; empty if `page` is not a view.
 pub(crate) fn pages_of(page: usize) -> Vec<usize> {
@@ -496,6 +478,65 @@ pub(crate) fn pages_of(page: usize) -> Vec<usize> {
         return Vec::new();
     }
     v.pages.get(&(section, offset + within as u64)).cloned().unwrap_or_default()
+}
+
+/// Batched lookup for `watch::protect`: acquires `VIEWS` once across all 64 KiB
+/// blocks in `[from_block, to_block)` and returns `(all_aliased_blocks,
+/// other_alias_blocks_sorted_deduped, guarded_block_count)` for every block
+/// whose physical page has between `2` and `max_views` views.
+pub(crate) fn alias_blocks_in(
+    from_block: usize,
+    to_block: usize,
+    max_views: usize,
+) -> (Vec<usize>, Vec<usize>, u64) {
+    let start = from_block.saturating_mul(K64);
+    let end = to_block.saturating_mul(K64);
+    if start >= end {
+        return (Vec::new(), Vec::new(), 0);
+    }
+    let v = views();
+    if v.views.is_empty() {
+        return (Vec::new(), Vec::new(), 0);
+    }
+    let mut all_aliased = Vec::new();
+    let mut others = Vec::new();
+    let mut blocks_counted = 0u64;
+    let first_view = v
+        .views
+        .range(..=start)
+        .next_back()
+        .filter(|&(&base, &(bytes, _, _))| base + bytes > start);
+    let overlapping = first_view
+        .into_iter()
+        .chain(v.views.range(start.saturating_add(1)..end));
+    for (&base, &(bytes, section, offset)) in overlapping {
+        let first = (base / K64).max(from_block);
+        let last = (base.saturating_add(bytes).div_ceil(K64)).min(to_block);
+        for block in first..last {
+            let page = block * K64;
+            let within = page.wrapping_sub(base);
+            if within >= bytes || !within.is_multiple_of(K64) {
+                continue;
+            }
+            let Some(shown) = v.pages.get(&(section, offset + within as u64)) else {
+                continue;
+            };
+            if shown.len() < 2 || shown.len() > max_views {
+                continue;
+            }
+            blocks_counted += 1;
+            for &alias_addr in shown {
+                let alias = alias_addr / K64;
+                all_aliased.push(alias);
+                if alias != block {
+                    others.push(alias);
+                }
+            }
+        }
+    }
+    others.sort_unstable();
+    others.dedup();
+    (all_aliased, others, blocks_counted)
 }
 
 /// The title views that show any of the physical bytes `[offset, offset +

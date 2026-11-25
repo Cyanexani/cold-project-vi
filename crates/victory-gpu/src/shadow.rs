@@ -908,6 +908,9 @@ fn give_back(v: Vec<u8>) {
 }
 
 const NOT_WATCHED: u8 = 2;
+/// Physical-page view memory tracked by `watch::writes_guarded` (skips the
+/// failing `GetWriteWatch` kernel syscall on every refresh).
+const VIEW_GUARDED: u8 = 3;
 
 /// Where `a` and `b` (of one length) first differ, compared eight bytes at
 /// a time.
@@ -1728,6 +1731,12 @@ impl Shadow {
         self.watched.load(Ordering::Relaxed) == NOT_WATCHED
     }
 
+    /// Whether the memory behind the copy is physical-page view memory tracked
+    /// by guards rather than `GetWriteWatch` (`ask_ahead` can skip it).
+    pub(crate) fn is_view_guarded(&self) -> bool {
+        self.watched.load(Ordering::Relaxed) == VIEW_GUARDED
+    }
+
     /// The copy's own number (see the field).
     pub(crate) fn id(&self) -> u64 {
         self.id
@@ -2472,9 +2481,18 @@ impl Shadow {
     /// [`Shadow::update`] of `[from, to)` (inside the buffer) where no
     /// shader writes.
     fn update_free(&self, from: usize, to: usize) -> usize {
-        if self.watched.load(Ordering::Relaxed) != NOT_WATCHED {
-            if let Some((now, written)) = crate::watch::writes(from, to, true) {
-                self.watched.store(1, Ordering::Relaxed);
+        let mode = self.watched.load(Ordering::Relaxed);
+        if mode != NOT_WATCHED {
+            let result = if mode == VIEW_GUARDED {
+                crate::watch::writes_guarded(from, to).map(|(now, w)| (now, w, true))
+            } else {
+                crate::watch::writes_kind(from, to, true)
+            };
+            if let Some((now, written, is_view)) = result {
+                let next = if is_view { VIEW_GUARDED } else { 1 };
+                if mode != next {
+                    self.watched.store(next, Ordering::Relaxed);
+                }
                 let copied = self.copy_stale(from, to, now, &written);
                 self.refresh_check(from, to);
                 #[cfg(feature = "diagnostics")]

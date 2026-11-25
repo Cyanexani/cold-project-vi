@@ -58,6 +58,9 @@ pub(crate) struct Staging {
     /// of 1,120 textures in one frame of run 18.)
     dirty: std::sync::atomic::AtomicBool,
     uploaded: std::sync::atomic::AtomicBool,
+    /// Set once a texture's memory turns out to be view-guarded so future
+    /// refreshes skip the failing `GetWriteWatch` syscall.
+    is_view: std::sync::atomic::AtomicBool,
     /// When a list last recorded a use of it (`crate::host::moment`).
     used: std::sync::atomic::AtomicU64,
 }
@@ -901,7 +904,18 @@ impl Staging {
         // every check for a while (e.g. movie planes rotating in memory).
         let mut unseen = false;
         if *GUARD.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_GUARD").is_none_or(|v| v != "0"))
-            && let Some((now, written)) = waited(1, || crate::watch::writes(start, start + size, true))
+            && let Some((now, written)) = waited(1, || {
+                if self.is_view.load(std::sync::atomic::Ordering::Relaxed) {
+                    crate::watch::writes_guarded(start, start + size)
+                } else {
+                    crate::watch::writes_kind(start, start + size, true).map(|(now, w, is_view)| {
+                        if is_view {
+                            self.is_view.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        (now, w)
+                    })
+                }
+            })
         {
             let frame = crate::frame::current();
             let every = crate::memcopy::hash_every();
@@ -1499,6 +1513,7 @@ fn staging(resource: This, texture: &ID3D12Resource, first: u32) -> Option<Arc<S
         last: Mutex::default(),
         dirty: std::sync::atomic::AtomicBool::new(true),
         uploaded: std::sync::atomic::AtomicBool::new(false),
+        is_view: std::sync::atomic::AtomicBool::new(false),
         used: std::sync::atomic::AtomicU64::new(crate::host::moment()),
     });
     map.insert(resource as usize, s.clone());
