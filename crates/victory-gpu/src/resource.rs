@@ -1657,9 +1657,14 @@ pub(crate) fn let_go_idle() {
     // the PC had 0.2-2 GB free and the title froze the PC with 23 GB committed: with
     // less than 2 GB free the copies go after 5 s, with less than 1 GB after 1 s.
     let free_mb = crate::host::available_physical_ram().map_or(u64::MAX, |b| b >> 20);
+    // From 85% of the budget no new texture is made for the heap's slots (`room`): in
+    // the run of 2026-11-26 the card reached 85-86% again and again and the texture
+    // queue stood still 20-25 s each time (991 of some 4,500 frames' passes made
+    // nothing), until copies idle for 5 s went. From 85% they go after 1 s now, and
+    // from 80% after 5 s, so that the card seldom reaches the line.
     let (idle_ms, idle_frames): (u64, u64) = match (share, free_mb) {
-        (90.., _) | (_, ..1024) => (1_000, 2),
-        (85..90, _) | (_, 1024..2048) => (5_000, 4),
+        (85.., _) | (_, ..1024) => (1_000, 2),
+        (80..85, _) | (_, 1024..2048) => (5_000, 4),
         _ => (30_000, 20),
     };
     // For the trail (`crate::host::trail`): how many went, their bytes,
