@@ -380,25 +380,40 @@ fn with_title<R>(memory: *const u8, size: usize, f: impl FnOnce(&[u8]) -> R) -> 
     })
 }
 
-/// The folder of detiled textures kept on disk (`VICTORY_TEXTURE_DISK=1`; off by default):
+/// The folder of detiled textures kept on disk (on by default; `VICTORY_TEXTURE_DISK=0`: off):
 /// a texture's staging contents, by the hash of its memory, its console layout and the
 /// host's footprints, read back the next time the same bytes are detiled, in this run or
 /// a later one. Set by [`use_texture_cache`].
-/// shortcut: an experiment. The texture's bytes are in memory already, so a read from disk
-/// pays only where detiling costs more than reading the file; the writes are capped at
-/// `DISK_MAX` a run and nothing is ever deleted (delete the folder to free the space).
+/// The texture's bytes are in memory already, so a read from disk pays only where
+/// detiling costs more than reading the file. In the runs of 2026-11-25 it read 8-20 GB
+/// a run that would have been detiled again (textures let go and made again). The
+/// writes are capped at `DISK_MAX` a run and `DISK_TOTAL_MAX` over all runs (counted in
+/// the folder's `written.bytes`); nothing is deleted (delete the folder to start over).
 static DISK_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// Textures smaller than this are detiled as before.
 const DISK_MIN: usize = 256 << 10;
 /// Bytes written to disk in a run, at most.
 const DISK_MAX: u64 = 8 << 30;
+/// Bytes written to the folder over all runs, at most (`written.bytes`).
+const DISK_TOTAL_MAX: u64 = 32 << 30;
+/// Bytes earlier runs wrote to the folder (read from `written.bytes` at the start).
+static DISK_BEFORE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// Since the start: textures read from disk and their bytes, written and their bytes.
 pub(crate) static DISK: [std::sync::atomic::AtomicU64; 4] = [const { std::sync::atomic::AtomicU64::new(0) }; 4];
 
-/// Keeps detiled textures in `dir` if `VICTORY_TEXTURE_DISK=1`.
+/// Keeps detiled textures in `dir` unless `VICTORY_TEXTURE_DISK=0`.
 pub fn use_texture_cache(dir: std::path::PathBuf) {
-    if std::env::var_os("VICTORY_TEXTURE_DISK").is_some_and(|v| v == "1") {
-        tracing::info!(dir = %dir.display(), "detiled textures kept on disk (VICTORY_TEXTURE_DISK=1)");
+    if std::env::var_os("VICTORY_TEXTURE_DISK").is_none_or(|v| v != "0") {
+        let before = std::fs::read_to_string(dir.join("written.bytes"))
+            .ok()
+            .and_then(|t| t.trim().parse::<u64>().ok())
+            .unwrap_or(0);
+        DISK_BEFORE.store(before, std::sync::atomic::Ordering::Relaxed);
+        tracing::info!(
+            dir = %dir.display(),
+            written_before_mb = before >> 20,
+            "detiled textures kept on disk (VICTORY_TEXTURE_DISK=0: off)"
+        );
         let _ = DISK_DIR.set(dir);
     }
 }
@@ -961,14 +976,21 @@ impl Staging {
             return;
         }
         self.detile_now(tiled);
-        if DISK[3].load(Relaxed) + used as u64 > DISK_MAX {
+        let this_run = DISK[3].load(Relaxed) + used as u64;
+        if this_run > DISK_MAX || DISK_BEFORE.load(Relaxed) + this_run > DISK_TOTAL_MAX {
             return;
         }
         let _ = std::fs::create_dir_all(path.parent().unwrap_or(dir));
         let tmp = path.with_extension("tmp");
         if std::fs::write(&tmp, &linear[..]).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
-            DISK[2].fetch_add(1, Relaxed);
-            DISK[3].fetch_add(used as u64, Relaxed);
+            let n = DISK[2].fetch_add(1, Relaxed) + 1;
+            let bytes = DISK[3].fetch_add(used as u64, Relaxed) + used as u64;
+            // The count over all runs, kept every 16 writes (a run stopped before the
+            // next one under-counts by at most 15 textures).
+            if n % 16 == 1 {
+                let total = DISK_BEFORE.load(Relaxed) + bytes;
+                let _ = std::fs::write(dir.join("written.bytes"), total.to_string());
+            }
         } else {
             let _ = std::fs::remove_file(&tmp);
         }

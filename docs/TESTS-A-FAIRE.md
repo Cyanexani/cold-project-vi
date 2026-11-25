@@ -128,7 +128,7 @@ l'essai du 25/11). Ils sont maintenant gardés (384 Mo au plus) et réutilisés.
 texture d'un autre objet). Ancien comportement :
 `$env:VICTORY_STAGING_POOL_MB = '0'`.
 
-**Cache disque des textures (en essai)** : `$env:VICTORY_TEXTURE_DISK = '1'`.
+**Cache disque des textures (actif par défaut depuis le 26/11)** : `$env:VICTORY_TEXTURE_DISK = '0'` pour le couper. Plafond : 32 Go écrits au total, comptés dans `written.bytes` du dossier.
 Les textures détuilées sont écrites dans
 `D:\GTA6 - Propre copie\victory-cache\textures` (tout le cache est maintenant dans le dossier du jeu, plus sur C) (8 Go au plus par partie) et relues
 au lancement suivant. Le premier lancement écrit (plus lent), le deuxième
