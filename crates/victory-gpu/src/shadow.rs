@@ -3123,14 +3123,18 @@ const WINDOW: u64 = 4 << 20;
 /// window ends nearer to what is read. An ask without a length keeps the
 /// 4 MiB grid whatever is set: a root view reads from its address to its
 /// window's end, and mesh streams bound that way reach megabytes.
-/// shortcut: the default stays 4 MiB until a run with the memory line's
-/// window counts has shown what the finer grids give; the same memory
-/// asked for with different ranges then lies in more than one window.
+/// 1 MiB by default since the runs of 2026-11-25 at the cell (with
+/// [`tails`]): 4 MiB held 22.1 GB private, 3.0 GB of it windows, at 2.17
+/// fps; 1 MiB 21.4 GB, 2.4 GB, 2.24 fps; 256 KiB 20.9 GB, 1.9 GB, but five
+/// times the windows and 2.14 fps (the preparation went from 130 to 181 ms
+/// a frame). `VICTORY_WINDOW_KB=4096` keeps the old grid.
+/// shortcut: the same memory asked for with different ranges lies in more
+/// than one window.
 fn window() -> u64 {
     static GRID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *GRID.get_or_init(|| {
         let kb = std::env::var("VICTORY_WINDOW_KB").ok().and_then(|v| v.trim().parse::<u64>().ok());
-        grid(kb)
+        grid(Some(kb.unwrap_or(1024)))
     })
 }
 
@@ -3159,7 +3163,8 @@ fn window_of(address: u64, end: u64, grid: u64) -> (u64, u64) {
 /// window is the cell's tail from the ask's step on ([`TAIL_STEP`]); an ask
 /// lower in the cell later makes a longer tail, which every ask from then
 /// on takes, and the shorter one goes when nothing holds it any more.
-/// shortcut: off unless `VICTORY_WINDOW_TAILS=1`. A longer tail is another
+/// On by default with the 1 MiB grid (see [`window`]); `VICTORY_WINDOW_TAILS=0`
+/// turns it off. shortcut: a longer tail is another
 /// host buffer than the shorter one: what was bound to the shorter stays
 /// right only because every list brings up to date the copy it bound
 /// (`draw.rs` keeps a root view's copy with its slot). It pays only
@@ -3168,7 +3173,7 @@ fn window_of(address: u64, end: u64, grid: u64) -> (u64, u64) {
 /// tail is that.
 fn tails() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VICTORY_WINDOW_TAILS").is_some_and(|v| v == "1"))
+    *ON.get_or_init(|| std::env::var_os("VICTORY_WINDOW_TAILS").is_none_or(|v| v != "0"))
 }
 
 /// Tails begin on multiples of this. A longer tail is a new host buffer,
