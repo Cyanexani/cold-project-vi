@@ -3075,18 +3075,26 @@ impl Host {
         if cfg!(feature = "diagnostics") && std::env::var_os("VICTORY_D3D12_WARP").is_some() {
             return true;
         }
-        // SAFETY: plain DXGI query using this device's own adapter LUID.
+        let is_software = |desc: &DXGI_ADAPTER_DESC1| {
+            desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 || desc.VendorId == 0x1414
+        };
+        if let Some(adapter) = &self.adapter
+            // SAFETY: plain DXGI adapter descriptor query.
+            && let Ok(desc) = unsafe { adapter.GetDesc1() }
+        {
+            return is_software(&desc);
+        }
+        // Fallback when `EnumAdapterByLuid` did not match (for example on
+        // headless CI runners): inspect the default DXGI adapter 0.
+        // SAFETY: plain DXGI enumeration.
         unsafe {
-            let luid = self.device.GetAdapterLuid();
             let Ok(factory) = CreateDXGIFactory2::<IDXGIFactory4>(DXGI_CREATE_FACTORY_FLAGS(0)) else {
-                return false;
+                return true;
             };
-            let Ok(adapter) = factory.EnumAdapterByLuid::<IDXGIAdapter1>(luid) else {
-                return false;
+            let Ok(adapter) = factory.EnumAdapters1(0) else {
+                return true;
             };
-            adapter
-                .GetDesc1()
-                .is_ok_and(|desc| desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0)
+            adapter.GetDesc1().map_or(true, |desc| is_software(&desc))
         }
     }
 
