@@ -402,7 +402,7 @@ fn translate(
             Ok(()) => {
                 t.translated += 1;
                 let n = WARMED.fetch_add(1, Ordering::Relaxed) + 1;
-                if n % 1000 == 0 {
+                if n.is_multiple_of(1000) {
                     println!("warm-up      {n} shaders in the cache");
                 }
             }

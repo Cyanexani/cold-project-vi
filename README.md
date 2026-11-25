@@ -66,7 +66,7 @@ Les options de vitesse d'avant (`VICTORY_TEXTURE_NO_WAIT`,
 actives par défaut : la commande ci-dessus suffit.
 
 **Avant de jouer, et après chaque mise à jour du traducteur de shaders** :
-double-cliquer sur `Prechauffer.bat` (ou `victory.exe translate --cache`).
+double-cliquer sur `Prechauffer.cmd` (ou `victory.exe translate --cache`).
 Il traduit d'avance tous les shaders du jeu (25 674 sur environ 26 000)
 dans le cache, comme une partie le ferait, pour que le jeu ne le fasse pas
 en pleine partie : quelques minutes la première fois. Sans lui, le premier
