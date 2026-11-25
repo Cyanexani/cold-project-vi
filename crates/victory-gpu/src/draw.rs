@@ -504,6 +504,27 @@ fn heap_recheck() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("VICTORY_HEAP_RECHECK").is_none_or(|v| v != "0"))
 }
+
+/// How long a slot whose pages are not mapped keeps its host copy, in
+/// milliseconds (`VICTORY_TEXTURE_KEEP_MS`, default 2000). The title streams
+/// a texture's pages out and back in; nulling the slot in between made every
+/// draw that sampled it read nothing, which is what the white arms and the
+/// red face were. Long enough to cover a stream-out and back, short enough
+/// that the card gets the memory of a texture that really went.
+fn texture_keep_ms() -> u64 {
+    static MS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *MS.get_or_init(|| {
+        std::env::var("VICTORY_TEXTURE_KEEP_MS")
+            .ok()
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(2000)
+    })
+}
+
+/// Slots whose pages were not mapped and whose host copy was kept anyway,
+/// and slots nulled after the grace, since the start.
+pub(crate) static HEAP_TEXTURES_KEPT: AtomicU64 = AtomicU64::new(0);
+pub(crate) static HEAP_TEXTURES_LET_GO: AtomicU64 = AtomicU64::new(0);
 /// Times a placed texture's slot was passed over because its memory is not
 /// mapped.
 pub(crate) static HEAP_TEXTURES_AWAY: AtomicU64 = AtomicU64::new(0);
@@ -1993,8 +2014,18 @@ impl State {
                 let mapped = crate::texture::mapped_bytes(address as *const u8, len as usize);
                 if mapped == 0 {
                     HEAP_TEXTURES_AWAY.fetch_add(1, Ordering::Relaxed);
-                    // Streamed out: what the slot showed is let go.
-                    host.texture_slot_gone(index);
+                    // Streamed out for now, or for good. The host copy is
+                    // kept for `texture_keep_ms`: the title streams a
+                    // texture's pages out and back in, and a null slot in
+                    // between samples nothing - the arms came out white and
+                    // the face red that way. Past the grace the slot is
+                    // nulled as before, so the card gets its memory back.
+                    if host.texture_slot_away(index).is_some_and(|away| away < texture_keep_ms()) {
+                        HEAP_TEXTURES_KEPT.fetch_add(1, Ordering::Relaxed);
+                    } else {
+                        host.texture_slot_gone(index);
+                        HEAP_TEXTURES_LET_GO.fetch_add(1, Ordering::Relaxed);
+                    }
                     host.texture_slot_later(index, write, frame, most);
                     continue;
                 }
