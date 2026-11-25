@@ -418,6 +418,56 @@ pub fn use_texture_cache(dir: std::path::PathBuf) {
     }
 }
 
+/// Bytes handed to the disk writer and not written yet: past `DISK_QUEUE_MAX`
+/// a texture is not written (it is detiled again the next time).
+static DISK_QUEUED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+const DISK_QUEUE_MAX: u64 = 256 << 20;
+
+/// Hands a detiled texture (`bytes`) to the disk writer for `path` in `dir`.
+fn disk_write(dir: std::path::PathBuf, path: std::path::PathBuf, bytes: Vec<u8>) {
+    use std::sync::atomic::Ordering::Relaxed;
+    type Sender = std::sync::mpsc::SyncSender<(std::path::PathBuf, std::path::PathBuf, Vec<u8>)>;
+    static WRITER: std::sync::OnceLock<Option<std::sync::Mutex<Sender>>> = std::sync::OnceLock::new();
+    let len = bytes.len() as u64;
+    if DISK_QUEUED.load(Relaxed) + len > DISK_QUEUE_MAX {
+        return;
+    }
+    let Some(writer) = WRITER.get_or_init(|| {
+        let (send, receive) = std::sync::mpsc::sync_channel::<(std::path::PathBuf, std::path::PathBuf, Vec<u8>)>(4096);
+        std::thread::Builder::new()
+            .name("texture disk writer".into())
+            .spawn(move || {
+                for (dir, path, bytes) in receive {
+                    let len = bytes.len() as u64;
+                    let _ = std::fs::create_dir_all(path.parent().unwrap_or(&dir));
+                    let tmp = path.with_extension("tmp");
+                    if std::fs::write(&tmp, &bytes).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
+                        let n = DISK[2].fetch_add(1, Relaxed) + 1;
+                        let written = DISK[3].fetch_add(len, Relaxed) + len;
+                        // The count over all runs, kept every 16 writes (a run
+                        // stopped before the next one under-counts by at most 15).
+                        if n % 16 == 1 {
+                            let total = DISK_BEFORE.load(Relaxed) + written;
+                            let _ = std::fs::write(dir.join("written.bytes"), total.to_string());
+                        }
+                    } else {
+                        let _ = std::fs::remove_file(&tmp);
+                    }
+                    DISK_QUEUED.fetch_sub(len, Relaxed);
+                }
+            })
+            .ok()
+            .map(|_| std::sync::Mutex::new(send))
+    }) else {
+        return;
+    };
+    DISK_QUEUED.fetch_add(len, Relaxed);
+    let sent = writer.lock().unwrap_or_else(|e| e.into_inner()).try_send((dir, path, bytes));
+    if sent.is_err() {
+        DISK_QUEUED.fetch_sub(len, Relaxed);
+    }
+}
+
 fn disk_dir() -> Option<&'static std::path::Path> {
     DISK_DIR.get().map(std::path::PathBuf::as_path)
 }
@@ -459,7 +509,7 @@ fn pool_limit() -> u64 {
         std::env::var("VICTORY_STAGING_POOL_MB")
             .ok()
             .and_then(|v| v.trim().parse::<u64>().ok())
-            .unwrap_or(128)
+            .unwrap_or(512)
             << 20
     })
 }
@@ -980,20 +1030,10 @@ impl Staging {
         if this_run > DISK_MAX || DISK_BEFORE.load(Relaxed) + this_run > DISK_TOTAL_MAX {
             return;
         }
-        let _ = std::fs::create_dir_all(path.parent().unwrap_or(dir));
-        let tmp = path.with_extension("tmp");
-        if std::fs::write(&tmp, &linear[..]).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
-            let n = DISK[2].fetch_add(1, Relaxed) + 1;
-            let bytes = DISK[3].fetch_add(used as u64, Relaxed) + used as u64;
-            // The count over all runs, kept every 16 writes (a run stopped before the
-            // next one under-counts by at most 15 textures).
-            if n % 16 == 1 {
-                let total = DISK_BEFORE.load(Relaxed) + bytes;
-                let _ = std::fs::write(dir.join("written.bytes"), total.to_string());
-            }
-        } else {
-            let _ = std::fs::remove_file(&tmp);
-        }
+        // Written by a thread of its own (`disk_writer`): the detile ran on the
+        // thread preparing the submission, which then waited for the disk (5 GB
+        // written in the first minutes of the 26/11 run).
+        disk_write(dir.to_path_buf(), path, linear.to_vec());
     }
 
     /// The bytes of the staging buffer its subresources take.

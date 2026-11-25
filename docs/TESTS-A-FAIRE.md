@@ -153,7 +153,7 @@ disparaissent ou clignotent.
 
 **Mémoire de la carte** : les nouvelles textures attendent dès 85 % du
 budget de la carte (avant : 90 %), et les textures inutilisées partent
-vite dès 80 %. La réserve de tampons recyclés est à 128 Mo.
+vite dès 80 %. La réserve de tampons recyclés est à 512 Mo (26/11).
 
 **Textures sur plusieurs cœurs** : `VICTORY_WIDE_TEXTURES=0` pour comparer.
 
