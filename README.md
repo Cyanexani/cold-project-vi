@@ -376,17 +376,31 @@ turns it off). Details: [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
 
 ## What is left
 
-1. Speed: this PC tops out around 20 fps (the game alone, measured with no
-   drawing). Keep the game's data on the GPU instead of copying 180 MB a
-   frame; cheaper indirect draws (about 2,000 clamps with drains); faster
-   64-lane programs on 32-lane GPUs; upstream's copy-back of written pages.
-2. Translate the shaders still refused (29): groups of several 64-lane waves
-   sharing their memory, water, voxels.
-3. Run the game's ray tracing (fallback light only for now; DexNom's Radeon
-   work is the lead).
-4. Stability: hold a long session.
-5. Memory: under 16 GB so Windows stops paging (windows with holes, host-side
-   textures, buffers shared with the GPU).
+Measured on 25-26/11 (RTX 3060, 16 GB): about 4.1-4.2 fps, 230-250 ms a frame.
+
+1. Speed (goal: 10 fps steady, so about 100 ms a frame). What is left:
+   - GPU, 85-100 ms: mostly the fixed cost of about 4,400 small draws a
+     frame (the costliest program, the cascade shadow mesh, is short; its
+     23 ms come from 389 draws). The game changes pipeline between almost
+     every draw, so they cannot simply be merged. Faster 64-lane programs on
+     32-lane GPUs would help.
+   - Preparing, about 125 ms: 70 ms of copies (about 190 MB a frame of game
+     memory), the rest sending changed bytes up to GPU-side copies.
+   - Copy-back, about 55 ms; and the render thread waits about a quarter of
+     its time for it, because the game reads back memory the GPU just wrote
+     (letting those reads through brought the device down: they are real).
+   Tried and dropped: sending submissions ahead (`VICTORY_RELAY=2`),
+   clamp windows ahead, hoisted clamps, a word-wise merge, window copies off
+   the GPU.
+2. Picture: the ray-tracing structure builder gives a wrong picture on
+   NVIDIA (`VICTORY_BVH_BUILDER=1`: glowing hair, blown-out windows, 2.3
+   fps), so rays miss by default and interiors stay dark. Four programs are
+   still refused on 32-lane GPUs: alpha-tested cascade shadows (groups of two
+   64-lane waves with wave-wide operations), the alpha transmission
+   prefilter and two VFX triangle programs.
+3. Stability: a full 10-minute run without stopping; longer sessions still
+   to be measured.
+4. Memory: 21 GB committed on 16 GB, with 2 GB of RAM left free.
 
 ## Useful switches
 

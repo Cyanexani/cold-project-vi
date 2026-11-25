@@ -604,23 +604,36 @@ très sombres : leurs visages ne sont éclairés que par les contours. Détails 
 
 ## Ce qui reste à faire
 
-1. Vitesse : ce PC plafonne vers 20 images/s (le jeu seul, mesuré sans
-   dessin) ; d'ici là, les trois morceaux comptent (carte
-   207 ms, préparation 135, recopie 50). Côté carte : réduire nos propres
-   passes autour des 4 100 draws indirects (bornages et barrières), accélérer
-   les programmes de 64 fils sur une carte à 32 voies, baisser la résolution
-   des ombres en cascade. Côté processeur : reprendre la pile de ScarlettPort
-   (recopie des seuls tampons relus, lectures servies sur la carte) et la
-   recopie de VIctory qui ne compare que les pages écrites (`cd94d35`).
-2. Traduire les shaders encore refusés (157 dans l'essai 11) : groupes de
-   plusieurs vagues de 64 qui partagent leur mémoire, surfaces, volumes d'eau.
-3. Faire tourner le ray tracing dans le jeu (pour l'instant, lumière de
-   secours seulement).
-4. Stabilité : tenir une longue partie (l'essai 11 a tenu 10 minutes).
-5. Réduire la mémoire (pour ne plus échanger avec le disque sur 16 Go) : fenêtres à trous qui ne suivent pas une seule section
-   (2,6 Go encore copiés), textures côté PC (3 à 4,5 Go), buffers partagés
-   avec la carte (environ 7 Go réservés).
-6. Essayer en jeu le reste de [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
+Mesures du 25-26/11 (RTX 3060, 16 Go) : environ 4,1-4,2 images/s, 230 à 250 ms par image.
+
+1. Vitesse (objectif : 10 images/s stables, soit environ 100 ms par image). Ce qui reste :
+   - Carte, 85-100 ms : surtout le coût fixe d'environ 4 400 petits dessins
+     par image (le programme le plus cher, le maillage des ombres en
+     cascade, est court ; ses 23 ms viennent de 389 dessins). Le jeu change
+     de pipeline entre presque chaque dessin : on ne peut pas simplement les
+     fusionner. Des programmes de 64 fils plus rapides sur une carte à 32
+     voies aideraient.
+   - Préparation, environ 125 ms : 70 ms de copies (environ 190 Mo par image
+     de mémoire du jeu), le reste pour envoyer les octets changés vers les
+     copies sur la carte.
+   - Recopie, environ 55 ms ; et le fil d'envoi l'attend environ un quart de
+     son temps, parce que le jeu relit de la mémoire que la carte vient
+     d'écrire (laisser passer ces lectures a fait perdre la carte : elles
+     sont réelles).
+   Essayé et abandonné : envoyer en avance (`VICTORY_RELAY=2`), bornages
+   anticipés, bornages remontés, fusion par mots, copies de fenêtres hors
+   de la carte.
+2. Image : le constructeur des structures de ray tracing donne une image
+   fausse sur NVIDIA (`VICTORY_BVH_BUILDER=1` : cheveux lumineux, fenêtres
+   brûlées, 2,3 images/s) ; les rayons ratent donc par défaut et les
+   intérieurs restent sombres. Quatre programmes sont encore refusés sur une
+   carte à 32 voies : les ombres en cascade des objets découpés (groupes de
+   deux vagues de 64 avec des opérations sur la vague entière), le filtre de
+   transmission alpha et deux programmes d'effets de triangles.
+3. Stabilité : une partie complète de 10 minutes sans arrêt ; les longues
+   parties restent à mesurer.
+4. Mémoire : 21 Go réservés sur 16 Go, avec 2 Go de RAM libres.
+5. Essayer en jeu le reste de [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
    (carte des vues, cheveux, ray tracing, logo, murs).
 
 ## Options utiles
