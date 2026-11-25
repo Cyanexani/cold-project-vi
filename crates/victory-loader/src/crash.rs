@@ -714,7 +714,9 @@ mod tests {
         if std::env::var_os("VICTORY_OVERFLOW_CHILD").is_none() {
             return;
         }
+        // Recurses on purpose, until the stack overflows.
         #[inline(never)]
+        #[allow(unconditional_recursion)]
         fn deeper(n: u64) -> u64 {
             let pad = std::hint::black_box([n; 64]);
             std::hint::black_box(deeper(n + 1)) + pad[3]
