@@ -5729,8 +5729,16 @@ impl<'a> Lower<'a> {
             // A buffer view the code only takes the address of, to walk
             // the memory behind it (a ray-tracing structure): the address
             // from the host, the other dwords have no value.
+            // Or one picked from the view heap at an index the program
+            // computes (the shadow-ray trace programs' ray-tracing
+            // structure): the address from the host's table by heap slot.
+            let address_of = match self.view_address(site) {
+                Some(a) => Some(a),
+                None if count <= 4 => self.slot_address(site)?,
+                None => None,
+            };
             if count <= 4
-                && let Some((lo, hi)) = self.view_address(site)
+                && let Some((lo, hi)) = address_of
             {
                 // Dword 2, the record count, from the host view's size: the
                 // shallow-water programs test it against zero to skip an
@@ -6584,6 +6592,52 @@ impl<'a> Lower<'a> {
         let v = self.as_int(f);
         self.strides.insert(key, v);
         Ok(Some(v))
+    }
+
+    /// The title address (low, high dword) of the buffer view the scalar
+    /// load at `load` picks from the view heap at an index the program
+    /// computes, from the host's table by heap slot
+    /// ([`super::shader::SLOT_ADDRESSES`]); None if the load is not of that
+    /// kind. After ScarlettPort's runtime (GPL-3.0).
+    fn slot_address(&mut self, load: Site) -> Result<Option<(V, V)>, Why> {
+        let heap = self
+            .scalar
+            .get(&load)
+            .and_then(|a| self.x.native.layout.get(a.param))
+            .is_some_and(|p| p.root == RootType::ResourceHeap);
+        if !heap {
+            return Ok(None);
+        }
+        let c = self.cur;
+        // The table is by title slot, as the strides': the index before any
+        // heap map (the host writes it by title slot).
+        let (slot, _) = self.title_heap_index(load, 0, false)?;
+        // Inside the table whatever the index.
+        let last = self.s.m.i32(super::shader::SLOT_STRIDES_COUNT - 1);
+        let i32t = self.s.t.i32;
+        let slot = self.s.op(c, "binary.i32", Attr::ReadNone, i32t, 40, &[slot, last]);
+        self.s.m.tag(slot, Tag::Clamp);
+        let three = self.s.m.i32(3);
+        let byte = self.s.m.bin(c, Bin::Shl, slot, three);
+        let first = self.s.m.i32(super::shader::SLOT_ADDRESSES * 4);
+        let byte = self.s.m.bin(c, Bin::Add, byte, first);
+        let h = self.s.root_srv_handle(super::shader::SLOT_STRIDES);
+        let iu = self.s.m.undef(i32t);
+        let mask = self.s.m.i8(3);
+        let align = self.s.m.i32(4);
+        let r = self.s.op(
+            c,
+            "rawBufferLoad.f32",
+            Attr::ReadOnly,
+            self.s.t.res_ret,
+            139,
+            &[h, byte, iu, mask, align],
+        );
+        let lo = self.s.m.extract(c, r, 0);
+        let lo = self.as_int(lo);
+        let hi = self.s.m.extract(c, r, 1);
+        let hi = self.as_int(hi);
+        Ok(Some((lo, hi)))
     }
 
     /// The heap index of a descriptor that may differ between lanes,
