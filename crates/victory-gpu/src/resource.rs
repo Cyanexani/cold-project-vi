@@ -1665,9 +1665,16 @@ pub(crate) fn let_go_idle() {
     // The PC's free memory: below 2 GB and 1 GB the same run made 35,300 copies
     // again (24,000 without the rule); with a 24 GB page file the PC no longer froze,
     // so the lines are 1 GB and 512 MB.
-    let (idle_ms, idle_frames): (u64, u64) = match (share, free_mb) {
-        (85.., _) | (_, ..512) => (1_000, 2),
-        (80..85, _) | (_, 512..1024) => (5_000, 4),
+    // And what the system can still commit: the run of 2026-11-26 ended with
+    // 1.3 GB of a 40 GB limit left (an allocation of 1 MB failed) while the PC
+    // still had RAM free. Below 4 GB the copies go after 5 s, below 2 GB after 1 s.
+    let commit_mb = crate::host::available_commit().map_or(u64::MAX, |b| b >> 20);
+    let tight = |at: u64, ram: u64| free_mb < ram || commit_mb < at;
+    let (idle_ms, idle_frames): (u64, u64) = match share {
+        85.. => (1_000, 2),
+        _ if tight(2048, 512) => (1_000, 2),
+        80..85 => (5_000, 4),
+        _ if tight(4096, 1024) => (5_000, 4),
         _ => (30_000, 20),
     };
     // For the trail (`crate::host::trail`): how many went, their bytes,
