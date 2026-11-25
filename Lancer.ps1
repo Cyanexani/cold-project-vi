@@ -24,14 +24,14 @@ if (-not $game -or -not (Test-Path $game)) {
 
 # Chaque mode : nom, explication, console, réglages.
 $modes = @(
-    @{ Nom = 'Normal (recommandé)'; Info = 'Series S, réglages par défaut (données sur la carte en priorité).'; Console = 'series-s'; Env = @{} },
-    @{ Nom = 'Normal + copie rapide'; Info = 'Copie de la mémoire du jeu sans passer par le noyau (en essai).'; Console = 'series-s'; Env = @{ VICTORY_COPY_PLAIN = '1' } },
+    @{ Nom = 'Normal (recommandé)'; Info = 'Series S, réglages par défaut : le meilleur mesuré (2,3 images/s à la cellule).'; Console = 'series-s'; Env = @{} },
+    @{ Nom = 'Copie par le noyau (ancienne)'; Info = 'Copies de la mémoire du jeu par le noyau, comme avant (plus lent).'; Console = 'series-s'; Env = @{ VICTORY_COPY_PLAIN = '0' } },
     @{ Nom = 'Demi-résolution'; Info = 'Le jeu rend à 50 % puis agrandit : image plus floue, carte moins chargée.'; Console = 'series-s'; Env = @{ VICTORY_RENDER_SCALE = '0.5'; VICTORY_OWN_UPSCALER = '1' } },
     @{ Nom = 'Très basse résolution (test de fps max)'; Info = 'Rendu à 30 % : moche, pour voir combien de fps le PC peut atteindre.'; Console = 'series-s'; Env = @{ VICTORY_RENDER_SCALE = '0.3'; VICTORY_OWN_UPSCALER = '1' } },
     @{ Nom = 'Économie de textures'; Info = 'Moins de textures gardées sur la carte (50 % de sa mémoire) : textures plus floues, moins de mémoire.'; Console = 'series-s'; Env = @{ VICTORY_TEXTURE_ROOM_PERCENT = '50' } },
-    @{ Nom = 'Anciens réglages mémoire'; Info = "Comme avant le 25/11 : textures d'abord sur la carte, sommets et constantes en RAM."; Console = 'series-s'; Env = @{ VICTORY_CARD_WINDOWS_PERCENT = '72'; VICTORY_CARD_WINDOWS_MB = '1536'; VICTORY_CARD_BUFFERS_MB = '2048'; VICTORY_CARD_VRAM_PERCENT = '92' } },
+    @{ Nom = 'Sommets et constantes sur la carte'; Info = 'Plus de données sur la carte : moins de mémoire partagée, mais plus lent chez toi (essai du 25/11).'; Console = 'series-s'; Env = @{ VICTORY_CARD_WINDOWS_PERCENT = '90'; VICTORY_CARD_WINDOWS_MB = '4096'; VICTORY_CARD_BUFFERS_MB = '4096'; VICTORY_CARD_VRAM_PERCENT = '94' } },
     @{ Nom = 'Éclairage de remplacement'; Info = 'Lumière ambiante et ombres lointaines de remplacement (zones sombres moins noires).'; Console = 'series-s'; Env = @{ VICTORY_AMBIENT_STUB = '1'; VICTORY_SHADOWMASK_STUB = '1' } },
-    @{ Nom = 'Tout pour la vitesse'; Info = 'Demi-résolution + éclairage de remplacement + économie de textures + copie rapide.'; Console = 'series-s'; Env = @{ VICTORY_RENDER_SCALE = '0.5'; VICTORY_OWN_UPSCALER = '1'; VICTORY_AMBIENT_STUB = '1'; VICTORY_SHADOWMASK_STUB = '1'; VICTORY_TEXTURE_ROOM_PERCENT = '50'; VICTORY_COPY_PLAIN = '1' } },
+    @{ Nom = 'Tout pour la vitesse'; Info = 'Demi-résolution + éclairage de remplacement + économie de textures + copie rapide.'; Console = 'series-s'; Env = @{ VICTORY_RENDER_SCALE = '0.5'; VICTORY_OWN_UPSCALER = '1'; VICTORY_AMBIENT_STUB = '1'; VICTORY_SHADOWMASK_STUB = '1'; VICTORY_TEXTURE_ROOM_PERCENT = '50' } },
     @{ Nom = 'Series X'; Info = 'Profil Series X : plus lourd, demande plus de mémoire.'; Console = 'series-x'; Env = @{} },
     @{ Nom = 'Mesure de la carte (diagnostic)'; Info = 'Chronomètre chaque commande de la carte : plus lent, pour les journaux.'; Console = 'series-s'; Env = @{ VICTORY_GPU_TIMING = '1' } },
     @{ Nom = 'Sans compteur'; Info = 'Normal, sans le compteur en haut à gauche.'; Console = 'series-s'; Env = @{ VICTORY_HUD = '0' } }

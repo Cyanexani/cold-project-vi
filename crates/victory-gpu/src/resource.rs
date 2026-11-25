@@ -1399,7 +1399,7 @@ pub(crate) fn room() -> bool {
 /// pixels, and the frame rate did not move)
 /// `VICTORY_TEXTURE_ROOM_PERCENT` says another (50 to 97). Leaving ~25%
 /// headroom keeps hot compute/skinning card buffers (which may use up to
-/// `VICTORY_CARD_VRAM_PERCENT`, default 94%) in local VRAM instead of
+/// `VICTORY_CARD_VRAM_PERCENT`, default 92%) in local VRAM instead of
 /// spilling onto PCIe shared memory.
 #[cfg(windows)]
 fn room_percent() -> u64 {
