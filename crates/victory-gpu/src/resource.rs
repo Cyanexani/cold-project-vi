@@ -1369,12 +1369,10 @@ pub(crate) fn host_made<'a>(
 #[cfg(windows)]
 pub(crate) fn room() -> bool {
     use std::sync::atomic::Ordering::Relaxed;
-    // The card may have room while the PC can commit little more: host
-    // textures count against the PC's commit too (run of 2026-11-25: 6.5 of
-    // 11.3 GB of the card in use when every allocation failed).
-    if COMMIT_LEFT_MB.load(Relaxed) < COMMIT_FLOOR_MB {
-        return false;
-    }
+    // Not the PC's commit: stopping new copies below 3 GB left to commit
+    // (runs essai-rt-8 and 9) held back 500-600 passes and 23,000 slots, and
+    // what lay in shadow drew black. Idle copies go sooner instead
+    // ([`let_go_idle`]).
     const FLOOR: u64 = 2 << 30;
     const WITHOUT_BUDGET: u64 = 4 << 30;
     static LIMIT: std::sync::OnceLock<Option<u64>> = std::sync::OnceLock::new();
@@ -1617,11 +1615,7 @@ pub(crate) fn card_accounting(room: bool, due: [u64; 5], never: Vec<(u64, u64)>,
     }
 }
 
-/// What the system could still commit at the last sweep ([`let_go_idle`],
-/// before each submission), in MB; unknown counts as plenty.
-static COMMIT_LEFT_MB: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
-/// Below this much left to commit, idle copies go after 1 s and no copy is
-/// made for the heap's slots ([`room`]).
+/// Below this much left to commit, idle copies go after 1 s.
 const COMMIT_FLOOR_MB: u64 = 3072;
 
 /// Lets go of the host copies of textures the title fills that nothing
@@ -1682,10 +1676,8 @@ pub(crate) fn let_go_idle() {
     // 1.3 GB of a 40 GB limit left (an allocation of 1 MB failed) while the PC
     // still had RAM free. The run of 2026-11-25 (essai-rt-7) went from 4.2 GB left
     // to failing every allocation in 8 s and died without a report: below 6 GB the
-    // copies go after 5 s, below 3 GB after 1 s, and below 3 GB no new copy is made
-    // for the heap's slots (`room`).
+    // copies go after 5 s, below 3 GB after 1 s.
     let commit_mb = crate::host::available_commit().map_or(u64::MAX, |b| b >> 20);
-    COMMIT_LEFT_MB.store(commit_mb, Relaxed);
     let tight = |at: u64, ram: u64| free_mb < ram || commit_mb < at;
     let (idle_ms, idle_frames): (u64, u64) = match share {
         85.. => (1_000, 2),
