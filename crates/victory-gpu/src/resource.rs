@@ -1437,19 +1437,19 @@ pub(crate) fn let_go_idle() {
     if !*ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_SWEEP").is_none_or(|v| v != "0")) {
         return;
     }
-    // Idle for 5 s and 4 frames from 75% of the card's budget; past 80% of it,
+    // Idle for 5 s and 4 frames from 85% of the card's budget; past 90% of it,
     // 1 s and 2 frames: at 2 frames a second the card ran at 10.0 of 11.0 GB with 5.2 GB
     // of it moved into a 16 GB PC's memory, which then paged (run of 2026-11-25, 7,162
     // page faults a frame). The other conditions stay: nothing else holds the copy.
-    // Under 75% of the budget: 30 s and 20 frames. As a Series S the card stayed at 77%
+    // Under 85% of the budget: 30 s and 20 frames. As a Series S the card stayed at 77%
     // and 60,000 copies went, 9,007 of them made again (7.8 GB) when a shot came back:
     // at 2-3 frames a second a texture off screen for a few seconds was gone.
     let share = crate::host::host()
         .and_then(|h| h.video_memory())
         .map_or(0, |[budget, used, ..]| used.saturating_mul(100) / budget.max(1));
     let (idle_ms, idle_frames): (u64, u64) = match share {
-        80.. => (1_000, 2),
-        75..80 => (5_000, 4),
+        90.. => (1_000, 2),
+        85..90 => (5_000, 4),
         _ => (30_000, 20),
     };
     // For the trail (`crate::host::trail`): how many went, their bytes,
