@@ -1410,12 +1410,18 @@ pub(crate) fn room() -> bool {
 #[cfg(windows)]
 pub(crate) fn let_go_idle() {
     use std::sync::atomic::Ordering::Relaxed;
-    const IDLE_MS: u64 = 5_000;
-    const IDLE_FRAMES: u64 = 4;
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     if !*ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_SWEEP").is_none_or(|v| v != "0")) {
         return;
     }
+    // Idle for 5 s and 4 frames; with the card's memory past nine tenths of its budget,
+    // 1 s and 2 frames: at 2 frames a second the card ran at 10.0 of 11.0 GB with 5.2 GB
+    // of it moved into a 16 GB PC's memory, which then paged (run of 2026-11-25, 7,162
+    // page faults a frame). The other conditions stay: nothing else holds the copy.
+    let tight = crate::host::host()
+        .and_then(|h| h.video_memory())
+        .is_some_and(|[budget, used, ..]| used >= budget / 10 * 9);
+    let (idle_ms, idle_frames): (u64, u64) = if tight { (1_000, 2) } else { (5_000, 4) };
     // For the trail (`crate::host::trail`): how many went, their bytes,
     // and the first one.
     let (mut went, mut bytes, mut first) = (0u64, 0u64, None);
@@ -1430,7 +1436,7 @@ pub(crate) fn let_go_idle() {
         let gone = {
             let mut made = r.host.made.lock().unwrap_or_else(|e| e.into_inner());
             let idle = made.as_ref().is_some_and(|(host, _)| {
-                crate::host::long_ago(r.host.used.load(Relaxed), IDLE_MS, IDLE_FRAMES)
+                crate::host::long_ago(r.host.used.load(Relaxed), idle_ms, idle_frames)
                     && std::sync::Arc::strong_count(host) == 1
                     && crate::host::references(&host.texture) == 1
             });

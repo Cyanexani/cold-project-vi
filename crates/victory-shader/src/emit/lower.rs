@@ -268,6 +268,8 @@ struct Lower<'a> {
     /// A console wave64 program in host waves of 32: the LDS dword counting the console threads
     /// handed to host waves (`wave_base`), and the base made in the entry block.
     halves: Option<u32>,
+    /// The program reads `src_pops_exiting_wave_id` (an ordered pixel section).
+    pops: bool,
     wave_base: Option<V>,
     /// Vertex and mesh outputs holding 16-bit values: row, whether two per
     /// dword, and the row packed after it.
@@ -1532,6 +1534,11 @@ impl<'a> Lower<'a> {
             clane: None,
             pair: None,
             halves,
+            pops: x.p.blocks.iter().flat_map(|b| &b.insts).any(|i| match &i.fields {
+                Fields::Sop { src, .. } => src.iter().any(|o| matches!(o, Operand::Const(239))),
+                Fields::Valu(v) => v.src.iter().any(|o| matches!(o, Operand::Const(239))),
+                _ => false,
+            }),
             wave_base: None,
             flat: None,
             no_barrier,
@@ -2209,6 +2216,15 @@ impl<'a> Lower<'a> {
                     // paths only seem to allow it before any save: the lane of a VGPR
                     // nobody wrote, and VGPRs nobody set read as zero.
                     None if n >= crate::ir::PARKED => Val::I32(self.s.m.i32(0)),
+                    // A pixel program with an ordered section (POPS: it reads
+                    // `src_pops_exiting_wave_id`, the hair and lash programs
+                    // PS_PedTexturedCutOutTint): the hardware hands it the
+                    // overlapped waves' ids in SGPRs, and an id of 0 says no
+                    // earlier wave overlaps, so the program skips its wait.
+                    // shortcut: no wait for overlapping pixels: where two
+                    // such pixels blend into the same texel their order is
+                    // the host's (rasterizer-ordered views would keep it).
+                    None if self.pops => Val::I32(self.s.m.i32(0)),
                     None => Val::Missing("a hardware SGPR input"),
                 },
                 Reg::Scc => Val::Missing("SCC on entry"),
@@ -3061,6 +3077,9 @@ impl<'a> Lower<'a> {
                 let v = inst.read(Reg::V(reg)).ok_or("an unread operand")?;
                 self.i32_of(v)
             }
+            // The ordered section's exiting-wave id: none has exited, as no earlier wave
+            // overlaps (see the hardware SGPR inputs of such programs in `inputs`).
+            Operand::Const(239) if self.pops => Ok(self.s.m.i32(0)),
             Operand::Const(c) => crate::resource::inline(c)
                 .map(|x| self.s.m.i32(x))
                 .ok_or("a special operand (vccz, execz, scc, lds_direct)"),

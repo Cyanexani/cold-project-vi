@@ -81,6 +81,18 @@ boucle** sont découpés « à l'échelle de la vague » pour tourner en vagues 
 32. Le fork l'avait coupé partout parce que deux programmes de particules à
 barrières **dans des boucles** bloquaient la carte ; ceux-là restent exclus.
 
+**Personnages (PS_PedTexturedCutOutTint, 10 programmes)** : ils utilisent
+la section ordonnée de la console (POPS : les pixels superposés attendent
+leur tour). Ils se traduisent maintenant, sans cette attente. À regarder :
+cheveux, cils, yeux. Si quelque chose clignote ou se mélange mal sur un
+personnage : `$env:VICTORY_SKIP_PIPELINES = 'a76619e2dcb45652,bb3f113d13bd2788'`
+et comparer.
+
+**Textures sous pression** : quand la carte dépasse 90 % de son budget,
+une texture inutilisée est libérée après 1 s et 2 images (5 s et 4 images
+sinon). Si des textures disparaissent puis reviennent :
+`$env:VICTORY_TEXTURE_SWEEP = '0'` pour comparer.
+
 **Volumes d'eau** : les 2 programmes CS_TransmissionVolumetrics (somme
 64 bits sur la vague, maintenant suivie) se traduisent avec
 `$env:VICTORY_WAVE_WIDE = '1'` seulement : leurs branches élargies sont dans
