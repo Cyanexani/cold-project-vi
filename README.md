@@ -245,40 +245,60 @@ pie showData
 
 ### Shaders
 
-Le jeu contient environ 26 000 shaders ; une scène en utilise environ 2 000.
+Le jeu contient 26 084 shaders ; une scène en utilise environ 2 000.
+Chiffres du 26/11 (traduction hors jeu de tout `shaders.rpf`, carte en
+vagues de 32 comme une RTX 3060).
 
 ```mermaid
 xychart-beta
     title "Shaders traduits sur tout le jeu, par sorte (%)"
-    x-axis ["Sommets et pixels", "Calcul", "Mesh"]
+    x-axis ["Sommets et pixels", "Calcul", "Mesh", "Ensemble"]
     y-axis "%" 95 --> 100
-    bar [99.7, 98.8, 99.97]
+    bar [99.99, 98.8, 100, 99.87]
 ```
 
-| Sorte | Traduits | Au total |
-|---|---|---|
-| Sommets et pixels | 14 201 | 14 247 |
-| Calcul | 2 650 | 2 682 |
-| Mesh | 8 762 | 8 765 |
+| Sorte | Traduits | Au total | % |
+|---|---|---|---|
+| Sommets et pixels | 14 246 | 14 247 | 99,99 % |
+| Calcul | 2 650 | 2 682 | 98,8 % |
+| Mesh | 8 765 | 8 765 | 100 % |
+| **Ensemble** | **25 661** | **25 694** | **99,87 %** |
 
-Débloqués les 24 et 25/11 : flaques (2), simulation d'eau (1), transparence
-(2), personnages à section ordonnée POPS (10, cheveux et cils), volumes
-d'eau (2, avec `VICTORY_WAVE_WIDE=1` seulement).
+S'y ajoutent 195 shaders de géométrie (voxels, 0,7 % du jeu) dont les
+ressources ne sont pas encore suivies : en les comptant, 98,4 % des
+26 084 shaders se traduisent.
 
-Encore refusés dans la scène de la cellule :
+```mermaid
+xychart-beta
+    title "Shaders traduits sur tout le jeu (%), au fil des jours"
+    x-axis ["25/11", "26/11"]
+    y-axis "%" 99 --> 100
+    bar [99.68, 99.87]
+```
+
+Débloqués le 26/11 : **40 surfaces** (murs et sols PS_TexturedDeferred,
+PS_TexturedLit, reflets de miroir, flaques, 3 mesh de terrain et d'ombres).
+Elles choisissaient entre deux échantillonneurs fixes (répéter ou bloquer
+au bord), ce qu'un handle D3D12 ne peut pas faire : chaque lecture de
+texture est maintenant faite avec les deux et le bon résultat gardé.
+Les 24 et 25/11 : flaques (2), simulation d'eau (1), transparence (2),
+personnages à section ordonnée POPS (10, cheveux et cils).
+
+Les 33 encore refusés, par cause :
 
 ```mermaid
 pie showData
-    title Shaders refusés à la cellule (7)
-    "Groupes de plusieurs vagues de 64 (ombres, transparence)" : 3
-    "Surfaces (dessinent de travers si forcées)" : 2
-    "Volumes d'eau (VICTORY_WAVE_WIDE=1 seulement)" : 2
+    title Shaders encore refusés sur tout le jeu (33)
+    "Vagues de 64 partageant la LDS (particules, traînées, eau, ombres de cheveux)" : 24
+    "Descripteur lu comme donnée (traceurs d'ombres RT)" : 5
+    "Masques de lanes (eau, ombres)" : 3
+    "Sommets et pixels (voxels)" : 1
 ```
 
-À cela s'ajoute **1 pipeline refusé par le pilote NVIDIA** (« Paramètre
-incorrect »). Les 2 programmes de surfaces se traduisaient avec une
-correction essayée le 25/11, mais ils rendaient les personnages flous : elle
-est retirée.
+Les 24 « vagues de 64 » partagent la mémoire de groupe entre plusieurs
+vagues : c'est l'étape 8 de [docs/wave64-on-wave32.md](docs/wave64-on-wave32.md),
+encore ouverte (risque de bloquer la carte). Dans la scène de la cellule,
+il en manque 6.
 
 ### Ray tracing
 
