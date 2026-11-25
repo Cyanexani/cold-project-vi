@@ -1,645 +1,430 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=Un%20jeu%20Xbox%20Series%20sur%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=An%20Xbox%20Series%20game%20on%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
 
-<a href="#où-en-est-le-jeu"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=Le+prologue+se+joue+%3A+on+dirige+l%27h%C3%A9ro%C3%AFne;2%2C3+images%2Fs+aujourd'hui%2C+plafond+mesur%C3%A9+%3A+20;Un+lanceur+en+Rust+avec+pr%C3%A9sence+Discord;Modes+de+test+%3A+sans+textures%2C+sans+dessin" alt="animation"/></a>
+<a href="#where-the-game-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=The+prologue+is+playable%3A+you+control+the+heroine;2.3+fps+today%2C+measured+ceiling%3A+20;A+Rust+launcher+with+Discord+presence;Test+modes%3A+no+textures%2C+no+drawing" alt="animation"/></a>
 
 <p>
-  <a href="README.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-actuel-0055A4?style=for-the-badge" alt="Français"/></a>
-  <a href="README.en.md"><img src="https://img.shields.io/badge/English-read-C8102E?style=for-the-badge" alt="English"/></a>
-  <a href="../../releases/latest"><img src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-lanceur%20%2B%20build-2ea44f?style=for-the-badge" alt="Télécharger"/></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/English-current-C8102E?style=for-the-badge" alt="English"/></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-lire-0055A4?style=for-the-badge" alt="Français"/></a>
+  <a href="https://discord.gg/GBJT5E8E4E"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"/></a>
+  <a href="../../releases/latest"><img src="https://img.shields.io/badge/%E2%AC%87%20Download-launcher%20%2B%20build-2ea44f?style=for-the-badge" alt="Download"/></a>
 </p>
 
 <p>
-  <img src="https://img.shields.io/badge/avancement-59%25-ffc371?style=flat-square" alt="avancement 59 %"/>
-  <img src="https://img.shields.io/badge/images%2Fs-2%2C3%20(max%20mesur%C3%A9%2020)-ff5f6d?style=flat-square" alt="images/s"/>
+  <img src="https://img.shields.io/badge/progress-59%25-ffc371?style=flat-square" alt="progress 59%"/>
+  <img src="https://img.shields.io/badge/fps-2.3%20(measured%20max%2020)-ff5f6d?style=flat-square" alt="fps"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
-  <img src="https://img.shields.io/badge/carte-RTX%2020%2B%20%2F%20mesh%20shaders-76B900?style=flat-square&logo=nvidia" alt="RTX 20+"/>
+  <img src="https://img.shields.io/badge/GPU-RTX%2020%2B%20%2F%20mesh%20shaders-76B900?style=flat-square&logo=nvidia" alt="RTX 20+"/>
   <img src="https://img.shields.io/badge/Rust-1.98-B7410E?style=flat-square&logo=rust" alt="Rust"/>
-  <img src="https://img.shields.io/badge/licence-GPL--3.0-845ec2?style=flat-square" alt="GPL-3.0"/>
+  <img src="https://img.shields.io/badge/license-GPL--3.0-845ec2?style=flat-square" alt="GPL-3.0"/>
 </p>
 
 <p>
-  <a href="#lancer"><img src="https://img.shields.io/badge/%E2%96%B6%20Lancer-222?style=for-the-badge" alt="Lancer"/></a>
-  <a href="#le-lanceur-lanceurexe"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Lanceur-222?style=for-the-badge" alt="Lanceur"/></a>
-  <a href="#vitesse"><img src="https://img.shields.io/badge/%E2%9A%A1%20Vitesse-222?style=for-the-badge" alt="Vitesse"/></a>
-  <a href="#mémoire"><img src="https://img.shields.io/badge/%F0%9F%A7%A0%20M%C3%A9moire-222?style=for-the-badge" alt="Mémoire"/></a>
-  <a href="#image"><img src="https://img.shields.io/badge/%F0%9F%96%BC%20Image-222?style=for-the-badge" alt="Image"/></a>
-  <a href="#ce-qui-reste-à-faire"><img src="https://img.shields.io/badge/%F0%9F%93%8B%20%C3%80%20faire-222?style=for-the-badge" alt="À faire"/></a>
+  <a href="#run-it"><img src="https://img.shields.io/badge/%E2%96%B6%20Run-222?style=for-the-badge" alt="Run"/></a>
+  <a href="#the-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Launcher-222?style=for-the-badge" alt="Launcher"/></a>
+  <a href="#speed"><img src="https://img.shields.io/badge/%E2%9A%A1%20Speed-222?style=for-the-badge" alt="Speed"/></a>
+  <a href="#memory"><img src="https://img.shields.io/badge/%F0%9F%A7%A0%20Memory-222?style=for-the-badge" alt="Memory"/></a>
+  <a href="#picture"><img src="https://img.shields.io/badge/%F0%9F%96%BC%20Picture-222?style=for-the-badge" alt="Picture"/></a>
+  <a href="#what-is-left"><img src="https://img.shields.io/badge/%F0%9F%93%8B%20To%20do-222?style=for-the-badge" alt="To do"/></a>
 </p>
 
 </div>
 
-Version de travail de [VIctory](https://github.com/Marvisak/VIctory), qui fait
-tourner la version Xbox Series d'un jeu en monde ouvert directement sous Windows,
-à partir des fichiers du jeu que l'utilisateur fournit. Elle part du fork
-[fxceless/victory-fork](https://github.com/fxceless/victory-fork) (commit
-`578d459`) et de ses commits suivants, jusqu'à `4e17478`, plus la « carte des
-vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
-`fx-heapmap`).
-
-> [!NOTE]
-> **Nouveau le 25/11 au soir** : un [lanceur](#le-lanceur-lanceurexe) avec
-> présence Discord et sauvegardes par endroit, deux [modes de test](#modes-de-test)
-> (sans textures, sans dessin), et la mesure de [ce que coûte le jeu
-> seul](#le-2511-au-soir--ce-que-coûte-le-jeu-seul-et-ce-que-coûte-notre-couche).
+A working version of [VIctory](https://github.com/Marvisak/VIctory), which runs
+the Xbox Series build of an open-world game natively on Windows, from game
+files you supply yourself. It starts from fxceless's
+[victory-fork](https://github.com/fxceless/victory-fork) (up to `4e17478`),
+with the view map of [Xeltax/VIcky](https://github.com/Xeltax/VIcky) and work
+from many other forks, named in each commit. *La même page en français :
+[README.fr.md](README.fr.md).*
 
 > [!IMPORTANT]
-> **Ce dépôt ne contient aucun fichier du jeu** : ni exécutable, ni données, ni
-> shaders extraits. Il faut sa propre copie du jeu. Ce projet n'est ni affilié à
-> son développeur ni son éditeur, ni approuvé par eux.
+> **This repository contains no game files**: no executable, data or extracted
+> shaders. You need your own copy of the game. Not affiliated with or endorsed
+> by the game's developer or publisher.
 
-Mis à jour le 25/11/2026 au soir (lanceur, modes de test, mesures du jeu
-seul, FSR expérimental).
+> [!NOTE]
+> **New on 25 November**: a [launcher](#the-launcher) with Discord presence and
+> saves by place, two [test modes](#test-modes) (no textures, no drawing), and
+> a measurement of [what the game costs on its own](#what-the-game-costs-alone-and-what-our-layer-costs).
 
-## Crédits et licence
+## Where the game stands
 
-- **[VIctory](https://github.com/Marvisak/VIctory)**, par Marvisak et ses
-  contributeurs, est la base de tout : le chargeur, les services du système,
-  le rendu Direct3D 12 et le recompilateur de shaders. Licence
-  GPL-3.0-or-later, comme ce dépôt (voir `LICENSE`).
-- **[victory-fork](https://github.com/fxceless/victory-fork)**, par fxceless :
-  le fork dont part ce travail (rendu du monde, ray tracing en cours).
-- **[VIcky](https://github.com/Xeltax/VIcky)**, par Xeltax : la carte des vues
-  pour la limite d'un million de vues des cartes NVIDIA.
-- **[XCL](https://github.com/ivall/xcl)**, par ivall (GPL-2.0-only), a servi de
-  référence pour le comportement du jeu sous une autre couche.
-- Le texte d'origine, en anglais, est dans
-  [docs/README-original.en.md](docs/README-original.en.md).
-- Développé avec [Claude Code](https://claude.com/claude-code).
+### Progress: about 59 %
 
-## Où en est le jeu
+`████████████░░░░░░░░` **about 59 %: playable** (you control the heroine in the prologue)
 
-### Avancement du portage : environ 59 %
+Measured on [PortWatch VI](https://portwatch-vi.xyz/#method)'s scale: up to
+50 %, each step needs the one before; beyond that, story, picture, speed and
+stability share the last 50 points. Those are our estimate: PortWatch counts
+them only with proof (a video).
 
-`████████████░░░░░░░░` **environ 59 % : jouable** (on dirige l'héroïne dans le prologue)
+| Milestone | % | State |
+|---|---|---|
+| Groundwork (loader, libraries, shaders, D3D12 rendering) | 0-10 | ✅ |
+| The executable runs | 10 | ✅ |
+| First picture (logos, intro) | 20 | ✅ |
+| Main menu | 30 | ✅ |
+| In the world (the prologue loads and shows) | 40 | ✅ |
+| Playable (you control a character) | 50 | ✅ the heroine moves in the prologue |
+| Story (17.5 points) | 0 | ⏳ still in the opening; finishing the prologue is worth about 3 |
+| Picture (12.5 points) | about 6 | ⚠️ lit, but big effects are missing (shadows, ray tracing) |
+| Speed (10 points: fps ÷ 30) | about 0.8 | ❌ 2.3 fps (best run, 25/11); goal 15 |
+| Stability (10 points) | about 2.5 | ⚠️ not measured over a long session yet |
 
-Mesuré avec le barème de [PortWatch VI](https://portwatch-vi.xyz/#method) :
-jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, le
-rendu, la vitesse et la stabilité se partagent les 50 derniers points. Ces
-points-là sont notre estimation : PortWatch ne les compte qu'avec une
-preuve (une vidéo).
-
-| Palier | % | État |
-|--------|---|------|
-| Fondations (chargeur, bibliothèques, shaders, rendu D3D12) | 0-10 | ✅ |
-| L'exécutable tourne | 10 | ✅ |
-| Première image (logos, intro) | 20 | ✅ |
-| Menu principal | 30 | ✅ |
-| Dans le monde (le prologue se charge et s'affiche) | 40 | ✅ |
-| Jouable (on dirige un personnage) | 50 | ✅ l'héroïne bouge dans le prologue |
-| Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
-| Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
-| Vitesse (10 points : images/s ÷ 30) | environ 0,8 | ❌ 2,3 images/s (meilleur essai du 25/11) ; objectif 15 |
-| Stabilité (10 points) | environ 2,5 | ⚠️ pas encore mesurée sur une longue partie |
-
-### Détail
-
-| Étape | État |
-|-------|------|
-| Démarrage, menus, écran titre | ✅ fonctionne |
-| Cinématique d'intro | ✅ se joue en entier et s'affiche correctement (vérifié en jeu le 25/11) |
-| Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
-| Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
-| Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
-| Images par seconde dans le monde | ❌ 2,3 (431 ms par image) sur RTX 3060 et 16 Go de RAM, carte occupée à 82 % ; 30 dans les menus |
-| Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
-| Stabilité | ⚠️ essai 11 (25/11) : 10 minutes sans plantage. Quand le PC n'a plus de mémoire à engager, le jeu se ferme sans rapport : un fichier d'échange de 32 Go au moins l'évite. Un débordement de pile est maintenant rapporté au lieu de fermer la fenêtre en silence |
+| Step | State |
+|---|---|
+| Boot, menus, title screen | ✅ works, 30 fps |
+| Intro cutscene | ✅ plays through and displays correctly |
+| Saves | ✅ the game saves and reloads a checkpoint |
+| Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
+| Light in the shade | ⚠️ fallback light by default: interiors and faces are lit, but some night cutscenes stay almost black (the game's ray tracing does not run yet) |
+| Frame rate in the world | ❌ 2.3 fps (431 ms a frame) on an RTX 3060 with 16 GB of RAM, GPU 82 % busy; 30 in the menus |
+| Memory | ❌ about 21 GB committed on a 16 GB PC (Windows pages to disk) |
+| Stability | ⚠️ 10 minutes without a crash in the longest measured run; a page file of 32 GB or more avoids silent exits when Windows runs out of commit |
 
 ```mermaid
 pie showData
-    title Avancement des étapes (sur 8)
-    "Fonctionne" : 3
-    "Partiel" : 3
-    "Pas encore" : 2
+    title Steps working (of 8)
+    "Working" : 3
+    "Partial" : 3
+    "Not yet" : 2
 ```
 
-## Lancer
+## Run it
 
-**Le plus simple** : télécharger le paquet de la
-[dernière version](../../releases/latest), le décompresser, mettre le dossier
-du jeu dans `victory.toml` (`[paths] game_dir = '...'`), lancer
-`Prechauffer.cmd` une fois (quelques minutes), puis `Lanceur.exe`. Il faut une
-carte RTX 20 ou plus récente, 16 Go de RAM ou plus, un fichier d'échange de
-32 Go et le « Visual C++ Redistributable » x64 de Microsoft.
+**Easiest:** download the package from the
+[latest release](../../releases/latest), unzip it, set your game folder in
+`victory.toml` (`[paths] game_dir = '...'`, the folder that holds
+`game_scarlett_master.exe`), run `Prechauffer.cmd` once (it translates every
+shader into the cache, a few minutes), then `Lanceur.exe`. On the title
+screen press A (Enter on the keyboard).
 
-**Depuis les sources** :
+**From source:**
 
 ```powershell
 cargo build --profile diag -p victory --features diagnostics
-target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute
+target\diag\victory.exe translate --cache
+target\diag\victory.exe run "<game folder>\game_scarlett_master.exe" --execute --console series-s
 ```
 
-Le chemin du jeu peut aussi être mis dans `victory.toml` (modèle :
-`victory.example.toml`).
+**You need** Windows 10/11 x64 with AVX2, a D3D12 GPU with shader model 6.6
+and mesh shaders (NVIDIA RTX 20 series or newer), 16 GB of RAM or more,
+Microsoft's Visual C++ x64 redistributable and a **page file of at least
+32 GB** (Advanced system settings → Performance → Virtual memory): the game
+commits about 21 GB, and with the default page file Windows runs out and the
+game closes without a report.
 
-### Le lanceur (`Lanceur.exe`)
+Recommended settings, all on by default: the **Series S** profile
+(`--console series-s`, lighter settings), the **fallback light**
+(`VICTORY_RT_MISS`, `0` turns it off), and the speed options that used to be
+switches (`VICTORY_TEXTURE_NO_WAIT`, `VICTORY_CARD_BUFFERS_MIN_MB`,
+`VICTORY_CARD_BUFFERS_MB`). Run `Prechauffer.cmd` again after every update of
+the shader translator: without it the first run translates shaders on the fly
+(a black or broken picture for minutes). What is left to try in game is in
+[docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md) (French).
 
-Une fenêtre en Rust (`apps/lanceur`) pour jouer sans PowerShell :
+### The launcher
 
-- **modes tout prêts** (ceux de `Lancer.cmd`, plus deux modes de test) et
-  **réglages à la main** : console S ou X, résolution interne (0,2 à 1,0),
-  upscaler du jeu, textures, éclairage, compteur, FSR d'AMD (expérimental),
-  variables `VICTORY_…` en plus ;
-- **images/s en direct** pendant la partie (ms par image, dessins, monde ou
-  menus, temps de jeu, dernières lignes du journal) ; le journal complet va
-  dans `logs\partie-lanceur-<date>.txt` ;
-- **présence Discord** : « Joue à » + le nom du jeu, d'après la fiche
-  que Discord a déjà dans sa liste publique de jeux (rien à créer), avec
-  l'endroit (monde ou menus), les images/s, le mode et le temps de jeu ;
-- **sauvegardes par endroit** : « Garder l'état actuel » sous un nom
-  (cellule, cafétéria, bateau...), puis repartir de là au lancement suivant
-  (les sauvegardes d'avant vont dans `_avant-restauration`).
+`Lanceur.exe` (source in `apps/lanceur`, Rust + egui, in French):
 
-Il retient ses réglages dans `%LOCALAPPDATA%\victory\lanceur.toml`. Pour le
-compiler (application à part, hors de l'espace de travail du jeu) :
+- **ready-made modes** and **manual settings**: Series S or X, internal
+  resolution (0.2 to 1.0), the game's own temporal upscaler, textures,
+  lighting, on-screen counter, AMD FSR (experimental), extra `VICTORY_…`
+  variables;
+- **live fps** while playing (ms a frame, draws, world or menus, play time,
+  last log lines); the full log goes to `logs\partie-lanceur-<date>.txt`;
+- **Discord presence**: "Playing" and the game's name, from the entry Discord
+  already has in its public list of games (nothing to create), with where you
+  are, the fps, the mode and the elapsed time;
+- **saves by place**: keep the current state under a name (cell, cafeteria,
+  boat...) and start from it next time (the saves before go to
+  `_avant-restauration`).
+
+It keeps its settings in `%LOCALAPPDATA%\victory\lanceur.toml`. Build it on
+its own (it is outside the game's workspace):
 
 ```powershell
 cd apps\lanceur
 cargo build --release
 ```
 
-puis copier `target\release\lanceur.exe` à la racine sous le nom
-`Lanceur.exe`.
+then copy `target\release\lanceur.exe` to the repository root as
+`Lanceur.exe`. It does not pick chapters (the game has none; saves by place
+stand in) and cannot teleport or make you invincible (that would need the
+player's position and health found in game memory, without symbols).
 
-**Ce qu'il ne fait pas** : choisir un chapitre (le jeu n'en a pas ; les
-sauvegardes par endroit en tiennent lieu), téléporter ou rendre invincible
-(il faudrait trouver dans la mémoire du jeu, sans symboles, la position et
-la santé du joueur).
+### Test modes
 
-### Modes de test
-
-| Option | Effet |
+| Switch | Effect |
 |---|---|
-| `VICTORY_NO_TEXTURES=1` | les textures du jeu ne sont ni envoyées à la carte ni montrées : chaque vue lit une petite texture grise de la même forme (2D, tableau, cube, 3D). Les cibles de rendu, la profondeur et ce que la carte écrit restent |
-| `VICTORY_NO_DRAWS=1` | ni pipelines ni shaders : chaque dessin du jeu est jeté, l'écran reste noir (le compteur s'affiche). Le jeu tourne quand même : sert à mesurer ce que coûte le jeu seul |
+| `VICTORY_NO_TEXTURES=1` | the game's textures are neither sent to the GPU nor shown: every view reads a small grey texture of the same shape (2D, array, cube, 3D). Render targets, depth and what the GPU writes stay |
+| `VICTORY_NO_DRAWS=1` | no pipelines, no shaders: every draw is dropped and the screen stays black (the counter shows). The game still runs, to measure the game on its own |
 
-### Réglages conseillés (PC de 16 Go)
+## Speed
 
-- **Mode Series S** : ajouter `--console series-s` à la commande. Le jeu se
-  croit sur Xbox Series S et choisit ses réglages plus légers (résolution,
-  budgets de mémoire) : c'est le mode utilisé pour les essais récents.
-
-  ```powershell
-  target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute --console series-s
-  ```
-
-- **Fichier d'échange de 32 Go au moins** (Paramètres système avancés →
-  Performances → Mémoire virtuelle). Le jeu engage environ 21 Go : avec le
-  fichier d'échange par défaut, Windows n'a plus de mémoire à engager et le
-  jeu se ferme sans rapport.
-- **Lumière de secours** : active par défaut (`VICTORY_RT_MISS`), tant que le
-  ray tracing du jeu ne tourne pas. Elle éclaire les zones à l'ombre ;
-  `VICTORY_RT_MISS=0` la coupe pour comparer.
-- À l'écran titre, appuyer sur **A** (Entrée au clavier).
-
-Les options de vitesse d'avant (`VICTORY_TEXTURE_NO_WAIT`,
-`VICTORY_CARD_BUFFERS_MIN_MB`, `VICTORY_CARD_BUFFERS_MB`) sont maintenant
-actives par défaut : la commande ci-dessus suffit.
-
-**Avant de jouer, et après chaque mise à jour du traducteur de shaders** :
-double-cliquer sur `Prechauffer.cmd` (ou `victory.exe translate --cache`).
-Il traduit d'avance tous les shaders du jeu (25 674 sur environ 26 000)
-dans le cache, comme une partie le ferait, pour que le jeu ne le fasse pas
-en pleine partie : quelques minutes la première fois. Sans lui, le premier
-lancement les traduit au fil de l'eau : image noire ou cassée pendant
-plusieurs minutes. Recompiler le reste de `victory.exe` ne vide plus ce
-cache (il ne dépend plus que du code du traducteur). Ce qui reste à essayer en jeu est décrit dans
-[docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md).
-
-## Vitesse
-
-Temps par image dans le monde, en millisecondes (scène de la cellule, carte
-RTX 3060, 16 Go de RAM, mode Series S).
+Frame time in the world (the cell scene, RTX 3060, 16 GB, Series S profile):
 
 ```mermaid
 xychart-beta
-    title "Temps par image (ms), plus bas = mieux ; objectif 66 ms (15 images/s)"
-    x-axis ["Avant (24/11)", "Correctifs du 24/11", "Meilleur du 25/11 (c1e7541)", "Objectif"]
+    title "Frame time (ms), lower is better; goal 66 ms (15 fps)"
+    x-axis ["Before (24/11)", "24/11 fixes", "Best of 25/11", "Goal"]
     y-axis "ms" 0 --> 1400
     bar [1316, 540, 431, 66]
 ```
 
 ```mermaid
 xychart-beta
-    title "Où passent les 431 ms d'une image, 25/11 (ms)"
-    x-axis ["Carte graphique", "Préparation (copies)", "Recopie vers le jeu"]
+    title "Where the 431 ms of a frame go, 25/11 (ms)"
+    x-axis ["GPU", "Preparing (copies)", "Copy-back"]
     y-axis "ms" 0 --> 250
     bar [207, 135, 50]
 ```
 
-**Pourquoi 15 images/s est encore loin** : même avec une carte infiniment
-rapide, la préparation et la recopie (environ 185 ms) plafonneraient le jeu
-vers 5 images/s. Il faut diviser chacun des trois morceaux par 3 à 7.
+### What the game costs alone, and what our layer costs
 
-### Le 25/11 : ce qui a aidé, ce qui a perdu
+Three runs at the cell with the test modes:
 
-De 2,2 à **2,33 images/s** (431 ms : préparation 135, carte 207, recopie 50).
-
-| Essai | Résultat | Gardé ? |
-|---|---|---|
-| Copies sur place (`crate::plaincopy`, repris de fxceless `a253706`) | copies 140 → 105 ms | ✅ par défaut |
-| Fenêtres sur une grille de 1 Mo, avec queues | 22,1 → 21,4 Go réservés | ✅ par défaut |
-| Recopie par `plaincopy` | recopie 50 → 48 ms | ✅ |
-| Compteur dans l'image (`VICTORY_HUD=0` le cache), menu `Lancer.cmd` | — | ✅ |
-| Bornages indirects regroupés (`VICTORY_HOIST_CLAMPS=1`, idée de Belobug) | carte 207 → 239 ms, grillage de la fenêtre disparu | ❌ |
-| Textures à 60 % de la carte | 14 600 textures en attente, vêtements en blocs | ❌ |
-| Fenêtres et tampons sur la carte (90 %, 4 Go) | carte +64 ms | ❌ |
-| Résolution 0,5 + éclairage simplifié | carte −80 ms mais 2,3 à 2,6 images/s et blocs | ❌ |
-| Lecture sur place (`VICTORY_INPLACE`) | carte retirée au bout de 30 s (NVIDIA verrouille la section en RAM) ; à 1 Go : 2,19 images/s | ❌ sur 16 Go |
-| Shaders : écriture de défaut seulement pour les pages absentes | carte 207 → 260 ms, 1,9 images/s | ❌ annulé |
-
-### Le 25/11 au soir : ce que coûte le jeu seul, et ce que coûte notre couche
-
-Trois essais à la cellule (RTX 3060, 16 Go), avec les modes de test :
-
-| Par image | Normal | Sans textures, résolution basse | Sans dessin (`VICTORY_NO_DRAWS`) |
+| Per frame | Normal | No textures, low resolution | No drawing (`VICTORY_NO_DRAWS`) |
 |---|---|---|---|
-| Images/s | 2,3 | **3,0** (stable) | **19 à 24** |
-| Temps par image | 431 ms | 333 ms | 42 à 53 ms |
-| Préparation (nos copies) | 135 ms | 130 ms (85 ms pour 180 Mo copiés) | 0,4 ms |
-| Carte | 207 ms | 112 ms | 0 |
-| Recopie vers le jeu | 50 ms | 34 ms | 0,1 ms |
-| RAM du jeu (réservée) | 21 Go | 14,4 Go | **6 Go** |
-| Mémoire de la carte | 8 Go | 4 Go | — |
+| fps | 2.3 | **3.0** (steady) | **19 to 24** |
+| Frame time | 431 ms | 333 ms | 42 to 53 ms |
+| Preparing (our copies) | 135 ms | 130 ms (85 ms for 180 MB copied) | 0.4 ms |
+| GPU | 207 ms | 112 ms | 0 |
+| Copy-back into game memory | 50 ms | 34 ms | 0.1 ms |
+| Game RAM (committed) | 21 GB | 14.4 GB | **6 GB** |
+| GPU memory | 8 GB | 4 GB | — |
 
 ```mermaid
 xychart-beta
-    title "Temps par image à la cellule (ms), plus bas = mieux"
-    x-axis ["Normal", "Sans textures + basse résolution", "Sans dessin"]
+    title "Frame time at the cell (ms), lower is better"
+    x-axis ["Normal", "No textures + low resolution", "No drawing"]
     y-axis "ms" 0 --> 450
     bar [431, 333, 48]
 ```
 
-Ce qu'on en tire :
+What this says:
 
-1. **Le plafond de ce PC est d'environ 20 images/s** : sans rien dessiner,
-   le code du jeu (monde, personnages, chargements, son) et nos services
-   système prennent 42 à 53 ms par image. Ce temps varie avec ce que le jeu
-   charge : sans dessin aussi, les images ne sont pas régulières.
-2. **Les 15 Go qui font déborder la RAM sont ceux de notre couche
-   graphique** (6 Go sans dessin, 21 Go avec), pas ceux du jeu.
-3. **Hypothèse** : textures et résolution ne sont plus le problème (sans
-   elles, la carte ne passe que de 207 à 112 ms). Ce qui reste ne dépend
-   pas des pixels :
-   - nos **copies de la mémoire du jeu vers la carte, environ 180 Mo par
-     image** (sommets, constantes, instances que le jeu change), recopiées
-     à chaque image : c'est le plus gros mur, 130 ms, et il ne bouge avec
-     aucun réglage ;
-   - **notre travail par dessin sur la carte** (environ 2 000 bornages de
-     draws indirects, chacun entouré d'une vidange, et nos comparaisons) :
-     environ 110 ms quelle que soit la résolution ;
-   - la **RAM pleine** (1 Go libre pendant ces essais) qui fait échanger
-     Windows avec le disque.
+1. **This PC tops out around 20 fps**: with nothing drawn, the game's own
+   code (world, characters, streaming, sound) and our system services take
+   42 to 53 ms a frame, and that time varies with what the game loads.
+2. **The 15 GB that overflow the RAM are our graphics layer's**, not the
+   game's (6 GB without drawing, 21 GB with).
+3. **Hypothesis**: textures and resolution are no longer the problem
+   (without them the GPU only goes from 207 to 112 ms). What is left does not
+   depend on pixels: our copies of about **180 MB of game memory to the GPU
+   every frame** (vertices, constants, instances the game changes; 130 ms,
+   the biggest wall, unmoved by any setting), our work around each indirect
+   draw (about 2,000 clamp passes, each with a pipeline drain, plus our
+   compares: about 110 ms at any resolution), and a full RAM (1 GB free).
+   The next real gain is to **keep the game's data on the GPU instead of
+   copying it every frame**.
 
-   Le prochain vrai gain est donc de **garder les données du jeu sur la
-   carte au lieu de les recopier** à chaque image (ce que vise la pile de
-   ScarlettPort, et ce qui a échoué ici jusqu'à présent faute de RAM).
+### What helped and what did not (25 November)
 
-Autres essais du soir :
-
-| Essai | Résultat |
-|---|---|
-| Bornages faits par le processeur | au plus 35 % des 2 000 bornages s'y prêtent (les autres lisent des arguments qu'un shader vient d'écrire) : au mieux environ 25 ms de carte gagnés ; pas fait |
-| Copies dans la mémoire de la carte coupées (`VICTORY_CARD_BUFFERS=0`) | carte 30 à 130 ms (la moitié de nos 207 ms est donc notre propre travail de comparaison), mais préparation 490 ms et recopie 190 ms : 0,6 à 1,6 image/s, pire |
-| Recopie qui ne compare que les pages écrites (VIctory `cd94d35`) | environ 100 conflits sur cette branche : à refaire à la main |
-
-### Où va le temps de la carte (essai `VICTORY_GPU_TIMING=1`)
-
-Aucun programme du jeu ne domine : le plus cher prend 6 ms par image.
-Sur les 122 ms notées commande par commande, **80 ms vont aux 4 100 draws
-indirects** (environ 20 µs chacun : le coût des passes de bornage et des
-barrières qui les entourent plus que du calcul), 34 ms aux dispatchs de
-calcul, le reste aux mesh, copies et envois de textures. La carte compte
-environ 200 ms par image en tout : les horodatages NVIDIA ne voient pas les
-vidanges entre les passes.
-
-### Les autres forks, mesurés ou annoncés
-
-| Fork | Carte | Images/s annoncées | Ce qui peut servir ici |
-|---|---|---|---|
-| Ici (25/11) | RTX 3060, 16 Go | **2,3** (mesuré) | — |
-| [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) v0.2.1 | RTX 3060, 32 Go conseillés | environ 4 | recopie limitée aux tampons relus, attentes de lecture 156 → 26 ms. **Essayé ici le 25/11** avec leurs réglages : écran noir à l'intro, 0,4 à 0,8 image/s, 1 400 à 3 300 draws sautés faute de pipelines (leur préparation `warm` + `precompile-graphics` dure plus de 20 min, coupée) |
-| [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1,03 (ville) | ray tracing qui tourne vraiment dans la ville (Radeon) ; suivi précis des écritures des shaders (`bc3cd4b`) |
-| [VItoriaBr](https://github.com/uiliannn/VItoriaBr) | RTX 5060 Ti, 40 Go | 3,5 à 6 | leur carte ne passe que 50 à 65 ms par image : la différence avec nous vient de nos comparaisons dans la mémoire de la carte et de la RAM (40 Go) |
-| [ztrx](https://github.com/Zettrox/ztrx) | RTX 3050 | 1 à 3 | le code de fxceless jusqu'à `4e17478` (déjà ici) ; le prologue y va de la cellule à la poursuite en bateau, 1 h 30 sans plantage |
-| [VIctory](https://github.com/Marvisak/VIctory) (`cd94d35`) | — | — | la recopie ne compare que les pages écrites |
-
-| Par image | Avant | Après |
+| Change | Result | Kept? |
 |---|---|---|
-| Attente des pipelines | 500 ms à chaque image | 0 ms |
-| Pipelines en cours de fabrication | 900 à 1 900, pendant des minutes | 0 une fois dans le monde |
-| Carte graphique | 390 à 440 ms | 300 à 340 ms |
-| Préparation (copies de la mémoire du jeu) | 230 à 280 ms | 130 à 160 ms |
-| Recopie vers le jeu | 90 à 120 ms | 57 à 70 ms |
+| In-place copies (`crate::plaincopy`, from fxceless `a253706`) | copies 140 → 105 ms | ✅ default |
+| Windows on a 1 MiB grid, with tails | 22.1 → 21.4 GB committed | ✅ default |
+| Copy-back through `plaincopy` | 50 → 48 ms | ✅ |
+| On-picture counter (`VICTORY_HUD=0` hides it), `Lancer.cmd` menu | — | ✅ |
+| Grouped indirect clamps (`VICTORY_HOIST_CLAMPS=1`, Belobug's idea) | GPU 207 → 239 ms, a window's fence vanished | ❌ |
+| Textures at 60 % of the GPU | 14,600 textures waiting, clothes in blocks | ❌ |
+| Windows and buffers on the GPU (90 %, 4 GB) | GPU +64 ms | ❌ |
+| Half resolution + simplified lighting | GPU −80 ms but 2.3 to 2.6 fps and blocks | ❌ |
+| In-place reads (`VICTORY_INPLACE`) | GPU lost after 30 s (NVIDIA locks the whole section in RAM); at 1 GB: 2.19 fps | ❌ on 16 GB |
+| Shaders note missing pages in a branch of their own | GPU 207 → 260 ms, 1.9 fps | ❌ reverted |
+| Clamps done by the CPU | at most 35 % of the 2,000 qualify (the rest read arguments a shader just wrote): about 25 ms at best | not done |
+| Card-memory copies off (`VICTORY_CARD_BUFFERS=0`) | GPU 30 to 130 ms (half our 207 ms is our own compare work), but preparing 490 ms and copy-back 190 ms: worse | ❌ |
+| ScarlettPort's runtime as-is, with its settings | black intro, 0.4 to 0.8 fps, thousands of draws dropped for want of pipelines | ❌ |
+| Upstream's page-marked copy-back (`cd94d35`) | about 100 conflicts on this branch: to be redone by hand | open |
 
-### Profil du 25/11 (essai 9, dans le monde)
+**Where the GPU's time goes** (`VICTORY_GPU_TIMING=1`): no game program
+dominates, the most expensive takes 6 ms a frame. Of the 122 ms noted command
+by command, **80 ms go to the 4,100 indirect draws** (about 20 µs each: the
+clamp passes and barriers around them more than the work), 34 ms to compute
+dispatches, the rest to mesh draws, copies and texture uploads. The GPU counts
+about 200 ms a frame in all: NVIDIA's timestamps do not see the drains between
+passes.
 
-2 à 2,5 images/s, 400 à 540 ms par image : carte graphique 100 à 220 ms,
-préparation 150 à 480 ms, recopie vers le jeu environ 300 ms (sur un autre
-fil, en parallèle). Le temps actif des processeurs se partage ainsi :
+### Other forks
 
-| Qui | Part |
-|-----|------|
-| Le code du jeu lui-même | 58 % |
-| Copies de la mémoire du jeu vers ses copies côté PC (`Shadow::update`) | 14 % |
-| Recopie de ce que la carte a écrit (`relay_land`) | 10 % |
-| Surveillance des écritures (`watch::writes`) | 3,5 % |
-| Lecture des fichiers du jeu, son | environ 5 % |
-
-Nos copies passent presque toutes par le noyau de Windows, qui va chercher
-sur le disque les pages échangées : la mémoire freine aussi le processeur.
-Prochaine mesure : `VICTORY_GPU_TIMING=1`, pour savoir quelles commandes
-occupent la carte. Objectif : 15 images/s, soit moins de 66 ms par image.
-
-### Les modes essayés pour que la carte n'attende plus
-
-La carte reste inactive environ 40 % du temps : le fil qui lui envoie le
-travail attend qu'elle ait fini chaque envoi (environ 30 fois par image)
-avant de préparer le suivant. Le fork d'origine a des modes qui envoient la
-suite sans attendre. Sur ce PC (16 Go), ils sont plus lents : le travail en
-vol demande plus de mémoire, qui déborde déjà.
-
-```mermaid
-xychart-beta
-    title "Temps par image à la cellule (ms), plus bas = mieux"
-    x-axis ["Normal", "VICTORY_LATE_WAIT=3", "VICTORY_RELAY=2 + WIDE_BACK"]
-    y-axis "ms" 0 --> 1000
-    bar [540, 850, 900]
-```
-
-| Par image | Normal | Attente tardive | Relais |
+| Fork | GPU | fps | Of use here |
 |---|---|---|---|
-| Recopie vers le jeu | ~70 ms | 170 à 300 ms | 270 à 700 ms |
-| Menus | 30 fps | — | 2 à 3 fps |
+| This one (25/11) | RTX 3060, 16 GB | **2.3** (measured) | — |
+| [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) | RTX 3060, 32 GB advised | about 4 | copy-back for read-back buffers only, read waits 156 → 26 ms; tried here: under 1 fps |
+| [VItoriaBr](https://github.com/uiliannn/VItoriaBr) | RTX 5060 Ti, 40 GB | 3.5 to 6 | their GPU takes 50 to 65 ms a frame |
+| [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1.03 | ray tracing that really runs (Radeon); precise tracking of shader writes |
+| [VIctory](https://github.com/Marvisak/VIctory) (`cd94d35`) | — | — | copy-back compares only the pages shaders wrote |
+| [ztrx](https://github.com/Zettrox/ztrx) | RTX 3050 | 1 to 3 | fxceless's code up to `4e17478` (already here); prologue to the boat chase, 1 h 30 without a crash |
 
-Ils restent éteints par défaut.
+## Memory
 
-### Les débuts de plan
-
-À chaque changement de plan, des centaines de nouvelles textures arrivent :
-la passe qui les crée et les envoie à la carte coûte alors de 150 à
-1 600 ms par image (35 ms une fois la scène chargée). C'est ce qui donne les
-personnages en basse qualité et les blocs pixelisés des premières secondes.
-Leur préparation (lecture, empreinte, détuilage) tourne maintenant sur
-plusieurs cœurs (`VICTORY_WIDE_TEXTURES=0` : sur un seul, comme avant).
-
-Ce qui a changé : une image n'attend plus des pipelines qui ne seront pas
-prêts à temps, les pipelines se fabriquent à la priorité du jeu, le cache des
-pipelines (1 Go) n'est plus réécrit toutes les 20 s, et le cache des shaders
-survit aux recompilations.
-
-Ce qui limite maintenant : la carte graphique (environ 325 ms), occupée à
-57 % seulement, et sa mémoire presque pleine (10,8 Go sur 12). La prochaine
-mesure (`VICTORY_GPU_TIMING=1`) dira quels programmes coûtent le plus. Pour
-15 images/s il faut descendre sous 66 ms.
-
-## Mémoire
-
-PC de test : Windows 11, carte NVIDIA, **16 Go de RAM**, fichier d'échange de
-32 Go.
-
-### Mémoire du jeu au fil du temps
-
-Mémoire privée du processus, en Go, mesurée toutes les 15 secondes. Le saut
-vers 1 min 30 correspond à l'arrivée dans le monde.
+Test PC: Windows 11, NVIDIA GPU, **16 GB of RAM**, 32 GB page file.
 
 ```mermaid
 xychart-beta
-    title "Mémoire privée (Go), sans options"
-    x-axis "secondes" [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300]
-    y-axis "Go" 0 --> 24
+    title "Private memory (GB) over a run, no options"
+    x-axis "seconds" [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300]
+    y-axis "GB" 0 --> 24
     line [7.1, 7.7, 8.0, 8.2, 8.5, 12.7, 16.1, 16.4, 16.8, 16.7, 17.8, 17.7, 17.2, 17.9, 18.4, 18.6, 20.1, 21.6, 22.4, 22.4]
 ```
 
-### Les lancements comparés
-
-```mermaid
-xychart-beta
-    title "Mémoire privée au plus haut (Go)"
-    x-axis ["Sans options", "Blocs 512 Mo", "512 Mo + trous", "Blocs 64 Mo"]
-    y-axis "Go" 0 --> 24
-    bar [22.9, 18.6, 12.7, 17.8]
-```
-
-```mermaid
-xychart-beta
-    title "Durée avant arrêt (secondes)"
-    x-axis ["Sans options", "Blocs 512 Mo", "512 Mo + trous", "Blocs 64 Mo"]
-    y-axis "secondes" 0 --> 320
-    bar [305, 183, 107, 168]
-```
-
-| Lancement | Mémoire au plus haut | Copies de la mémoire du jeu | Fin |
-|-----------|----------------------|-----------------------------|-----|
-| Sans options | 22,9 Go, en hausse | 4,2 Go | arrêté à 5 min, pas de plantage |
-| `VICTORY_POOL_COMMIT=1` + `VICTORY_INPLACE=1`, blocs de 512 Mo | 18,6 Go | 4,5 Go | plantage à 183 s (RAM épuisée) |
-| idem + fenêtres « à trous » | 12,7 Go | presque aucune à ce moment | plantage à 107 s (RAM épuisée) |
-| idem, blocs de 64 Mo | 17,8 Go | 4,4 Go | plantage à 168 s (mémoire réservable de Windows épuisée) |
-
-### Où va la mémoire du jeu (lancement sans options, à 5 min)
-
-Mémoire réservée par type, en Go (toute n'est pas en RAM à la fois).
+The jump near 1 min 30 is the arrival in the world.
 
 ```mermaid
 pie showData
-    title Mémoire réservée par le jeu (Go)
-    "Vues des pages du jeu" : 7.4
-    "Buffers partagés avec la carte" : 7.2
-    "Tas du jeu" : 4.6
-    "Autres allocations" : 4.3
-    "Fenêtres de mémoire du jeu" : 2.4
-    "Tas du processus" : 1.0
+    title Memory committed by the game at 5 min (GB)
+    "Views of game pages" : 7.4
+    "Buffers shared with the GPU" : 7.2
+    "Game heap" : 4.6
+    "Other allocations" : 4.3
+    "Windows of game memory" : 2.4
+    "Process heap" : 1.0
 ```
 
-### La mémoire prise hors du jeu
+About 7 GB are taken before the game starts; closing Discord, Chrome and
+Overwolf frees about 3.3 GB.
 
-Environ 7 Go sont déjà pris avant de lancer le jeu. Fermer Discord, Chrome et
-Overwolf en libère environ 3,3 Go.
+What we learned:
 
-```mermaid
-pie showData
-    title Mémoire hors du jeu (Go)
-    "Discord" : 1.6
-    "Chrome" : 1.5
-    "App Claude" : 1.4
-    "Noyau Windows et pilotes" : 1.0
-    "Edge WebView" : 0.4
-    "Defender" : 0.4
-    "Overwolf" : 0.2
-```
+- NVIDIA's driver refuses to open the game's 6.1 GB pool as one section; split
+  in blocks (`VICTORY_POOL_BLOCK_MB`, 64 by default) each block opens.
+- **Opening a section on the GPU locks all of it in RAM**, even pages never
+  touched, so open sections count against `VICTORY_INPLACE_MB` (4096 by
+  default).
+- Most refused 4 MB windows are only **partly mapped** by the game (803
+  windows, 3.4 GB); very few have their pages out of order (32, 140 MB).
+  Partial windows whose pages follow one section are now read without a copy
+  (`VICTORY_INPLACE_HOLES=0` goes back to copying).
+- Pointing a reserved buffer's tiles at a section **loses the NVIDIA GPU**.
+- With `VICTORY_POOL_COMMIT=1` Windows commits 6.1 GB more at once: on this
+  PC the game crashes sooner. **For now, run without the memory options.**
 
-### Ce qu'on a appris
+| Run | Peak memory | Copies of game memory | End |
+|---|---|---|---|
+| No options | 22.9 GB, rising | 4.2 GB | stopped at 5 min, no crash |
+| `VICTORY_POOL_COMMIT=1` + `VICTORY_INPLACE=1`, 512 MB blocks | 18.6 GB | 4.5 GB | crash at 183 s (RAM exhausted) |
+| same + windows with holes | 12.7 GB | almost none then | crash at 107 s (RAM exhausted) |
+| same, 64 MB blocks | 17.8 GB | 4.4 GB | crash at 168 s (Windows commit exhausted) |
 
-- Le pilote NVIDIA refuse d'ouvrir le pool du jeu (6,1 Go) en une seule
-  section. Découpé en blocs (`VICTORY_POOL_BLOCK_MB`, 64 par défaut), chaque
-  bloc s'ouvre.
-- **Ouvrir une section côté carte graphique la verrouille entièrement en
-  RAM**, même les pages jamais touchées. Les sections ouvertes comptent donc
-  dans la limite `VICTORY_INPLACE_MB` (4096 par défaut).
-- La plupart des fenêtres de 4 Mo refusées ne sont que **partiellement
-  mappées** par le jeu (803 fenêtres, 3,4 Go). Très peu ont leurs pages dans le
-  désordre (32, 140 Mo). Les fenêtres partielles dont les pages suivent une
-  même section sont maintenant lues sans copie (`VICTORY_INPLACE_HOLES=0`
-  revient à la copie).
-- Pointer les tuiles d'un buffer réservé vers une section **fait perdre la
-  carte NVIDIA**. Les pages dispersées ne peuvent donc pas être couvertes par
-  cette voie. Test : `cargo test -p victory-gpu card_probe -- --ignored --nocapture`.
-- Avec `VICTORY_POOL_COMMIT=1`, Windows réserve d'un coup 6,1 Go de plus : sur
-  ce PC, le jeu plante plus tôt. **Pour l'instant, mieux vaut lancer sans les
-  options mémoire.**
-
-## Image
+## Picture
 
 ### Shaders
 
-Le jeu contient 26 084 shaders ; une scène en utilise environ 2 000.
-Chiffres du 26/11 (traduction hors jeu de tout `shaders.rpf`, carte en
-vagues de 32 comme une RTX 3060).
+The game holds 26,084 shaders; a scene uses about 2,000. Offline translation
+of the whole archive, with 32-lane waves as on an RTX 3060:
 
-```mermaid
-xychart-beta
-    title "Shaders traduits sur tout le jeu, par sorte (%)"
-    x-axis ["Sommets et pixels", "Calcul", "Mesh", "Ensemble"]
-    y-axis "%" 95 --> 100
-    bar [99.99, 98.95, 100, 99.89]
-```
-
-| Sorte | Traduits | Au total | % |
+| Kind | Translated | Total | % |
 |---|---|---|---|
-| Sommets et pixels | 14 246 | 14 247 | 99,99 % |
-| Calcul | 2 654 | 2 682 | 98,95 % |
-| Mesh | 8 765 | 8 765 | 100 % |
-| **Ensemble** | **25 665** | **25 694** | **99,89 %** |
-
-S'y ajoutent 195 shaders de géométrie (voxels, 0,7 % du jeu) dont les
-ressources ne sont pas encore suivies : en les comptant, 98,4 % des
-26 084 shaders se traduisent.
-
-```mermaid
-xychart-beta
-    title "Shaders traduits sur tout le jeu (%), au fil des jours"
-    x-axis ["25/11", "26/11"]
-    y-axis "%" 99 --> 100
-    bar [99.68, 99.89]
-```
-
-Débloqués le 26/11 : **4 traceurs d'ombres** (CS_TraceShadowRays : une
-table des adresses des tampons par case du tas, reprise du runtime de
-ScarlettPort, GPL-3.0) et **40 surfaces** (murs et sols PS_TexturedDeferred,
-PS_TexturedLit, reflets de miroir, flaques, 3 mesh de terrain et d'ombres).
-Elles choisissaient entre deux échantillonneurs fixes (répéter ou bloquer
-au bord), ce qu'un handle D3D12 ne peut pas faire : chaque lecture de
-texture est maintenant faite avec les deux et le bon résultat gardé.
-Les 24 et 25/11 : flaques (2), simulation d'eau (1), transparence (2),
-personnages à section ordonnée POPS (10, cheveux et cils).
-
-Les 29 encore refusés, par cause :
+| Vertex and pixel | 14,246 | 14,247 | 99.99 % |
+| Compute | 2,654 | 2,682 | 98.95 % |
+| Mesh | 8,765 | 8,765 | 100 % |
+| **All** | **25,665** | **25,694** | **99.89 %** |
 
 ```mermaid
 pie showData
-    title Shaders encore refusés sur tout le jeu (29)
-    "Vagues de 64 partageant la LDS (particules, traînées, eau, ombres de cheveux)" : 24
-    "Masques de lanes (eau, ombres, traceur adaptatif)" : 4
-    "Sommets et pixels (voxels)" : 1
+    title Shaders still refused (29)
+    "64-lane waves sharing LDS (particles, trails, water, hair shadows)" : 24
+    "Lane masks (water, shadows, adaptive tracer)" : 4
+    "Vertex and pixel (voxels)" : 1
 ```
 
-Les 24 « vagues de 64 » partagent la mémoire de groupe entre plusieurs
-vagues : c'est l'étape 8 de [docs/wave64-on-wave32.md](docs/wave64-on-wave32.md),
-encore ouverte (risque de bloquer la carte). Dans la scène de la cellule,
-il en manque 6.
+Plus 195 geometry shaders (voxels, 0.7 % of the game) whose resources are not
+tracked yet: counting them, 98.4 % of the 26,084 shaders translate. The 24
+"64-lane waves" share group memory between several waves: step 8 of
+[docs/wave64-on-wave32.md](docs/wave64-on-wave32.md), still open.
 
-### Agrandissement de l'image (FSR)
+### Upscaling (FSR)
 
-En mode Series S, le jeu rend en 1280×720 et demande à **FSR 4** de l'agrandir
-en 1920×1080. FSR 4 ne tourne pas ici (ses passes demandent une fonction du
-pilote Xbox que l'on n'a pas, et ses programmes de secours sont en shader
-model 5) : un **étirement simple** le remplace (`victory-gpu/src/upscale.rs`),
-sans netteté ni accumulation. L'image est donc plus floue que sur console.
+As a Series S the game renders 1280×720 and asks **FSR 4** for 1920×1080. FSR 4
+cannot run here (its passes need an Xbox driver method we do not have, and its
+fallback programs are shader model 5), so a **plain stretch** stands in
+(`victory-gpu/src/upscale.rs`), with no sharpening and no accumulation: the
+picture is softer than on the console.
 
-Expérimental (25/11) : le module d'upstream (VIctory `0b35b7f`,
-`victory-hle/src/modules/fidelityfx.rs`) qui sert les appels du jeu avec le
-**FSR PC d'AMD** sur la carte (FSR 3.1.6 sur une RTX). Il demande le DLL
-officiel `amd_fidelityfx_upscaler_dx12.dll` du
-[FidelityFX SDK](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK)
-dans un dossier donné par `VICTORY_FIDELITYFX_DIR` ; sans lui, c'est
-l'étirement simple. Le jeu décrit ses images avec des formats console (une
-sortie R9G9B9E5 que le PC ne sait pas écrire : image verte, bleue ou rouge
-au premier essai) : les formats annoncés sont ceux de nos copies, et la
-profondeur passe par une copie R32. Le deuxième essai a perdu la carte
-graphique : **à ne pas utiliser pour jouer**. Le FSR n'apporterait de toute
-façon que de la netteté (1 à 2 ms de carte), pas d'images/s.
-
-Autre piste, pas encore faite : le jeu fournit au FSR tout ce dont le
-**DLSS** d'NVIDIA a besoin (couleur, profondeur, vecteurs de mouvement,
+Experimental: upstream's module (VIctory `0b35b7f`,
+`victory-hle/src/modules/fidelityfx.rs`) serves the game's calls with **AMD's
+PC FSR** (3.1.6 on an RTX). It needs the official
+`amd_fidelityfx_upscaler_dx12.dll` from the
+[FidelityFX SDK](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) in
+a folder named by `VICTORY_FIDELITYFX_DIR`; without it, the plain stretch runs.
+The game describes its images with console formats (an R9G9B9E5 output a PC
+cannot write: a flat green, blue or red picture in the first test), so the
+formats given are those of our copies and depth goes as an R32 copy. The
+second test lost the GPU: **do not use it to play**. FSR would only bring
+sharpness (1 to 2 ms of GPU), not frames. Not done yet: NVIDIA **DLSS**, for
+which the game already provides everything (colour, depth, motion vectors,
 jitter).
 
 ### Ray tracing
 
-Les commits `6a2d9f9` à `7b0f736` du fork sont intégrés : les programmes
-d'ombre et de tracé se traduisent, et le test rayon/boîte et rayon/triangle du
-matériel est émulé. La perte de la carte graphique de ces versions venait
-d'une forme « wave64 » des shaders de particules, qui met des barrières de
-groupe dans des branches et des boucles. Elle est maintenant active par défaut
-pour les programmes **sans boucle**, et pour ceux dont les branches élargies
-sont toutes hors des boucles (`VICTORY_WAVE_WIDE=1` : partout, `0` : nulle
-part).
-Le ray tracing reste désactivé par défaut (`VICTORY_BVH_BUILDER=1`). Tant
-qu'il l'est, une **lumière de secours** est active : le test rayon/nœud
-répond « rien touché », ce qui éclaire les zones à l'ombre sans ombres de
-ray tracing (`VICTORY_RT_MISS=0` la coupe). Les cinématiques de nuit restent
-très sombres : leurs visages ne sont éclairés que par les contours. Détails :
-[docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
+The game's indirect light and the shadows of its lamps and sun are ray traced,
+in its own compute shaders (no ray-tracing API): the builder programs
+(49 of 52), the trace programs (59 of 64) and the shading program translate,
+and the hardware ray/box and ray/triangle test is emulated and checked bit for
+bit on the GPU over 311 cases. The builder is **off by default**
+(`VICTORY_BVH_BUILDER=1` turns it on) and has not run end to end in the game.
+Meanwhile a **fallback light** is on: the ray test answers "nothing hit",
+which lights shaded areas without ray-traced shadows (`VICTORY_RT_MISS=0`
+turns it off). Details: [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
 
-## Ce qui reste à faire
+## What is left
 
-1. Vitesse : ce PC plafonne vers 20 images/s (le jeu seul, mesuré sans
-   dessin) ; d'ici là, les trois morceaux comptent (carte
-   207 ms, préparation 135, recopie 50). Côté carte : réduire nos propres
-   passes autour des 4 100 draws indirects (bornages et barrières), accélérer
-   les programmes de 64 fils sur une carte à 32 voies, baisser la résolution
-   des ombres en cascade. Côté processeur : reprendre la pile de ScarlettPort
-   (recopie des seuls tampons relus, lectures servies sur la carte) et la
-   recopie de VIctory qui ne compare que les pages écrites (`cd94d35`).
-2. Traduire les shaders encore refusés (157 dans l'essai 11) : groupes de
-   plusieurs vagues de 64 qui partagent leur mémoire, surfaces, volumes d'eau.
-3. Faire tourner le ray tracing dans le jeu (pour l'instant, lumière de
-   secours seulement).
-4. Stabilité : tenir une longue partie (l'essai 11 a tenu 10 minutes).
-5. Réduire la mémoire (pour ne plus échanger avec le disque sur 16 Go) : fenêtres à trous qui ne suivent pas une seule section
-   (2,6 Go encore copiés), textures côté PC (3 à 4,5 Go), buffers partagés
-   avec la carte (environ 7 Go réservés).
-6. Essayer en jeu le reste de [docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md)
-   (carte des vues, cheveux, ray tracing, logo, murs).
+1. Speed: this PC tops out around 20 fps (the game alone, measured with no
+   drawing). Keep the game's data on the GPU instead of copying 180 MB a
+   frame; cheaper indirect draws (about 2,000 clamps with drains); faster
+   64-lane programs on 32-lane GPUs; upstream's copy-back of written pages.
+2. Translate the shaders still refused (29): groups of several 64-lane waves
+   sharing their memory, water, voxels.
+3. Run the game's ray tracing (fallback light only for now; DexNom's Radeon
+   work is the lead).
+4. Stability: hold a long session.
+5. Memory: under 16 GB so Windows stops paging (windows with holes, host-side
+   textures, buffers shared with the GPU).
 
-## Options utiles
+## Useful switches
 
-| Variable | Effet |
-|----------|-------|
-| `VICTORY_POOL_COMMIT=1` | réserve le pool du jeu d'un coup (nécessaire pour l'ouvrir sur la carte) |
-| `VICTORY_POOL_BLOCK_MB` | taille des blocs du pool (64 par défaut) |
-| `VICTORY_INPLACE=1` | lit la mémoire du jeu sans copie quand c'est possible |
-| `VICTORY_INPLACE_MB` | mémoire verrouillée au plus pour cela (4096 par défaut) |
-| `VICTORY_INPLACE_HOLES=0` | recopie les fenêtres partiellement mappées |
-| `VICTORY_PIPELINE_WAIT_MS` | attente maximale des pipelines par image (500 par défaut) |
-| `VICTORY_PIPELINE_WAIT_BACKLOG` | au-delà de ce nombre de pipelines en retard (16), une image ne les attend plus ; `0` : toujours attendre |
-| `VICTORY_PIPELINE_LOW_PRIORITY=1` | fabrique les pipelines en priorité basse, comme avant |
-| `VICTORY_SHADER_KEY_EXE=1` | cache des shaders lié à tout l'exécutable, comme avant |
-| `VICTORY_GPU_TIMING=1` | temps de chaque commande sur la carte, par programme |
-| `VICTORY_TEXTURE_SWEEP=0` | ne libère jamais les textures inutilisées |
-| `VICTORY_SKIP_PIPELINES=<hash>,...` | saute les dessins des programmes listés (pour comparer) |
-| `VICTORY_WIDE_TEXTURES=0` | prépare les textures sur un seul cœur, comme avant |
-| `VICTORY_LATE_WAIT=0` | attend la carte après chaque envoi, comme avant (par défaut : envoie la suite sans attendre, 450-480 ms par image au lieu de 560-610) |
-| `VICTORY_INDIRECT_WINDOW=0` | vérifie les dessins indirects un par un, comme avant (par défaut : jusqu'à 64 d'un coup, plus rapide et les murs reviennent) |
-| `VICTORY_WIDE_REFRESH=1` | copies de la mémoire du jeu sur plusieurs cœurs (en essai) |
-| `VICTORY_RELAY=2`, `VICTORY_LATE_WAIT=3` | envoi sans attendre la carte : plus lent sur un PC de 16 Go |
-| `VICTORY_MISSING_LOG=1` | `translate` : dit quelle instruction n'a pas de valeur et pourquoi |
-| `VICTORY_D3D12_DEBUG=1` | couche de débogage Direct3D (build `diag`), nomme les erreurs |
-| `VICTORY_BVH_BUILDER=1` | active la construction des structures de ray tracing |
-| `VICTORY_WAVE_WIDE` | forme wave64 « vague entière » : par défaut sans boucle seulement ; `1` partout, `0` nulle part |
-| `VICTORY_WAVE_LOCAL=idiom` | seulement les formes exactes des programmes wave64 |
-| `VICTORY_RT_MISS` | lumière de secours (rayons qui ne touchent rien) : active par défaut tant que le constructeur est éteint ; `0` la coupe |
-| `VICTORY_HEAP_MAP=0` | coupe la carte des vues de VIcky |
-| `VICTORY_TEXTURE_NO_WAIT=0` | les textures attendent les remappages du jeu (avant : défaut) |
-| `VICTORY_CARD_BUFFERS_MIN_MB` | taille dès laquelle la carte compare les buffers au lieu du processeur (1 Mo par défaut, avant 16) |
-| `VICTORY_PROFILE=4` | profileur (build `diag`) |
+| Variable | Effect |
+|---|---|
+| `VICTORY_NO_TEXTURES=1` | grey surfaces, no game textures (test) |
+| `VICTORY_NO_DRAWS=1` | nothing drawn, no pipelines or shaders (test) |
+| `VICTORY_RENDER_SCALE` | fixed internal resolution, 0.2 to 1.0 of the output |
+| `VICTORY_OWN_UPSCALER=1` | the game's own temporal upscaler instead of FSR |
+| `VICTORY_FIDELITYFX_DIR` | folder of AMD's PC FSR DLL (experimental) |
+| `VICTORY_HUD=0` | hides the on-picture counter |
+| `VICTORY_RT_MISS=0` | turns the fallback light off |
+| `VICTORY_BVH_BUILDER=1` | builds the ray-tracing structures |
+| `VICTORY_GPU_TIMING=1` | time of every GPU command, by program (diagnostics build, slower) |
+| `VICTORY_D3D12_DEBUG=1` | Direct3D debug layer, names errors (diagnostics build) |
+| `VICTORY_SKIP_PIPELINES=<hash>,...` | skips the draws of the listed programs (to compare) |
+| `VICTORY_PIPELINE_WAIT_MS` | longest wait for pipelines in a frame (500 by default) |
+| `VICTORY_POOL_COMMIT=1`, `VICTORY_INPLACE=1` | read game memory without a copy where possible (crashes sooner on 16 GB) |
+| `VICTORY_RELAY=2`, `VICTORY_LATE_WAIT=3` | submit without waiting for the GPU: slower on a 16 GB PC |
+| `VICTORY_MISSING_LOG=1` | `translate`: says which instruction has no value and why |
+| `VICTORY_PROFILE=4` | profiler (diagnostics build) |
+
+## Community
+
+Questions, results on your PC, bugs: the **[Discord server](https://discord.gg/GBJT5E8E4E)**.
+For a bug, attach `logs\partie-lanceur-<date>.txt` and, if there is one,
+`%LOCALAPPDATA%\victory\data\7952987A\crashes.log`.
+
+## Credits and license
+
+- **[VIctory](https://github.com/Marvisak/VIctory)**, by Marvisak and its
+  contributors, is the base of everything: the loader, the system services,
+  the Direct3D 12 renderer and the shader recompiler. GPL-3.0-or-later, like
+  this repository (see `LICENSE`).
+- **[victory-fork](https://github.com/fxceless/victory-fork)**, by fxceless:
+  the fork this work starts from (world rendering, ray tracing in progress).
+- **[VIcky](https://github.com/Xeltax/VIcky)**, by Xeltax: the view map for
+  NVIDIA's one-million-view limit.
+- **[XCL](https://github.com/ivall/xcl)**, by ivall (GPL-2.0-only), served as
+  a reference for the game's behaviour under another layer.
+- The work of many other forks (ScarlettPort, VItoriaBr, victory-perf,
+  Belobug and more), named in each commit that takes it.
+- The project's original text is in
+  [docs/README-original.en.md](docs/README-original.en.md).
+- Developed with [Claude Code](https://claude.com/claude-code).
