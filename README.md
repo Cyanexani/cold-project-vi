@@ -52,7 +52,7 @@ preuve (une vidéo).
 | Jouable (on dirige un personnage) | 50 | ✅ Lucia bouge dans le prologue |
 | Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
 | Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
-| Vitesse (10 points : images/s ÷ 30) | environ 0,8 | ❌ environ 2,5 images/s |
+| Vitesse (10 points : images/s ÷ 30) | environ 0,8 | ❌ 2,3 images/s (meilleur essai du 25/11) ; objectif 15 |
 | Stabilité (10 points) | environ 2,5 | ⚠️ pas encore mesurée sur une longue partie |
 
 ### Détail
@@ -60,19 +60,19 @@ preuve (une vidéo).
 | Étape | État |
 |-------|------|
 | Démarrage, menus, écran titre | ✅ fonctionne |
-| Cinématique d'intro | ⚠️ se joue en entier, mais le logo Rockstar est mal éclairé |
+| Cinématique d'intro | ✅ se joue en entier et s'affiche correctement (vérifié en jeu le 25/11) |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ✅ on dirige Lucia ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
-| Images par seconde dans le monde | ❌ environ 2,5 (400 ms par image) sur RTX 3060 et 16 Go de RAM, carte occupée à 79 % ; 30 dans les menus |
+| Images par seconde dans le monde | ❌ 2,3 (431 ms par image) sur RTX 3060 et 16 Go de RAM, carte occupée à 82 % ; 30 dans les menus |
 | Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
 | Stabilité | ⚠️ essai 11 (25/11) : 10 minutes sans plantage. Quand le PC n'a plus de mémoire à engager, le jeu se ferme sans rapport : un fichier d'échange de 32 Go au moins l'évite. Un débordement de pile est maintenant rapporté au lieu de fermer la fenêtre en silence |
 
 ```mermaid
 pie showData
     title Avancement des étapes (sur 8)
-    "Fonctionne" : 2
-    "Partiel" : 4
+    "Fonctionne" : 3
+    "Partiel" : 3
     "Pas encore" : 2
 ```
 
@@ -122,23 +122,63 @@ cache (il ne dépend plus que du code du traducteur). Ce qui reste à essayer en
 ## Vitesse
 
 Temps par image dans le monde, en millisecondes (scène de la cellule, carte
-RTX 3060, essais du 24/11).
+RTX 3060, 16 Go de RAM, mode Series S).
 
 ```mermaid
 xychart-beta
-    title "Temps par image (ms), plus bas = mieux"
-    x-axis ["Avant (cache + attente)", "Après les correctifs du 24/11"]
+    title "Temps par image (ms), plus bas = mieux ; objectif 66 ms (15 images/s)"
+    x-axis ["Avant (24/11)", "Correctifs du 24/11", "Meilleur du 25/11 (c1e7541)", "Objectif"]
     y-axis "ms" 0 --> 1400
-    bar [1316, 540]
+    bar [1316, 540, 431, 66]
 ```
 
 ```mermaid
 xychart-beta
-    title "Où passent les 540 ms d'une image (ms)"
+    title "Où passent les 431 ms d'une image, 25/11 (ms)"
     x-axis ["Carte graphique", "Préparation (copies)", "Recopie vers le jeu"]
-    y-axis "ms" 0 --> 400
-    bar [325, 140, 65]
+    y-axis "ms" 0 --> 250
+    bar [207, 135, 50]
 ```
+
+**Pourquoi 15 images/s est encore loin** : même avec une carte infiniment
+rapide, la préparation et la recopie (environ 185 ms) plafonneraient le jeu
+vers 5 images/s. Il faut diviser chacun des trois morceaux par 3 à 7.
+
+### Le 25/11 : ce qui a aidé, ce qui a perdu
+
+De 2,2 à **2,33 images/s** (431 ms : préparation 135, carte 207, recopie 50).
+
+| Essai | Résultat | Gardé ? |
+|---|---|---|
+| Copies sur place (`crate::plaincopy`, repris de fxceless `a253706`) | copies 140 → 105 ms | ✅ par défaut |
+| Fenêtres sur une grille de 1 Mo, avec queues | 22,1 → 21,4 Go réservés | ✅ par défaut |
+| Recopie par `plaincopy` | recopie 50 → 48 ms | ✅ |
+| Compteur dans l'image (`VICTORY_HUD=0` le cache), menu `Lancer.cmd` | — | ✅ |
+| Bornages indirects regroupés (`VICTORY_HOIST_CLAMPS=1`, idée de Belobug) | carte 207 → 239 ms, grillage de la fenêtre disparu | ❌ |
+| Textures à 60 % de la carte | 14 600 textures en attente, vêtements en blocs | ❌ |
+| Fenêtres et tampons sur la carte (90 %, 4 Go) | carte +64 ms | ❌ |
+| Résolution 0,5 + éclairage simplifié | carte −80 ms mais 2,3 à 2,6 images/s et blocs | ❌ |
+| Lecture sur place (`VICTORY_INPLACE`) | carte retirée au bout de 30 s (NVIDIA verrouille la section en RAM) ; à 1 Go : 2,19 images/s | ❌ sur 16 Go |
+| Shaders : écriture de défaut seulement pour les pages absentes | carte 207 → 260 ms, 1,9 images/s | ❌ annulé |
+
+### Où va le temps de la carte (essai `VICTORY_GPU_TIMING=1`)
+
+Aucun programme du jeu ne domine : le plus cher prend 6 ms par image.
+Sur les 122 ms notées commande par commande, **80 ms vont aux 4 100 draws
+indirects** (environ 20 µs chacun : le coût des passes de bornage et des
+barrières qui les entourent plus que du calcul), 34 ms aux dispatchs de
+calcul, le reste aux mesh, copies et envois de textures. La carte compte
+environ 200 ms par image en tout : les horodatages NVIDIA ne voient pas les
+vidanges entre les passes.
+
+### Les autres forks, mesurés ou annoncés
+
+| Fork | Carte | Images/s annoncées | Ce qui peut servir ici |
+|---|---|---|---|
+| Ici (25/11) | RTX 3060, 16 Go | **2,3** (mesuré) | — |
+| [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) v0.2.1 | RTX 3060, 32 Go conseillés | environ 4 | recopie limitée aux tampons relus, attentes de lecture 156 → 26 ms. **Essayé ici le 25/11** avec leurs réglages : écran noir à l'intro, 0,4 à 0,8 image/s, 1 400 à 3 300 draws sautés faute de pipelines (leur préparation `warm` + `precompile-graphics` dure plus de 20 min, coupée) |
+| [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1,03 (ville) | suivi précis des écritures des shaders (`bc3cd4b`) |
+| [VIctory](https://github.com/Marvisak/VIctory) (`cd94d35`) | — | — | la recopie ne compare que les pages écrites |
 
 | Par image | Avant | Après |
 |---|---|---|
@@ -383,12 +423,13 @@ très sombres : leurs visages ne sont éclairés que par les contours. Détails 
 
 ## Ce qui reste à faire
 
-1. Vitesse (de 2,5 à 15 images/s) : la carte est maintenant la limite
-   (occupée à 79 %). Baisser la résolution des ombres en cascade, accélérer
-   les programmes de 64 fils sur une carte à 32 voies, réduire nos propres
-   passes (environ 2 160 bornages, 700 barrières et 350 passes d'empreinte
-   par image), reprendre la recopie de VIctory qui ne compare que les pages
-   écrites (`cd94d35`).
+1. Vitesse (de 2,3 à 15 images/s) : les trois morceaux comptent (carte
+   207 ms, préparation 135, recopie 50). Côté carte : réduire nos propres
+   passes autour des 4 100 draws indirects (bornages et barrières), accélérer
+   les programmes de 64 fils sur une carte à 32 voies, baisser la résolution
+   des ombres en cascade. Côté processeur : reprendre la pile de ScarlettPort
+   (recopie des seuls tampons relus, lectures servies sur la carte) et la
+   recopie de VIctory qui ne compare que les pages écrites (`cd94d35`).
 2. Traduire les shaders encore refusés (157 dans l'essai 11) : groupes de
    plusieurs vagues de 64 qui partagent leur mémoire, surfaces, volumes d'eau.
 3. Faire tourner le ray tracing dans le jeu (pour l'instant, lumière de
