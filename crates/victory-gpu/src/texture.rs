@@ -380,13 +380,15 @@ fn with_title<R>(memory: *const u8, size: usize, f: impl FnOnce(&[u8]) -> R) -> 
     })
 }
 
-/// The folder of detiled textures kept on disk (on by default; `VICTORY_TEXTURE_DISK=0`: off):
+/// The folder of detiled textures kept on disk (`VICTORY_TEXTURE_DISK=1`; off by default):
 /// a texture's staging contents, by the hash of its memory, its console layout and the
 /// host's footprints, read back the next time the same bytes are detiled, in this run or
 /// a later one. Set by [`use_texture_cache`].
 /// The texture's bytes are in memory already, so a read from disk pays only where
 /// detiling costs more than reading the file. In the runs of 2026-11-25 it read 8-20 GB
-/// a run that would have been detiled again (textures let go and made again). The
+/// a run that would have been detiled again (textures let go and made again), but on
+/// a SATA disk the textures then cost 6.8-12 ms a megabyte to prepare against 0.9
+/// without it (the key hashes the whole texture, then the file is read): off again. The
 /// writes are capped at `DISK_MAX` a run and `DISK_TOTAL_MAX` over all runs (counted in
 /// the folder's `written.bytes`); nothing is deleted (delete the folder to start over).
 static DISK_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
@@ -401,9 +403,9 @@ static DISK_BEFORE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64:
 /// Since the start: textures read from disk and their bytes, written and their bytes.
 pub(crate) static DISK: [std::sync::atomic::AtomicU64; 4] = [const { std::sync::atomic::AtomicU64::new(0) }; 4];
 
-/// Keeps detiled textures in `dir` unless `VICTORY_TEXTURE_DISK=0`.
+/// Keeps detiled textures in `dir` if `VICTORY_TEXTURE_DISK=1`.
 pub fn use_texture_cache(dir: std::path::PathBuf) {
-    if std::env::var_os("VICTORY_TEXTURE_DISK").is_none_or(|v| v != "0") {
+    if std::env::var_os("VICTORY_TEXTURE_DISK").is_some_and(|v| v == "1") {
         let before = std::fs::read_to_string(dir.join("written.bytes"))
             .ok()
             .and_then(|t| t.trim().parse::<u64>().ok())
@@ -412,7 +414,7 @@ pub fn use_texture_cache(dir: std::path::PathBuf) {
         tracing::info!(
             dir = %dir.display(),
             written_before_mb = before >> 20,
-            "detiled textures kept on disk: on (VICTORY_TEXTURE_DISK=0 turns it off)"
+            "detiled textures kept on disk (VICTORY_TEXTURE_DISK=1)"
         );
         let _ = DISK_DIR.set(dir);
     }
