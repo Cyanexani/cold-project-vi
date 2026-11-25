@@ -210,12 +210,14 @@ pub(crate) fn lane_hash(bytes: &[u8]) -> [u8; 32] {
 /// Ranges `[start, end)` of memory, each with a count (one buffer made and
 /// let go twice at the same place counts twice); overlaps are allowed.
 #[derive(Default)]
+#[allow(dead_code)] // victory-perf's; the texture overlap is ours
 pub(crate) struct RangeSet {
     ranges: std::collections::BTreeMap<(u64, u64), u32>,
     /// The longest range ever held: an overlap query looks back that far.
     longest: u64,
 }
 
+#[allow(dead_code)]
 impl RangeSet {
     pub(crate) const fn new() -> RangeSet {
         RangeSet {
@@ -323,6 +325,7 @@ impl Default for Group {
 
 impl Group {
     /// Runs `job` on the pool's threads.
+    #[allow(dead_code)]
     pub(crate) fn spawn(&self, job: impl FnOnce() + Send + 'static) {
         *self.left.0.lock().unwrap_or_else(|e| e.into_inner()) += 1;
         let left = self.left.clone();

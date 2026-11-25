@@ -922,30 +922,6 @@ extern "system" fn present(
     S_OK
 }
 
-/// The bytes from one plane's description to the next in a present.
-#[cfg(windows)]
-const PLANE_STRIDE: usize = 0x48;
-
-/// The first resource of a present's second plane, if it has one that is not
-/// the first plane's (`first`): what is drawn over the first.
-///
-/// # Safety
-/// `parameters` is null or points at `planes` plane descriptions,
-/// [`PLANE_STRIDE`] bytes apart, each listing `count` resources.
-#[cfg(windows)]
-unsafe fn second_plane(planes: u32, parameters: *const Plane, first: This) -> Option<This> {
-    if planes < 2 || parameters.is_null() {
-        return None;
-    }
-    // SAFETY: the caller's: a second description follows the first.
-    let plane = unsafe { &*parameters.cast::<u8>().add(PLANE_STRIDE).cast::<Plane>() };
-    if plane.count == 0 || plane.resources.is_null() {
-        return None;
-    }
-    // SAFETY: the caller's: the plane lists `count` resources.
-    let resource = unsafe { *plane.resources };
-    (!resource.is_null() && resource != first).then_some(resource)
-}
 /// Diagnostics: logs a presented frame that is black after one that was
 /// not, with what was presented and how many draws ran since.
 #[cfg(all(windows, feature = "diagnostics"))]
