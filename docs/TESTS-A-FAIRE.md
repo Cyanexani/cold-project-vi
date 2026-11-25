@@ -110,7 +110,7 @@ texture d'un autre objet). Ancien comportement :
 
 **Cache disque des textures (en essai)** : `$env:VICTORY_TEXTURE_DISK = '1'`.
 Les textures détuilées sont écrites dans
-`%LOCALAPPDATA%\victory\cache\textures` (8 Go au plus par partie) et relues
+`D:\GTA6 - Propre copie\victory-cache\textures` (tout le cache est maintenant dans le dossier du jeu, plus sur C) (8 Go au plus par partie) et relues
 au lancement suivant. Le premier lancement écrit (plus lent), le deuxième
 relit : c'est lui qu'il faut comparer. Le journal dit « detiled textures on
 disk since the start: N read, M written ».

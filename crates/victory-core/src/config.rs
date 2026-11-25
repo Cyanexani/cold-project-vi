@@ -85,14 +85,19 @@ impl Config {
                 .collect(),
             _ => file.test_titles,
         };
+        let game_dir = env_path("VICTORY_GAME_DIR").or(file.game_dir);
+        // The cache (shaders, pipelines, images, up to 8 GB of textures a run) goes in the
+        // game's folder, on the game's disk, when there is one: the system disk of the
+        // 25/11 PC was 98% full.
         let cache_dir = env_path("VICTORY_CACHE_DIR")
             .or(file.cache_dir)
+            .or_else(|| game_dir.as_ref().map(|g| g.join("victory-cache")))
             .map_or_else(|| default_dir("cache"), Ok)?;
         let data_dir = env_path("VICTORY_DATA_DIR")
             .or(file.data_dir)
             .map_or_else(|| default_dir("data"), Ok)?;
         Ok(Config {
-            game_dir: env_path("VICTORY_GAME_DIR").or(file.game_dir),
+            game_dir,
             cache_dir,
             data_dir,
             test_titles,
@@ -152,6 +157,16 @@ mod tests {
         let cfg = Config::resolve(file, None, env).unwrap();
         assert_eq!(cfg.game_dir.unwrap(), PathBuf::from("from-env"));
         assert_eq!(cfg.cache_dir, PathBuf::from("cache-from-file"));
+    }
+
+    #[test]
+    fn cache_defaults_to_the_game_folder() {
+        let file = FilePaths {
+            game_dir: Some("game".into()),
+            ..Default::default()
+        };
+        let cfg = Config::resolve(file, None, |_| None).unwrap();
+        assert_eq!(cfg.cache_dir, Path::new("game").join("victory-cache"));
     }
 
     #[test]
