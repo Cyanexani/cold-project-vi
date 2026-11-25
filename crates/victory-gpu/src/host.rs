@@ -3067,6 +3067,29 @@ impl Host {
         })
     }
 
+    /// Whether the host device is backed by a software adapter (WARP /
+    /// Microsoft Basic Render Driver), either via `VICTORY_D3D12_WARP` or
+    /// because the host has no hardware GPU (such as hosted CI runners).
+    #[cfg(test)]
+    pub(crate) fn on_warp(&self) -> bool {
+        if cfg!(feature = "diagnostics") && std::env::var_os("VICTORY_D3D12_WARP").is_some() {
+            return true;
+        }
+        // SAFETY: plain DXGI query using this device's own adapter LUID.
+        unsafe {
+            let luid = self.device.GetAdapterLuid();
+            let Ok(factory) = CreateDXGIFactory2::<IDXGIFactory4>(DXGI_CREATE_FACTORY_FLAGS(0)) else {
+                return false;
+            };
+            let Ok(adapter) = factory.EnumAdapterByLuid::<IDXGIAdapter1>(luid) else {
+                return false;
+            };
+            adapter
+                .GetDesc1()
+                .is_ok_and(|desc| desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0)
+        }
+    }
+
     /// A new list, open for recording.
     pub(crate) fn new_list(&self) -> windows::core::Result<HostList> {
         #[cfg(feature = "diagnostics")]

@@ -1396,6 +1396,13 @@ mod tests {
             super::super::library::LOADED.load(Ordering::Relaxed) > loaded,
             "the depth-bounds pipeline was compiled again instead of loaded from the library"
         );
+        // WARP reports DepthBoundsTestSupported=true but ignores OMSetDepthBounds
+        // during rasterization (depth 0.5 passes bounds [0.6, 1.0]); the draw
+        // check below requires a hardware adapter.
+        if host.on_warp() {
+            eprintln!("software adapter (WARP) does not enforce depth bounds; skipping draw check");
+            return;
+        }
 
         // Execute two draws against a depth buffer cleared to 0.5:
         // 1) bounds [0.6, 1.0] -> rejected (target stays 0)
