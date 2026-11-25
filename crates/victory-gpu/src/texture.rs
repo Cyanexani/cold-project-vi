@@ -873,11 +873,15 @@ impl Staging {
         if *GUARD.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_GUARD").is_none_or(|v| v != "0"))
             && let Some((now, written)) = waited(1, || crate::watch::writes(start, start + size, true))
         {
-            const HASH_EVERY: u64 = 8;
+            let frame = crate::frame::current();
+            let every = crate::memcopy::hash_every();
             let unwritten = last.asked != 0 && written.iter().all(|&(_, w)| w <= last.asked);
             last.asked = now;
-            let turn = crate::frame::current().wrapping_add((start >> 16) as u64).is_multiple_of(HASH_EVERY);
+            let turn = crate::memcopy::check_turn(frame, start, every);
             if unwritten && !turn {
+                if every != 8 && crate::memcopy::check_turn(frame, start, 8) {
+                    crate::memcopy::add(crate::memcopy::M::ChecksSkipped, 1);
+                }
                 return 0;
             }
         }
@@ -915,7 +919,7 @@ impl Staging {
             crate::copystat::add(crate::copystat::C::TexHashed, size as u64);
             let changed = with_read(size, |read| {
                 crate::host::copy_mapped(read.as_mut_ptr(), self.memory, size, false);
-                let hash = blake3::hash(read);
+                let hash = crate::memcopy::content_hash(read);
                 if last.hash == Some(hash) {
                     return false;
                 }
@@ -935,7 +939,7 @@ impl Staging {
         }
         if through_copy() {
             return with_title(self.memory, size, |tiled| {
-                let hash = blake3::hash(tiled);
+                let hash = crate::memcopy::content_hash(tiled);
                 #[cfg(feature = "diagnostics")]
                 crate::copystat::add(crate::copystat::C::TexHashed, size as u64);
                 if last.hash == Some(hash) {
@@ -951,7 +955,7 @@ impl Staging {
         // SAFETY: committed memory of the texture's layout size, and it
         // stays committed while `_mapped` is held.
         let tiled = unsafe { std::slice::from_raw_parts(self.memory, size) };
-        let hash = blake3::hash(tiled);
+        let hash = crate::memcopy::content_hash(tiled);
         #[cfg(feature = "diagnostics")]
         crate::copystat::add(crate::copystat::C::TexHashed, size as u64);
         if last.hash == Some(hash) {
@@ -976,7 +980,7 @@ impl Staging {
             if !crate::host::read_into(self.memory, read) {
                 return false;
             }
-            let hash = blake3::hash(read);
+            let hash = crate::memcopy::content_hash(read);
             if last.hash != Some(hash) {
                 last.hash = Some(hash);
                 self.detile(read, Some(hash));

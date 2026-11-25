@@ -1358,7 +1358,7 @@ extern "system" fn copy_memory(this: This, dst: u64, src: u64, len: u64, _flags:
         && src != 0
     {
         let len = len as usize;
-        list.defer(move || {
+        list.defer_known(dst as usize, src as usize, len, move || {
             if crate::texture::committed(src as *const u8, len)
                 && crate::texture::committed(dst as *const u8, len)
             {
@@ -2005,7 +2005,18 @@ extern "system" fn barrier_groups(this: This, count: u32, _groups: *const u8) {
     if count > 0
         && let Some(list) = host_list(this)
     {
+        use std::sync::atomic::Ordering::Relaxed;
         use windows::Win32::Graphics::Direct3D12::D3D12_RESOURCE_BARRIER;
+        // Nothing written through unordered access since the list's last
+        // such barrier: nothing to wait for (`VICTORY_BARRIER_MERGE`).
+        if crate::host::barrier_merge() {
+            if !list.uav_pending() {
+                crate::host::BARRIER_STATS[1].fetch_add(1, Relaxed);
+                return;
+            }
+            list.set_uav_pending(false);
+            crate::host::BARRIER_STATS[0].fetch_add(1, Relaxed);
+        }
         // SAFETY: the same layout; no resource named.
         let barrier = unsafe { std::mem::transmute::<Barrier, D3D12_RESOURCE_BARRIER>(UAV_BARRIER) };
         // SAFETY: an open list.

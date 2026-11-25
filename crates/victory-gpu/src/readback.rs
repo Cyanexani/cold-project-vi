@@ -184,6 +184,12 @@ pub(crate) fn copy_back(start: u64, len: u64) -> bool {
     back
 }
 
+/// Whether a read-back buffer lies in `[start, start + len)`, whatever the
+/// switch says (victory-perf's view of shader writes the CPU reads).
+pub(crate) fn tagged_in(start: u64, len: u64) -> bool {
+    overlaps(&TAGGED.lock().unwrap_or_else(|e| e.into_inner()), start, start.saturating_add(len))
+}
+
 /// A buffer starting at `start` is let go: if it was a read-back buffer,
 /// it is one no more.
 pub(crate) fn untag(start: u64) {

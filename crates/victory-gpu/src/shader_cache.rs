@@ -117,10 +117,111 @@ fn build() -> &'static [u8; 32] {
 /// The translation of a console shader container, from the cache when
 /// there is one.
 pub(crate) fn host_shader(container: &[u8]) -> Result<HostShader, String> {
+    host_shader_cached(container).map(|(shader, _)| shader)
+}
+
+/// Like [`host_shader`], also reporting whether the translation came from the
+/// disk cache (`true`) or was freshly translated (`false`).
+#[cfg(windows)]
+pub(crate) fn host_shader_cached(container: &[u8]) -> Result<(HostShader, bool), String> {
+    if let Some(s) = stand_in(container) {
+        return Ok((s, false));
+    }
     let translate = |c: &[u8]| victory_shader::emit::translate(c).map_err(|e| e.to_string());
-    match CACHE.get() {
+    let r = match CACHE.get() {
         Some(cache) => cached(cache, build(), container, translate),
-        None => translate(container),
+        None => translate(container).map(|shader| (shader, false)),
+    };
+    match r {
+        Err(e) => exposure_stub(container).map(|s| (s, false)).ok_or(e),
+        ok => ok,
+    }
+}
+
+/// Optional stand-ins from `victory_shader::emit::stand_in`:
+/// - `VICTORY_AMBIENT_STUB=1`: replaces diffuse GI temporal resolve passes with
+///   a constant ambient light floor (`VICTORY_AMBIENT_STUB_VALUE`, default 0.1).
+/// - `VICTORY_SHADOWMASK_STUB=1`: replaces RT distant shadow passes with 1.0
+///   (lit) (`VICTORY_SHADOWMASK_STUB_VALUE`, default 1.0).
+#[cfg(windows)]
+fn stand_in(container: &[u8]) -> Option<HostShader> {
+    use victory_shader::emit::stand_in as s;
+    let hash = blake3::hash(container).to_hex()[..16].to_owned();
+    let kinds = [
+        ("VICTORY_AMBIENT_STUB", s::AMBIENT_HASHES, s::AMBIENT_VALUE, s::ambient_slots(&hash)),
+        ("VICTORY_SHADOWMASK_STUB", s::SHADOWMASK_HASHES, s::SHADOWMASK_VALUE, s::SHADOWMASK_SLOTS),
+    ];
+    for (name, hashes, value, defaults) in kinds {
+        if std::env::var(name).ok().as_deref().map(str::trim) != Some("1") {
+            continue;
+        }
+        let listed = match std::env::var(format!("{name}_HASHES")) {
+            Ok(v) => v
+                .split(|c: char| c == ',' || c.is_whitespace())
+                .any(|h| h.eq_ignore_ascii_case(&hash)),
+            Err(_) => hashes.contains(&hash.as_str()),
+        };
+        if !listed {
+            continue;
+        }
+        let value = std::env::var(format!("{name}_VALUE"))
+            .ok()
+            .and_then(|v| v.trim().parse::<f32>().ok())
+            .unwrap_or(value);
+        let slots = std::env::var(format!("{name}_SLOTS")).unwrap_or_default();
+        let plan = s::Plan::new(value)
+            .with_overrides(defaults)
+            .with_overrides(&slots);
+        match s::storing_plan(container, plan) {
+            Ok((shader, plan)) => {
+                tracing::warn!(
+                    %hash,
+                    stand_in = name,
+                    value,
+                    outputs = ?plan.seen,
+                    "pass replaced by a stand-in writing each output in its own encoding"
+                );
+                return Some(shader);
+            }
+            Err(e) => {
+                tracing::warn!(%hash, stand_in = name, error = %e, "stand-in does not translate");
+            }
+        }
+    }
+    None
+}
+
+/// `VICTORY_EXPOSURE_STUB=1`: replaces untranslatable auto-exposure shader
+/// with a constant mid-grey luminance stand-in.
+#[cfg(windows)]
+fn exposure_stub(container: &[u8]) -> Option<HostShader> {
+    use victory_shader::emit::exposure;
+    if std::env::var("VICTORY_EXPOSURE_STUB").ok()?.trim() != "1" {
+        return None;
+    }
+    let hash = blake3::hash(container).to_hex()[..16].to_owned();
+    let listed = match std::env::var("VICTORY_EXPOSURE_STUB_HASHES") {
+        Ok(v) => v
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .any(|h| h.eq_ignore_ascii_case(&hash)),
+        Err(_) => exposure::HASHES.contains(&hash.as_str()),
+    };
+    if !listed {
+        return None;
+    }
+    let value = std::env::var("VICTORY_EXPOSURE_STUB_VALUE")
+        .ok()
+        .and_then(|v| v.trim().parse::<f32>().ok())
+        .unwrap_or(exposure::VALUE);
+    match exposure::stub(container, value) {
+        Ok(s) => {
+            tracing::warn!(%hash, value, "exposure shader replaced by a constant stand-in");
+            Some(s)
+        }
+        Err(e) => {
+            tracing::warn!(%hash, error = %e, "exposure stand-in does not translate either");
+            None
+        }
     }
 }
 
@@ -151,7 +252,7 @@ fn cached(
     build: &[u8; 32],
     container: &[u8],
     translate: impl Fn(&[u8]) -> Result<HostShader, String> + Send + Sync,
-) -> Result<HostShader, String> {
+) -> Result<(HostShader, bool), String> {
     let input = [&build[..], container].concat();
     let converter = Translate {
         translate,
@@ -162,20 +263,21 @@ fn cached(
             .get_or_convert(&converter, &input)
             .map_err(|e| format!("{e:#}"))?;
         if let Some(shader) = std::fs::read(&path).ok().and_then(|b| decode(&b)) {
-            let (counter, what) = if converter.ran.load(Ordering::Relaxed) {
-                (&MISSES, "translated and cached")
-            } else {
+            let was_cached = !converter.ran.load(Ordering::Relaxed);
+            let (counter, what) = if was_cached {
                 (&HITS, "from the cache")
+            } else {
+                (&MISSES, "translated and cached")
             };
             counter.fetch_add(1, Ordering::Relaxed);
             tracing::debug!(path = %path.display(), "shader {what}");
-            return Ok(shader);
+            return Ok((shader, was_cached));
         }
         tracing::debug!(path = %path.display(), "unreadable shader cache entry; translating again");
         let _ = std::fs::remove_file(&path);
     }
     MISSES.fetch_add(1, Ordering::Relaxed);
-    (converter.translate)(container)
+    (converter.translate)(container).map(|shader| (shader, false))
 }
 
 const MAGIC: &[u8; 4] = b"VSH1";
@@ -395,21 +497,36 @@ mod tests {
             runs.fetch_add(1, Ordering::Relaxed);
             Ok(shader())
         };
-        assert_eq!(cached(&cache, &build, container, translate), Ok(shader()));
-        assert_eq!(cached(&cache, &build, container, translate), Ok(shader()));
+        assert_eq!(
+            cached(&cache, &build, container, translate),
+            Ok((shader(), false))
+        );
+        assert_eq!(
+            cached(&cache, &build, container, translate),
+            Ok((shader(), true))
+        );
         assert_eq!(runs.load(Ordering::Relaxed), 1, "the second came from disk");
 
         // Another build translates again.
-        assert_eq!(cached(&cache, &[8; 32], container, translate), Ok(shader()));
+        assert_eq!(
+            cached(&cache, &[8; 32], container, translate),
+            Ok((shader(), false))
+        );
         assert_eq!(runs.load(Ordering::Relaxed), 2);
 
         // A damaged entry is a miss, translated and stored again.
         for e in walk(dir.path()) {
             std::fs::write(e, b"VSH1 broken").unwrap();
         }
-        assert_eq!(cached(&cache, &build, container, translate), Ok(shader()));
+        assert_eq!(
+            cached(&cache, &build, container, translate),
+            Ok((shader(), false))
+        );
         assert_eq!(runs.load(Ordering::Relaxed), 3);
-        assert_eq!(cached(&cache, &build, container, translate), Ok(shader()));
+        assert_eq!(
+            cached(&cache, &build, container, translate),
+            Ok((shader(), true))
+        );
         assert_eq!(runs.load(Ordering::Relaxed), 3);
 
         // Failures are not stored.

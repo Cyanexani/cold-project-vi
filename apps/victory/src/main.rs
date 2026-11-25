@@ -5,6 +5,7 @@
 
 mod census;
 mod inspect;
+mod precompile;
 mod run;
 mod shader;
 mod translate;
@@ -89,6 +90,28 @@ enum Command {
         #[arg(long)]
         cache: bool,
     },
+    /// Translate shaders into the runtime cache ahead of time (resumable).
+    /// With --pipelines, also compile compute pipelines into the host
+    /// pipeline library and GPU driver cache.
+    Precompile {
+        paths: Vec<PathBuf>,
+        /// Also compile compute shaders into `host-pipelines.bin` and the GPU
+        /// driver cache.
+        #[arg(long)]
+        pipelines: bool,
+        /// Restrict precompilation to one shader stage.
+        #[arg(long, value_enum)]
+        only: Option<precompile::StageFilter>,
+        /// Stop after this many unique shader containers.
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Translation worker threads (default: every logical core).
+        #[arg(long)]
+        jobs: Option<usize>,
+        /// Concurrent GPU driver compute pipeline compilations (default: 4).
+        #[arg(long)]
+        pipeline_jobs: Option<usize>,
+    },
     /// Prepare, map and bind a title executable; with --execute, run it.
     Run {
         exe: PathBuf,
@@ -159,15 +182,29 @@ fn main() -> Result<()> {
             cache,
         } => {
             // `VICTORY_VIEW_LIMIT=<null slot>`: translate as on a host whose view heap is capped
-            if let Some(n) = std::env::var("VICTORY_VIEW_LIMIT").ok().and_then(|v| v.parse().ok()) {
+            if let Some(n) = std::env::var("VICTORY_VIEW_LIMIT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+            {
                 victory_shader::emit::set_view_heap_limit(n);
             }
             // `VICTORY_HOST_WAVE=32`: translate as for a GPU whose waves are at most 32 lanes
-            if let Some(n) = std::env::var("VICTORY_HOST_WAVE").ok().and_then(|v| v.parse().ok()) {
+            if let Some(n) = std::env::var("VICTORY_HOST_WAVE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+            {
                 victory_shader::emit::set_host_max_wave(n);
             }
             translate::run(paths, validate, pipelines, list, jobs, cache)
         }
+        Command::Precompile {
+            paths,
+            pipelines,
+            only,
+            limit,
+            jobs,
+            pipeline_jobs,
+        } => precompile::run(paths, pipelines, only, limit, jobs, pipeline_jobs),
         Command::Run {
             exe,
             unimplemented,

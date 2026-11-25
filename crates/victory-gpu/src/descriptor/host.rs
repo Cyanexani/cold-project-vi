@@ -1678,6 +1678,65 @@ impl HostHeap {
         self.keep(index, None);
     }
 
+    /// Unpins any title slots currently viewing a resource whose raw COM
+    /// pointer is in `victims`, replacing them with a valid D3D12 null SRV so
+    /// the evicted host texture can be freed safely without GPU page faults.
+    /// Must only be called when no GPU submission is in flight (`sweep`).
+    pub(crate) fn evict_kept(&self, victims: &std::collections::HashSet<usize>) -> u64 {
+        if self.sampler || victims.is_empty() {
+            return 0;
+        }
+        // With a heap map, host slots past the window are not title slots, and
+        // what this pass forgets is keyed by title slot: not evicted there.
+        if self.made.lock().unwrap_or_else(|e| e.into_inner()).map.is_some() {
+            return 0;
+        }
+        let mut evicted_slots: Vec<u32> = Vec::new();
+        let mut removed_objs: Vec<ID3D12Resource> = Vec::new();
+        {
+            let mut kept = self.kept.lock().unwrap_or_else(|e| e.into_inner());
+            let limit = kept.len().min(self.count as usize);
+            for (i, slot) in kept[..limit].iter_mut().enumerate() {
+                if slot.as_ref().is_some_and(|r| {
+                    victims.contains(&(windows::core::Interface::as_raw(r) as usize))
+                }) {
+                    null_view(self.cpu(i as u32));
+                    if let Some(old) = slot.take() {
+                        removed_objs.push(old);
+                    }
+                    evicted_slots.push(i as u32);
+                }
+            }
+        }
+        if evicted_slots.is_empty() {
+            return 0;
+        }
+        for old in removed_objs {
+            crate::host::retire(old);
+        }
+        {
+            let mut made = self.made.lock().unwrap_or_else(|e| e.into_inner());
+            for &slot in &evicted_slots {
+                if let Some(entry) = made.keys.get_mut(slot as usize) {
+                    *entry = 0;
+                }
+            }
+        }
+        {
+            let mut placed = self.placed.lock().unwrap_or_else(|e| e.into_inner());
+            for &slot in &evicted_slots {
+                placed.forget(slot);
+            }
+        }
+        {
+            let mut textures = self.textures.lock().unwrap_or_else(|e| e.into_inner());
+            for &slot in &evicted_slots {
+                textures.remove(slot);
+            }
+        }
+        evicted_slots.len() as u64
+    }
+
     /// Slot `index` now views `resource` (or nothing of the host's).
     fn keep(&self, index: u32, resource: Option<ID3D12Resource>) {
         let mut kept = self.kept.lock().unwrap_or_else(|e| e.into_inner());

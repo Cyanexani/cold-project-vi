@@ -139,8 +139,27 @@ struct Window {
     scratch: ID3D12Resource,
 }
 
-/// The most records clamped in one pass ([`windows`]).
-const WINDOW_MOST: u64 = 64;
+/// The most records clamped in one pass ([`windows`]):
+/// `VICTORY_INDIRECT_WINDOW_MOST` (16 to 65,536; 4,096 by default, which
+/// covers a whole argument buffer of mesh records in a few doubling passes).
+fn window_most() -> u64 {
+    static MOST: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *MOST.get_or_init(|| {
+        std::env::var("VICTORY_INDIRECT_WINDOW_MOST")
+            .ok()
+            .and_then(|v| v.trim().parse::<u64>().ok())
+            .map_or(4096, |n| n.clamp(16, 65_536))
+    })
+}
+
+/// `VICTORY_CLAMP_LIGHT_RESTORE` (on by default, `=0` off): after a clamp
+/// pass before a draw, only the pipeline state the pass replaced is set
+/// again (the graphics root signature and its arguments are not touched by
+/// a compute pass), instead of forgetting what the host list has bound.
+fn light_restore() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_CLAMP_LIGHT_RESTORE").is_none_or(|v| v != "0"))
+}
 
 /// Whether indirect draws that read record after record of one argument
 /// buffer are clamped a window at a time (on by default since the run of
@@ -157,7 +176,7 @@ const WINDOW_MOST: u64 = 64;
 ///
 /// With the switch, when a draw asks for a record a short step after the
 /// one drawn before, the clamp takes that record and the ones that step
-/// apart after it (16, then twice as many each time, [`WINDOW_MOST`] at
+/// apart after it (16, then twice as many each time, [`window_most`] at
 /// most, never past the buffer) into
 /// the list's scratch buffer in one pass, and the draws that follow read
 /// their record there with no pass of ours, until one of these: a compute
@@ -1408,11 +1427,28 @@ impl State {
             .entry(std::ptr::from_ref(host) as usize)
             .or_insert_with(|| (0, Ranges::new()));
         let changed = host.buffer_changes();
-        let slots = if *passes % 16 == 0 {
+        let slots = if *passes == 0 {
             ranges.clear();
             host.buffer_slots()
         } else {
-            changed
+            // Incremental 1/16th rolling refresh per pass: visits and prunes
+            // every slot every 16 frames without a 140 ms spike from clearing
+            // and re-mirroring all 83,000 slots at once.
+            let bucket = (*passes % 16) as u32;
+            let mut batch: Vec<u32> = changed;
+            let mut seen: std::collections::HashSet<u32> = batch.iter().copied().collect();
+            let all = host.buffer_slots();
+            let mut live_bucket = std::collections::HashSet::new();
+            for index in all {
+                if index % 16 == bucket {
+                    live_bucket.insert(index);
+                    if seen.insert(index) {
+                        batch.push(index);
+                    }
+                }
+            }
+            ranges.retain(|&index, _| index % 16 != bucket || live_bucket.contains(&index));
+            batch
         };
         *passes += 1;
         // Whether the device was there before the pass: a view that removes
@@ -2043,7 +2079,22 @@ impl State {
         list.note_op(|| self.op_text(format!("dispatch {x}x{y}x{z}"), true));
         // SAFETY: an open list with everything set.
         unsafe { list.list.Dispatch(x, y, z) };
+        self.note_writes(list);
         DISPATCHED.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// `VICTORY_BARRIER_MERGE`: marks unordered writes pending on `list` if
+    /// any stage of the currently bound pipeline can store to buffers or
+    /// textures (`Translated::writes`; unknown pipelines count as writing).
+    fn note_writes(&self, list: &HostList) {
+        if !crate::host::barrier_merge() {
+            return;
+        }
+        let writes = crate::pipeline::host_pipeline(self.pipeline as This)
+            .is_none_or(|p| p.stages.iter().any(|stage| stage.translated().writes));
+        if writes {
+            list.set_uav_pending(true);
+        }
     }
 
     /// What a draw or dispatch runs, for the device-removed report
@@ -2313,6 +2364,7 @@ impl State {
                     self.mesh_scissor(list, true);
                     // SAFETY: an open list with everything set.
                     unsafe { l6.DispatchMesh(x, 1, 1) };
+                    self.note_writes(list);
                     self.mesh_scissor(list, false);
                     DRAWN.fetch_add(1, Ordering::Relaxed);
                     true
@@ -2713,6 +2765,7 @@ impl State {
                 list.list
                     .DrawInstanced(count, instances, from, first_instance)
             };
+            self.note_writes(list);
             DRAWN.fetch_add(1, Ordering::Relaxed);
         }
         if !ran {
@@ -2814,6 +2867,7 @@ impl State {
                 list.list
                     .DrawIndexedInstanced(indices, instances, first, base, first_instance)
             };
+            self.note_writes(list);
             DRAWN.fetch_add(1, Ordering::Relaxed);
         }
         if !ran {
@@ -2955,7 +3009,7 @@ impl State {
                             && step % 4 == 0
                             && (w.records == 1 || step == u64::from(w.step));
                         if walks {
-                            let fit = (args.left(arguments) / step).min(WINDOW_MOST) as u32;
+                            let fit = (args.left(arguments) / step).min(window_most()) as u32;
                             (step as u32, (if w.records == 1 { 16 } else { w.records * 2 }).min(fit).max(1))
                         } else {
                             (stride, max)
@@ -2971,20 +3025,32 @@ impl State {
                 // own and copies clamped active records into a scratch
                 // buffer at offset 0.
                 let count_arg = counter.as_ref().map(|(s, at)| (&s.buffer, s.offset(*at)));
+                // Dedicated buffers (not placed over title memory that other
+                // buffers alias): the clamp may wait on them alone.
+                let own = !args.in_place() && counter.as_ref().is_none_or(|(s, _)| !s.in_place());
                 // More than the record asked for: a window clamped ahead,
                 // whose unfilled slots must not spend the list's budget.
                 let bounded = if windowed && records > 1 {
-                    crate::indirect::bound_ahead(list, (&args.buffer, offset), (kind, step, records))
+                    crate::indirect::bound_ahead(list, (&args.buffer, offset), (kind, step, records), own)
                 } else {
-                    crate::indirect::bound(list, (&args.buffer, offset), count_arg, (kind, step, records))
+                    crate::indirect::bound(list, (&args.buffer, offset), count_arg, (kind, step, records), own)
                 };
                 let Some(bounded) = bounded else {
                     self.window = None;
                     why("not bounded (no clamp, or arguments not 4-byte aligned)");
                     return false;
                 };
-                self.host_pipeline = 0;
+                // The clamp pass replaced the pipeline state and compute root
+                // signature; a draw's graphics roots stay intact.
+                let before = self.host_pipeline;
                 self.host_roots[1] = 0;
+                self.host_pipeline = 0;
+                if light_restore() && kind != DISPATCH && before == p.pso.as_raw() as usize {
+                    // SAFETY: an open list and the pipeline the list had bound
+                    // before the clamp pass.
+                    unsafe { list.list.SetPipelineState(&p.pso) };
+                    self.host_pipeline = before;
+                }
                 self.window = windowed.then(|| Window {
                     copy: args.id(),
                     kind,
@@ -3027,6 +3093,7 @@ impl State {
                 counter.as_ref().map_or(0, |(s, at)| s.offset(*at)),
             )
         };
+        self.note_writes(list);
         if kind == MESH {
             self.mesh_scissor(list, false);
         }

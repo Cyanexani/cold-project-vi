@@ -48,6 +48,8 @@ pub fn warm_shader(container: &[u8]) -> Result<(), String> {
         Err("no host GPU".into())
     }
 }
+#[cfg(windows)]
+pub use victory_gpu::precompile;
 
 /// Keeps the host's translations of the title's shaders in `dir` (a
 /// folder of the cache) across runs, and its compiled pipelines beside it
