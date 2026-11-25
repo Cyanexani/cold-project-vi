@@ -110,8 +110,8 @@ preuve (une vidéo).
 | Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
 | Images par seconde dans le monde | ❌ 2,3 (431 ms par image) sur RTX 3060 et 16 Go de RAM, carte occupée à 82 % ; 30 dans les menus |
-| Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
-| Stabilité | ⚠️ essai 11 (25/11) : 10 minutes sans plantage. Quand le PC n'a plus de mémoire à engager, le jeu se ferme sans rapport : un fichier d'échange de 32 Go au moins l'évite. Un débordement de pile est maintenant rapporté au lieu de fermer la fenêtre en silence |
+| Mémoire | ⚠️ 22 à 25 Go réservés sur un PC de 16 Go. Le côté processeur des copies qui vivent sur la carte est maintenant de la mémoire ordinaire que Windows peut mettre sur le disque (avant : 3 à 4,5 Go bloqués pour la carte) : à la fin d'une partie de 10 minutes, le jeu garde environ 5 Go en RAM au lieu de moins de 1 Go |
+| Stabilité | ⚠️ une partie complète de 10 minutes dans le monde sans arrêt (25/11 au soir), là où le jeu s'arrêtait net vers 9 minutes. `VICTORY_HOLD=71B6330:1` met en pause le chien de garde du jeu et `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` agrandit deux réserves d'objets qui se vidaient (idées de Tejvardhan-717) ; un fichier d'échange de 32 Go au moins aide encore. Un débordement de pile est rapporté au lieu de fermer la fenêtre en silence |
 
 ```mermaid
 pie showData

@@ -41,8 +41,9 @@ pub fn run(
     drop(original);
     victory_hle::runtime::set_main_image(image.base());
     victory_hle::runtime::set_image_path(image.base(), exe);
-    hold(image.base(), image.info().size_of_image as usize);
-    patch(image.base(), image.info().size_of_image as usize);
+    // The patches first: the default hold is for the build they recognise.
+    let known = patch(image.base(), image.info().size_of_image as usize);
+    hold(image.base(), image.info().size_of_image as usize, known);
     println!(
         "mapped at      {:#x} (preferred {:#x})",
         image.base(),
@@ -201,10 +202,14 @@ fn watch(base: usize, size: usize) {
 /// 5ABB240:E8FB3C61FF:B800000100` replace those calls with `mov eax,
 /// 0x10000` (65,536 entries each).
 #[cfg(windows)]
-fn patch(base: usize, size: usize) {
-    let Ok(list) = std::env::var("VICTORY_PATCH") else {
-        return;
-    };
+fn patch(base: usize, size: usize) -> bool {
+    // Unset: the two pool patches below (each applied only where the code
+    // is the expected bytes); `0` or empty: none.
+    let list = std::env::var("VICTORY_PATCH").unwrap_or_else(|_| DEFAULT_PATCH.to_owned());
+    let mut applied_all = !list.trim().is_empty() && list.trim() != "0";
+    if !applied_all {
+        return false;
+    }
     let bytes = |h: &str| -> Option<Vec<u8>> {
         let h = h.trim();
         if !h.len().is_multiple_of(2) {
@@ -225,19 +230,32 @@ fn patch(base: usize, size: usize) {
         };
         let Some((rva, old, new)) = parsed else {
             eprintln!("VIctory: patch {item:?} not understood");
+            applied_all = false;
             continue;
         };
         if rva.checked_add(new.len()).is_none_or(|end| end > size) {
             eprintln!("VIctory: patch at title+{rva:#x} outside the image");
+            applied_all = false;
             continue;
         }
         let done = victory_loader::patch_code(base + rva, &old, &new);
+        applied_all &= done;
         eprintln!(
             "VIctory: patch at title+{rva:#x}: {}",
             if done { "applied" } else { "not applied (the code there differs)" }
         );
     }
+    applied_all
 }
+
+/// The patches made when `VICTORY_PATCH` is unset ([`patch`]).
+#[cfg(windows)]
+const DEFAULT_PATCH: &str = "5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100";
+
+/// The hold made when `VICTORY_HOLD` is unset ([`hold`]), only for the
+/// build the default patches recognised: the byte is not checked first.
+#[cfg(windows)]
+const DEFAULT_HOLD: &str = "71B6330:1";
 
 /// `VICTORY_HOLD=<rva>:<byte>,...` (hex) keeps the byte at each title+rva at
 /// that value, rewritten every 100 ms: a title switch held on or off. From
@@ -245,10 +263,17 @@ fn patch(base: usize, size: usize) {
 /// which otherwise ends the game when frames take seconds (a null write at
 /// title+0x23cf683, seen here too).
 #[cfg(windows)]
-fn hold(base: usize, size: usize) {
-    let Ok(list) = std::env::var("VICTORY_HOLD") else {
-        return;
+fn hold(base: usize, size: usize, known: bool) {
+    // Unset: the watchdog pause, if the default patches found the build
+    // they were made for; `0` or empty: none.
+    let list = match std::env::var("VICTORY_HOLD") {
+        Ok(list) => list,
+        Err(_) if known => DEFAULT_HOLD.to_owned(),
+        Err(_) => return,
     };
+    if list.trim().is_empty() || list.trim() == "0" {
+        return;
+    }
     let hex = |s: &str| usize::from_str_radix(s.trim().trim_start_matches("0x"), 16).ok();
     let held: Vec<(usize, u8)> = list
         .split(',')

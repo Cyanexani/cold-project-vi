@@ -81,8 +81,8 @@ them only with proof (a video).
 | Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
 | Light in the shade | ⚠️ fallback light by default: interiors and faces are lit, but some night cutscenes stay almost black (the game's ray tracing does not run yet) |
 | Frame rate in the world | ❌ 2.3 fps (431 ms a frame) on an RTX 3060 with 16 GB of RAM, GPU 82 % busy; 30 in the menus |
-| Memory | ❌ about 21 GB committed on a 16 GB PC (Windows pages to disk) |
-| Stability | ⚠️ 10 minutes without a crash in the longest measured run; a page file of 32 GB or more avoids silent exits when Windows runs out of commit |
+| Memory | ⚠️ about 22-25 GB committed on a 16 GB PC. The CPU side of the copies that live on the GPU is now ordinary memory Windows can page out (it was 3-4.5 GB locked for the GPU): at the end of a 10-minute run the game still has about 5 GB in RAM instead of under 1 GB |
+| Stability | ⚠️ a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
 
 ```mermaid
 pie showData
