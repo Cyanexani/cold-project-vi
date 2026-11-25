@@ -5404,7 +5404,11 @@ impl HostList {
 
     #[cfg(feature = "diagnostics")]
     fn note(&self, what: impl FnOnce() -> String, range: Option<(u64, u64)>) {
-        if !dred_on() {
+        // Noted with device-removed data, and with timing on: the timing
+        // sums the commands' card time by pipeline from these notes
+        // (`crate::copystat::command_took`); run essai-rt-13 timed without
+        // device-removed data and its slow lists named no command.
+        if !dred_on() && !timing() {
             crate::capture::op(std::ptr::from_ref(self) as usize, what);
             return;
         }
@@ -5417,12 +5421,15 @@ impl HostList {
             }
             let what = what();
             crate::capture::op(std::ptr::from_ref(self) as usize, || what.clone());
-            let text: Vec<u16> = what.encode_utf16().chain([0]).collect();
-            const UNICODE: u32 = 0;
-            // SAFETY: an open list; the marker is copied when recorded.
-            unsafe {
-                self.list.SetMarker(UNICODE, Some(text.as_ptr().cast()), 2 * text.len() as u32)
-            };
+            // The marker only for the device-removed report.
+            if dred_on() {
+                let text: Vec<u16> = what.encode_utf16().chain([0]).collect();
+                const UNICODE: u32 = 0;
+                // SAFETY: an open list; the marker is copied when recorded.
+                unsafe {
+                    self.list.SetMarker(UNICODE, Some(text.as_ptr().cast()), 2 * text.len() as u32)
+                };
+            }
             self.notes
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
