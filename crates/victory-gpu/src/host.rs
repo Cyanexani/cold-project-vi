@@ -4455,6 +4455,10 @@ impl Host {
                 self.settle(&mut submitted, why);
             }
         }
+        // Descriptors the title copied into placed heaps directly, before
+        // command lists that index those slots are submitted (fxceless
+        // a26859f, with 9376fd6's fingerprint).
+        crate::descriptor::sync_heaps();
         let behind = late && flying();
         // Before this submission counts as started: what the sweep lets go
         // of is named by no list, and nothing runs now (behind flights the
@@ -6378,6 +6382,7 @@ impl Meter {
         tracing::info!(
             "indirect mesh dispatches: the largest group count asked for {mesh_largest} (run: at most 65535), {mesh_groups:.0} groups asked per frame"
         );
+        crate::descriptor::sync_line(frames);
         late_line(frames);
         crate::draw::batch_line(frames);
         card_clock_line(frames, ms);
