@@ -329,6 +329,7 @@ très sombres : leurs visages ne sont éclairés que par les contours. Détails 
 | `VICTORY_TEXTURE_SWEEP=0` | ne libère jamais les textures inutilisées |
 | `VICTORY_SKIP_PIPELINES=<hash>,...` | saute les dessins des programmes listés (pour comparer) |
 | `VICTORY_WIDE_TEXTURES=0` | prépare les textures sur un seul cœur, comme avant |
+| `VICTORY_INDIRECT_WINDOW=0` | vérifie les dessins indirects un par un, comme avant (par défaut : jusqu'à 64 d'un coup, plus rapide et les murs reviennent) |
 | `VICTORY_WIDE_REFRESH=1` | copies de la mémoire du jeu sur plusieurs cœurs (en essai) |
 | `VICTORY_RELAY=2`, `VICTORY_LATE_WAIT=3` | envoi sans attendre la carte : plus lent sur un PC de 16 Go |
 | `VICTORY_MISSING_LOG=1` | `translate` : dit quelle instruction n'a pas de valeur et pourquoi |
