@@ -36,7 +36,15 @@ pub(crate) struct Pending {
     shaders: Vec<Arc<Shader>>,
     pub(crate) graphics: Option<Box<GraphicsState>>,
     queue_state: AtomicU8,
-    made: OnceLock<Option<HostPipeline>>,
+    made: OnceLock<HostPipeline>,
+    /// The frame of the last failed attempt (`u64::MAX`: none) and how many
+    /// attempts have failed. A failure is not final: what the host refuses
+    /// once it may accept later (a device that was removed, a pool that was
+    /// empty, a wait that ran out), and holding a `None` here for the rest of
+    /// the run dropped every draw that needed it - `0 being made` for ever
+    /// (2026-11-25: 353-3,287 draws a frame, the weapon model among them).
+    failed_frame: AtomicU64,
+    failures: AtomicU64,
     /// What identifies it across runs (shader containers and state), and
     /// whether a draw or dispatch has requested it yet.
     key: String,
@@ -118,6 +126,8 @@ impl Pending {
             begun: OnceLock::new(),
             queue_state: AtomicU8::new(NOT_QUEUED),
             made: OnceLock::new(),
+            failed_frame: AtomicU64::new(u64::MAX),
+            failures: AtomicU64::new(0),
             key: key.finalize().to_hex()[..32].to_owned(),
             used: AtomicBool::new(false),
         }
@@ -136,8 +146,23 @@ impl Pending {
 
     fn make(&self) {
         let _ = self.begun.set(Instant::now());
-        self.made
-            .get_or_init(|| HostPipeline::new(&self.shaders, self.graphics.as_deref()));
+        if self.made.get().is_some() {
+            return;
+        }
+        match HostPipeline::new(&self.shaders, self.graphics.as_deref()) {
+            Some(pipeline) => {
+                let _ = self.made.set(pipeline);
+            }
+            None => {
+                // Kept as a frame, not as a verdict: `ready` tries again
+                // after `retry_frames`, and the queue has to take it back
+                // (its state only ever moves up otherwise).
+                self.failures.fetch_add(1, Ordering::Relaxed);
+                self.failed_frame
+                    .store(crate::frame::current(), Ordering::Relaxed);
+                self.queue_state.store(NOT_QUEUED, Ordering::Relaxed);
+            }
+        }
         let (lock, done) = &DONE;
         let _held = lock.lock().unwrap_or_else(|e| e.into_inner());
         done.notify_all();
@@ -148,26 +173,28 @@ impl Pending {
 /// not translate, else "refused" or "being made"; `None` if it has one.
 #[cfg(feature = "diagnostics")]
 pub(crate) fn missing(p: &Pending) -> Option<String> {
-    match p.made.get() {
-        Some(Some(_)) => None,
-        None => Some(p.left_out.map_or_else(
-            || format!("being made {:?}", p.shaders),
-            str::to_owned,
-        )),
-        Some(None) => {
-            let failed: Vec<String> = p
-                .shaders
-                .iter()
-                .filter(|s| matches!(s.translated.get(), Some(None)))
-                .map(|s| format!("{} {}", s.stage, s.hash))
-                .collect();
-            Some(if failed.is_empty() {
-                format!("refused {:?}", p.shaders)
-            } else {
-                failed.join(" + ")
-            })
-        }
+    if p.made.get().is_some() {
+        return None;
     }
+    if let Some(why) = p.left_out {
+        return Some(why.to_owned());
+    }
+    let failures = p.failures.load(Ordering::Relaxed);
+    if failures == 0 {
+        return Some(format!("being made {:?}", p.shaders));
+    }
+    let failed: Vec<String> = p
+        .shaders
+        .iter()
+        .filter(|s| matches!(s.translated.get(), Some(None)))
+        .map(|s| format!("{} {}", s.stage, s.hash))
+        .collect();
+    let why = if failed.is_empty() {
+        format!("refused {:?}", p.shaders)
+    } else {
+        failed.join(" + ")
+    };
+    Some(format!("{why} ({failures} attempts)"))
 }
 
 /// Signalled whenever a worker has made a pipeline.
@@ -274,11 +301,32 @@ pub(crate) fn ready(p: &Arc<Pending>) -> Option<&HostPipeline> {
     if !p.used.load(Ordering::Relaxed) && !p.used.swap(true, Ordering::Relaxed) {
         super::library::note_used(&p.key);
     }
-    if p.made.get().is_none() {
+    if p.made.get().is_none() && due(p) {
         start(p, REQUESTED);
         wait(p, crate::frame::current());
     }
-    p.made.get()?.as_ref()
+    p.made.get()
+}
+
+/// Whether a pipeline that is not made may be tried again: never tried, or
+/// its last attempt failed `retry_frames` ago.
+fn due(p: &Pending) -> bool {
+    let after = p.failed_frame.load(Ordering::Relaxed);
+    after == u64::MAX || crate::frame::current() >= after.saturating_add(retry_frames())
+}
+
+/// How many frames apart a failed pipeline is tried again
+/// (`VICTORY_PIPELINE_RETRY_FRAMES`, default 300). An attempt is cheap: a
+/// shader that does not translate is cached as such, so a retry repeats the
+/// host's own check rather than the translation.
+fn retry_frames() -> u64 {
+    static EVERY: OnceLock<u64> = OnceLock::new();
+    *EVERY.get_or_init(|| {
+        std::env::var("VICTORY_PIPELINE_RETRY_FRAMES")
+            .ok()
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(300)
+    })
 }
 
 /// Makes `p` on this thread if it is not made yet (waiting for a worker
@@ -288,7 +336,7 @@ pub(crate) fn now(p: &Arc<Pending>) -> bool {
         return false;
     }
     p.make();
-    p.made.get().is_some_and(|made| made.is_some())
+    p.made.get().is_some()
 }
 
 /// At the title's creation of a pipeline: starts it at once if an earlier
