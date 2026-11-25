@@ -60,6 +60,16 @@ Ce qui change sans rien régler :
   défaut, l'effet attendu est faible ; à regarder : les ombres de
   l'éclairage (zones trop sombres ou trop claires). Pour comparer :
   `$env:VICTORY_SKIP_PIPELINES = '002e93a6cc2aa355,07c93bfb77fecebb,0e64f14fae060d04,96ccb14ef981fd85'`
+- **Textures du fork (commit 310c6eb de fxceless, repris le 26/11)** : le jeu
+  range une texture dans la place laissée par les grands niveaux absents
+  d'une autre ; chaque nouvelle vue sortait ses voisines de la file d'envoi
+  (des dizaines de milliers de cases vides par partie). Selon le fork, la
+  première pièce a ses murs et les personnages leurs textures dès le premier
+  lancement. À regarder : l'illustration du menu, les murs de la cour, la
+  vitesse d'arrivée des textures. Pour comparer :
+  `$env:VICTORY_STALE_TEXTURES = 'overlap'` (l'ancienne règle) et
+  `$env:VICTORY_REUPLOAD_WHEN_FULL = '0'`. Trace des murs :
+  `$env:VICTORY_WALLS_TRACE = '1'`.
 - **Copie de tampons sur la carte** : elle ne tourne plus avec
   `VICTORY_WINDOW_TAILS` / `VICTORY_WINDOW_KB` (les murs disparaissaient
   à la fenêtre). `$env:VICTORY_GPU_BUFFER_COPIES = '0'` la coupe partout.
