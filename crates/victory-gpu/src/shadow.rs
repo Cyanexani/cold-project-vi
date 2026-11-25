@@ -963,7 +963,7 @@ pub(crate) fn wide_back() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_WIDE_BACK").is_some_and(|v| v == "1"))
 }
 
-type Job = Box<dyn FnOnce() + Send>;
+pub(crate) type Job = Box<dyn FnOnce() + Send>;
 
 /// Threads kept for [`wide`]: what they are to do, and the word that there
 /// is something.
@@ -1004,7 +1004,7 @@ fn workers() -> &'static Workers {
 
 /// Runs `jobs` on the kept threads and on this one, and returns when all
 /// of them are done. The jobs copy and compare memory; they do not panic.
-fn wide(jobs: Vec<Job>) {
+pub(crate) fn wide(jobs: Vec<Job>) {
     if jobs.len() < 2 {
         for job in jobs {
             job();

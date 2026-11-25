@@ -5087,7 +5087,13 @@ impl HostList {
     fn run_deferred(&self, batch: &mut Batch) {
         #[cfg(feature = "diagnostics")]
         use crate::copystat::{C, add};
+        // Textures due in a run of texture steps: brought up to date together, on several
+        // threads (`wide_textures`), before the next step of another kind.
+        let mut textures: Vec<std::sync::Arc<crate::texture::Staging>> = Vec::new();
         for step in &self.deferred().copies {
+            if !matches!(step, Step::Texture(_)) && !textures.is_empty() {
+                refresh_textures(std::mem::take(&mut textures));
+            }
             let started = std::time::Instant::now();
             let copied = match step {
                 &Step::Copy(dst, src, len) => {
@@ -5156,7 +5162,7 @@ impl HostList {
                 }
                 Step::Texture(staging) => {
                     if batch.texture_due(staging) {
-                        staging.refresh();
+                        textures.push(staging.clone());
                     }
                     continue;
                 }
@@ -5164,7 +5170,46 @@ impl HostList {
             PREPARING[0].fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
             PREPARING[1].fetch_add(copied as u64, Ordering::Relaxed);
         }
+        refresh_textures(textures);
     }
+}
+
+/// Whether a submission's texture refreshes (read title memory, hash, detile into the
+/// staging buffer) run on several threads (on by default; `VICTORY_WIDE_TEXTURES=0`: one
+/// after the other on the submitting thread, as before). Each refresh writes only its own
+/// staging buffer and notes, and reads title memory; the write watch, the guards and the
+/// lock that keeps title memory mapped are behind their own locks, as they are for the
+/// title's threads. Textures arrive in bursts at every cut (90-100 ms a frame of refreshes
+/// in the run of 2026-11-25).
+fn wide_textures() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_WIDE_TEXTURES").is_none_or(|v| v != "0"))
+}
+
+/// Brings `textures` up to date (`Staging::refresh`), on several threads when there are
+/// a few of them ([`wide_textures`]).
+fn refresh_textures(textures: Vec<std::sync::Arc<crate::texture::Staging>>) {
+    if textures.len() < 3 || !wide_textures() {
+        for t in textures {
+            t.refresh();
+        }
+        return;
+    }
+    struct Sent(std::sync::Arc<crate::texture::Staging>);
+    // SAFETY: a staging buffer's pointers are its mapped upload memory and the title's
+    // texture memory; `refresh` writes only the former, under the staging's own lock.
+    unsafe impl Send for Sent {}
+    let jobs: Vec<crate::shadow::Job> = textures
+        .into_iter()
+        .map(|t| {
+            let t = Sent(t);
+            Box::new(move || {
+                let t = t;
+                t.0.refresh();
+            }) as crate::shadow::Job
+        })
+        .collect();
+    crate::shadow::wide(jobs);
 }
 
 /// Whether a submission's refreshes of host copies run on several threads,
@@ -5735,6 +5780,8 @@ impl Meter {
         let picked = crate::draw::HEAP_BUFFER_PASSES.swap(0, Ordering::Relaxed) as f64 / frames;
         let picked_ms =
             crate::draw::HEAP_BUFFER_MICROS.swap(0, Ordering::Relaxed) as f64 / 1e3 / frames;
+        let picked_tex_ms =
+            crate::draw::HEAP_TEXTURE_MICROS.swap(0, Ordering::Relaxed) as f64 / 1e3 / frames;
         // Copies between depth textures and their colour twins, each way.
         let [twin_to_depth, twin_to_colour] =
             [2, 3].map(|i| crate::resource::TWINS[i].swap(0, Ordering::Relaxed) as f64 / frames);
@@ -5806,7 +5853,7 @@ impl Meter {
                  {copy_mb:.1} MB, textures {texture_ms:.1} ms {texture_mb:.1} MB; {gpu:.1} on the \
                  GPU; {back_ms:.1} copying back {back_mb:.1} MB), {draws:.0} draws/frame, \
                  dropped {dropped:.0} without a host pipeline ({making} being made) and \
-                 {indirect:.0} indirect; heap buffers {picked:.1} passes {picked_ms:.1} ms;                  texture slots written so far: {placed} placed, {objects} of objects; \
+                 {indirect:.0} indirect; heap buffers {picked:.1} passes {picked_ms:.1} ms ({picked_tex_ms:.1} of it textures);                  texture slots written so far: {placed} placed, {objects} of objects; \
                  textures picked by index: {picked_textures} uploaded so far ({picked_mb} MB), \
                  {picked_waiting} waiting, {picked_away} passed over unmapped; depth textures with                  unordered access: {du0} made, bound as depth {du1}x, cleared as depth {du2}x,                  unordered views refused {du3}x; buffer views left null as the host would refuse them: {refused}",
                 picked_textures = crate::draw::HEAP_TEXTURES.load(Ordering::Relaxed),
