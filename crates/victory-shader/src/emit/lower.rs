@@ -2347,7 +2347,23 @@ impl<'a> Lower<'a> {
                     // such pixels blend into the same texel their order is
                     // the host's (rasterizer-ordered views would keep it).
                     None if self.pops => Val::I32(self.s.m.i32(0)),
-                    None => Val::Missing("a hardware SGPR input"),
+                    None => {
+                        // Nothing said which register this was, and the
+                        // refusal is the whole story a run gets: 10 pixel
+                        // programs of one title stop here, all with "GFX10
+                        // code at 0x2dbc / 0x3014: a hardware SGPR input is
+                        // not supported" (2026-11-25). `VICTORY_SGPR_TRACE=1`
+                        // names the register and the stage, so the input can
+                        // be modelled the way the POPS case above was.
+                        if std::env::var_os("VICTORY_SGPR_TRACE").is_some() {
+                            eprintln!(
+                                "victory-shader: an SGPR read that nothing initialized: \
+                                 sgpr=s{n} pops={}",
+                                self.pops
+                            );
+                        }
+                        Val::Missing("a hardware SGPR input")
+                    }
                 },
                 Reg::Scc => Val::Missing("SCC on entry"),
                 Reg::V(_) => match io_inputs.get(&v) {
