@@ -99,9 +99,11 @@ fn install() {
         if context.Rip != (&raw const victory_copy_guarded_at) as u64 {
             return EXCEPTION_CONTINUE_SEARCH;
         }
-        const READ: usize = 0;
-        let read = r.NumberParameters >= 1 && r.ExceptionInformation[0] == READ;
-        let gone = (r.ExceptionCode == EXCEPTION_ACCESS_VIOLATION || r.ExceptionCode == EXCEPTION_IN_PAGE_ERROR) && read;
+        // A read of a page that is gone, or a write into title memory that
+        // is not there ([`copy_to_title`]: the caller opened its guards, so
+        // a write that faults meets memory the title unmapped). Host
+        // destinations never fault; the kernel's copy behind says the same.
+        let gone = r.ExceptionCode == EXCEPTION_ACCESS_VIOLATION || r.ExceptionCode == EXCEPTION_IN_PAGE_ERROR;
         if gone || r.ExceptionCode == EXCEPTION_GUARD_PAGE {
             context.Rip = (&raw const victory_copy_guarded_fault) as u64;
             return EXCEPTION_CONTINUE_EXECUTION;
@@ -153,6 +155,14 @@ pub(crate) fn copy(to: *mut u8, from: *const u8, len: usize) -> bool {
     whole
 }
 
+/// With [`on`]: writes `len` bytes from host memory at `from` into title
+/// memory at `to`, whose guards the caller opened (`crate::watch::writing`);
+/// false if it is off or a page of `to` was not there (the caller then
+/// writes through the kernel, as before).
+pub(crate) fn copy_to_title(to: *mut u8, from: *const u8, len: usize) -> bool {
+    copy(to, from, len)
+}
+
 /// With the frame line: what [`copy`] did per frame over `frames`.
 pub(crate) fn line(frames: f64) {
     if !on() {
@@ -170,7 +180,7 @@ pub(crate) fn line(frames: f64) {
 mod tests {
     use super::*;
     use windows_sys::Win32::System::Memory::{
-        MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_NOACCESS, PAGE_READWRITE, VirtualAlloc, VirtualFree,
+        MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, VirtualAlloc, VirtualFree,
     };
 
     const PAGE: usize = 4096;
@@ -213,6 +223,29 @@ mod tests {
         // And the registers the caller owns came back: this still works.
         assert!(guarded(to.as_mut_ptr(), base, PAGE));
         assert!(to[..PAGE].iter().all(|&b| b == 0xAB));
+        // SAFETY: the test's reservation.
+        unsafe { VirtualFree(base.cast(), 0, MEM_RELEASE) };
+    }
+
+    /// A write into memory that is not there, or not writable, ends the copy
+    /// with false and the thread goes on ([`copy_to_title`]).
+    #[test]
+    fn a_write_into_a_page_that_is_not_there_ends_the_copy_without_a_fault() {
+        // SAFETY: memory of the test's own.
+        let base = unsafe { VirtualAlloc(std::ptr::null(), 3 * PAGE, MEM_RESERVE, PAGE_NOACCESS) } as *mut u8;
+        assert!(!base.is_null());
+        // SAFETY: the first page of that reservation.
+        assert!(!unsafe { VirtualAlloc(base.cast(), PAGE, MEM_COMMIT, PAGE_READWRITE) }.is_null());
+        let from = vec![0x5Au8; 2 * PAGE];
+        assert!(guarded(base, from.as_ptr(), PAGE));
+        // SAFETY: the committed page.
+        assert!(unsafe { std::slice::from_raw_parts(base, PAGE) }.iter().all(|&b| b == 0x5A));
+        // Into the reserved page after it: false, no fault.
+        assert!(!guarded(base.wrapping_add(PAGE / 2), from.as_ptr(), PAGE));
+        // Committed but read-only.
+        // SAFETY: the third page of the reservation.
+        assert!(!unsafe { VirtualAlloc(base.wrapping_add(2 * PAGE).cast(), PAGE, MEM_COMMIT, PAGE_READONLY) }.is_null());
+        assert!(!guarded(base.wrapping_add(2 * PAGE), from.as_ptr(), 16));
         // SAFETY: the test's reservation.
         unsafe { VirtualFree(base.cast(), 0, MEM_RELEASE) };
     }
