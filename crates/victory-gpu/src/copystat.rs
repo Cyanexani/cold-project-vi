@@ -778,6 +778,18 @@ fn log_memory() {
         made[4],
         mb(made[5]),
     );
+    {
+        let up: Vec<u64> = crate::host::UPLOAD_MADE.iter().map(|a| a.load(Relaxed)).collect();
+        let pool: Vec<u64> = crate::texture::POOL_USE.iter().map(|a| a.load(Relaxed)).collect();
+        tracing::info!(
+            "upload buffers since the start: {:.0} ms making and mapping them; {} for one copy of a list, {} large scratch of a list;              texture staging buffers: {} taken from the pool, {} made anew (VICTORY_STAGING_POOL_MB)",
+            up[0] as f64 / 1000.0,
+            up[1],
+            up[2],
+            pool[0],
+            pool[1],
+        );
+    }
     tracing::info!(
         "memory, placed textures: {} of them were asked for again with other filler words in their description          (one resource and host copy each since the filler left the key; VICTORY_PLACED_FILLER=1 keeps it)",
         crate::resource::placed_filler_twins()

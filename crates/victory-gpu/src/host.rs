@@ -443,6 +443,10 @@ pub(crate) static PREPARING: [std::sync::atomic::AtomicU64; 4] = [
 /// memory) and the graphics card's own (indirect arguments, twins' copies).
 /// For the memory line: against what is alive, they show what was let go.
 pub(crate) static MADE: [std::sync::atomic::AtomicU64; 6] = [const { std::sync::atomic::AtomicU64::new(0) }; 6];
+/// Upload buffers made since the start: microseconds spent making and
+/// mapping them, and how many of them were a list's one-copy uploads
+/// (`HostList::upload`) and a list's large scratch (past a chunk).
+pub(crate) static UPLOAD_MADE: [std::sync::atomic::AtomicU64; 3] = [const { std::sync::atomic::AtomicU64::new(0) }; 3];
 
 /// What of that is alive now, for the memory line (`MADE` counts what was
 /// ever made: 42,607 upload buffers, 77.9 GB, in five minutes of run 60,
@@ -5002,6 +5006,7 @@ impl HostList {
     ///
     /// shortcut: one buffer per copy; pool them once uploads are frequent.
     pub(crate) fn upload(&self, host: &Host, size: u64) -> Option<(ID3D12Resource, *mut u8)> {
+        UPLOAD_MADE[1].fetch_add(1, Ordering::Relaxed);
         let (buffer, data) = host.upload_buffer(size)?;
         name(&buffer, || format!("list upload {size:#x}"));
         self.deferred().hold_upload(buffer.clone(), size);
@@ -5015,6 +5020,7 @@ impl HostList {
         let mut s = self.scratch.lock().unwrap_or_else(|e| e.into_inner());
         let len = len.max(1).next_multiple_of(256);
         if len > SCRATCH_CHUNK {
+            UPLOAD_MADE[2].fetch_add(1, Ordering::Relaxed);
             let (buffer, data) = host.upload_buffer(len)?;
             name(&buffer, || format!("list scratch {len:#x}"));
             // SAFETY: a live buffer.
@@ -5655,6 +5661,7 @@ impl Host {
     pub(crate) fn upload_buffer(&self, size: u64) -> Option<(ID3D12Resource, *mut u8)> {
         MADE[0].fetch_add(1, Ordering::Relaxed);
         MADE[1].fetch_add(size, Ordering::Relaxed);
+        let began = std::time::Instant::now();
         let heap = D3D12_HEAP_PROPERTIES {
             Type: D3D12_HEAP_TYPE_UPLOAD,
             ..Default::default()
@@ -5690,6 +5697,7 @@ impl Host {
                     b.Map(0, None, Some(&mut data))
                 })
         };
+        UPLOAD_MADE[0].fetch_add(began.elapsed().as_micros() as u64, Ordering::Relaxed);
         match made {
             Ok(()) => Some((buffer?, data.cast())),
             Err(e) => {
