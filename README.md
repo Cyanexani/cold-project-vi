@@ -254,15 +254,15 @@ xychart-beta
     title "Shaders traduits sur tout le jeu, par sorte (%)"
     x-axis ["Sommets et pixels", "Calcul", "Mesh", "Ensemble"]
     y-axis "%" 95 --> 100
-    bar [99.99, 98.8, 100, 99.87]
+    bar [99.99, 98.95, 100, 99.89]
 ```
 
 | Sorte | Traduits | Au total | % |
 |---|---|---|---|
 | Sommets et pixels | 14 246 | 14 247 | 99,99 % |
-| Calcul | 2 650 | 2 682 | 98,8 % |
+| Calcul | 2 654 | 2 682 | 98,95 % |
 | Mesh | 8 765 | 8 765 | 100 % |
-| **Ensemble** | **25 661** | **25 694** | **99,87 %** |
+| **Ensemble** | **25 665** | **25 694** | **99,89 %** |
 
 S'y ajoutent 195 shaders de géométrie (voxels, 0,7 % du jeu) dont les
 ressources ne sont pas encore suivies : en les comptant, 98,4 % des
@@ -273,10 +273,12 @@ xychart-beta
     title "Shaders traduits sur tout le jeu (%), au fil des jours"
     x-axis ["25/11", "26/11"]
     y-axis "%" 99 --> 100
-    bar [99.68, 99.87]
+    bar [99.68, 99.89]
 ```
 
-Débloqués le 26/11 : **40 surfaces** (murs et sols PS_TexturedDeferred,
+Débloqués le 26/11 : **4 traceurs d'ombres** (CS_TraceShadowRays : une
+table des adresses des tampons par case du tas, reprise du runtime de
+ScarlettPort, GPL-3.0) et **40 surfaces** (murs et sols PS_TexturedDeferred,
 PS_TexturedLit, reflets de miroir, flaques, 3 mesh de terrain et d'ombres).
 Elles choisissaient entre deux échantillonneurs fixes (répéter ou bloquer
 au bord), ce qu'un handle D3D12 ne peut pas faire : chaque lecture de
@@ -284,14 +286,13 @@ texture est maintenant faite avec les deux et le bon résultat gardé.
 Les 24 et 25/11 : flaques (2), simulation d'eau (1), transparence (2),
 personnages à section ordonnée POPS (10, cheveux et cils).
 
-Les 33 encore refusés, par cause :
+Les 29 encore refusés, par cause :
 
 ```mermaid
 pie showData
-    title Shaders encore refusés sur tout le jeu (33)
+    title Shaders encore refusés sur tout le jeu (29)
     "Vagues de 64 partageant la LDS (particules, traînées, eau, ombres de cheveux)" : 24
-    "Descripteur lu comme donnée (traceurs d'ombres RT)" : 5
-    "Masques de lanes (eau, ombres)" : 3
+    "Masques de lanes (eau, ombres, traceur adaptatif)" : 4
     "Sommets et pixels (voxels)" : 1
 ```
 

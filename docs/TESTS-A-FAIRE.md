@@ -53,6 +53,13 @@ Ce qui change sans rien régler :
   sols, reflets, flaques. Si une surface a l'air fausse ou plus floue,
   comparer en sautant ces 40 programmes :
   `$env:VICTORY_SKIP_PIPELINES = '006267451f43e7de,023e53b08ce01357,028198219db43888,103ee468bb36e9f7,17cb5f1075a00ef9,36fcfa1f850bdcf1,386771306a526f9e,4336a35992d1fa4b,433fb2aeec8a63f2,45fa76191e66c3ce,481ab63a1473061d,4909ccd69ef29ded,54fac5d3e86f9aa3,58899977d59e95c9,5a94c88f2ee40bc8,5ff5fd0611b044d1,676c77fe81c73ce6,6c3a24ab3406c760,70b1e733c912c8e9,70cb520ef8275799,71f318decc1233b0,7da1402abc1d4af4,86c214405bf22736,8f0871129b4f3061,91321f9948435001,925d917ce78662eb,95d14fac2a5b5840,a7dc32bf2185e215,bb23eaac564f1d86,bc78a82ba2382a71,c8bf259e98736faf,cbf2f85a3c0e5043,cbfeba8fce1dd1ae,ce86cdeea9f1b2c7,d54ba0ff001dabdd,d7f87775f42fab9f,e2f95452ecaeb5e6,efce39ec51c443c0,f4fd42dc10ebd74d,f70d4e2a8eb354a6'`
+- **Traceurs d'ombres (4 programmes CS_TraceShadowRays, 26/11)** : ils
+  prenaient leur structure de ray tracing dans le tas à un index calculé et
+  étaient refusés. Ils se traduisent avec une table des adresses par case
+  du tas (reprise de ScarlettPort). Le ray tracing restant éteint par
+  défaut, l'effet attendu est faible ; à regarder : les ombres de
+  l'éclairage (zones trop sombres ou trop claires). Pour comparer :
+  `$env:VICTORY_SKIP_PIPELINES = '002e93a6cc2aa355,07c93bfb77fecebb,0e64f14fae060d04,96ccb14ef981fd85'`
 - **Copie de tampons sur la carte** : elle ne tourne plus avec
   `VICTORY_WINDOW_TAILS` / `VICTORY_WINDOW_KB` (les murs disparaissaient
   à la fenêtre). `$env:VICTORY_GPU_BUFFER_COPIES = '0'` la coupe partout.
