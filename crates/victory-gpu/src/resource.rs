@@ -1394,10 +1394,11 @@ pub(crate) fn room() -> bool {
 }
 
 /// The share of the card's budget, in percent, up to which host copies of
-/// textures picked by index are made ([`room`]): 75 unless
+/// textures picked by index are made ([`room`]): 60 unless (85 before
+/// 2026-11-25: textures took the card and windows stayed in the PC's memory)
 /// `VICTORY_TEXTURE_ROOM_PERCENT` says another (50 to 97). Leaving ~25%
 /// headroom keeps hot compute/skinning card buffers (which may use up to
-/// `VICTORY_CARD_VRAM_PERCENT`, default 92%) in local VRAM instead of
+/// `VICTORY_CARD_VRAM_PERCENT`, default 94%) in local VRAM instead of
 /// spilling onto PCIe shared memory.
 #[cfg(windows)]
 fn room_percent() -> u64 {
@@ -1406,7 +1407,7 @@ fn room_percent() -> u64 {
         std::env::var("VICTORY_TEXTURE_ROOM_PERCENT")
             .ok()
             .and_then(|v| v.trim().parse::<u64>().ok())
-            .map_or(85, |percent| percent.clamp(50, 97))
+            .map_or(60, |percent| percent.clamp(50, 97))
     })
 }
 

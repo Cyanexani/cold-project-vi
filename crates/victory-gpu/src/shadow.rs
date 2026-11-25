@@ -196,7 +196,7 @@ fn card_limits() -> (u64, u64) {
         let mb = |name: &str, default: u64| {
             std::env::var(name).ok().and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(default) << 20
         };
-        (mb("VICTORY_CARD_BUFFERS_MIN_MB", 1).max(1 << 20), mb("VICTORY_CARD_BUFFERS_MB", 2048))
+        (mb("VICTORY_CARD_BUFFERS_MIN_MB", 1).max(1 << 20), mb("VICTORY_CARD_BUFFERS_MB", 4096))
     })
 }
 
@@ -232,7 +232,7 @@ pub(crate) fn card_hash_bytes(size: u64) -> u64 {
 }
 
 /// Maximum share of VRAM budget (%) up to which card buffers may be allocated
-/// (`VICTORY_CARD_VRAM_PERCENT`, default 92; clamped 50..=95). Kept higher
+/// (`VICTORY_CARD_VRAM_PERCENT`, default 94; clamped 50..=95). Kept higher
 /// than [`crate::resource::room_percent`] so hot compute/skinning buffers keep
 /// VRAM priority over streamed textures.
 fn card_vram_percent() -> u64 {
@@ -241,7 +241,7 @@ fn card_vram_percent() -> u64 {
         std::env::var("VICTORY_CARD_VRAM_PERCENT")
             .ok()
             .and_then(|v| v.trim().parse::<u64>().ok())
-            .map_or(92, |p| p.clamp(50, 95))
+            .map_or(94, |p| p.clamp(50, 95))
     })
 }
 
@@ -281,7 +281,7 @@ fn card_for(size: u64) -> Option<ID3D12Resource> {
 }
 
 /// The most bytes of windows outside buffers whose copies go to the card's
-/// memory (`VICTORY_CARD_WINDOWS_MB`; default 1536 MiB, `=0` disables).
+/// memory (`VICTORY_CARD_WINDOWS_MB`; default 4096 MiB since 2026-11-25, 1536 before; `=0` disables).
 ///
 /// Windows are two thirds of the PC memory the card shares (run 104: 861
 /// windows, 3,552 MB of 5,400), and every draw that takes vertices, indices
@@ -299,7 +299,24 @@ fn card_for(size: u64) -> Option<ID3D12Resource> {
 fn window_card_most() -> u64 {
     static MOST: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *MOST.get_or_init(|| {
-        std::env::var("VICTORY_CARD_WINDOWS_MB").ok().and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(1536) << 20
+        std::env::var("VICTORY_CARD_WINDOWS_MB").ok().and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(4096) << 20
+    })
+}
+
+/// The share of the card's budget, in percent, under which windows go to
+/// the card's memory ([`window_card_for`]): `VICTORY_CARD_WINDOWS_PERCENT`
+/// (90 unless said, 50 to 95; 72 before 2026-11-25). Every draw reads its vertices, indices and
+/// constants from windows: one left in the PC's memory is read over the
+/// bus each time. The textures' share (`VICTORY_TEXTURE_ROOM_PERCENT`, 85)
+/// fills the card first, so at 72 most windows stayed in the PC's memory
+/// (5.3 GB shared with the card at the cell, 2026-11-25).
+fn window_card_percent() -> u64 {
+    static PERCENT: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *PERCENT.get_or_init(|| {
+        std::env::var("VICTORY_CARD_WINDOWS_PERCENT")
+            .ok()
+            .and_then(|v| v.trim().parse::<u64>().ok())
+            .map_or(90, |p| p.clamp(50, 95))
     })
 }
 
@@ -318,7 +335,7 @@ fn window_card_for(size: u64) -> Option<ID3D12Resource> {
         return None;
     }
     if let Some([budget, used, ..]) = host.video_memory()
-        && used + size > budget / 100 * 72
+        && used + size > budget / 100 * window_card_percent()
     {
         return None;
     }

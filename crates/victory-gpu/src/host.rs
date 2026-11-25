@@ -6423,7 +6423,9 @@ pub(crate) fn copy_mapped(dst: *mut u8, src: *const u8, len: usize, title_dst: b
     }
     #[cfg(feature = "diagnostics")]
     let moved = std::time::Instant::now();
-    let whole = read(src, dst, len);
+    // Into host memory: in place first, if asked for (`crate::plaincopy`);
+    // through the kernel if that is off or met a page that was not there.
+    let whole = (!title_dst && crate::plaincopy::copy(dst, src, len)) || read(src, dst, len);
     #[cfg(feature = "diagnostics")]
     crate::copystat::add(crate::copystat::C::MoveUs, moved.elapsed().as_micros() as u64);
     if whole {
@@ -6805,6 +6807,7 @@ impl Meter {
         );
         crate::descriptor::sync_line(frames);
         late_line(frames);
+        crate::plaincopy::line(frames);
         crate::draw::batch_line(frames);
         card_clock_line(frames, ms);
         crate::shadow::back_line(frames);

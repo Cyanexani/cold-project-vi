@@ -32,6 +32,8 @@ mod compose;
 #[cfg(windows)]
 mod hud;
 #[cfg(windows)]
+mod plaincopy;
+#[cfg(windows)]
 pub mod upscale;
 #[cfg(windows)]
 mod host;
