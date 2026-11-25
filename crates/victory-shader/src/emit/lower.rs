@@ -202,6 +202,12 @@ struct Lower<'a> {
     user_data: Option<V>,
     user_reads: BTreeMap<u32, UserData>,
     samplers: Vec<[u32; 4]>,
+    /// The sampler `handle` last chose between two immediate ones: the
+    /// first's handle, the second's, whether the second is picked.
+    alt_sampler: Option<(V, V, V)>,
+    /// Sample results made with the first of two samplers: the same made
+    /// with the second, and whether it is picked (`sample_op`).
+    alt_results: HashMap<V, (V, V)>,
     descriptors: HashMap<(Site, bool), &'a Source>,
     scalar: HashMap<Site, Address>,
     exports: HashMap<Site, &'a Export>,
@@ -1496,6 +1502,8 @@ impl<'a> Lower<'a> {
             user_data: None,
             user_reads: BTreeMap::new(),
             samplers: Vec::new(),
+            alt_sampler: None,
+            alt_results: HashMap::new(),
             descriptors: x
                 .res
                 .descriptors
@@ -6296,19 +6304,8 @@ impl<'a> Lower<'a> {
                     .get(..4)
                     .and_then(|w| w.try_into().ok())
                     .ok_or("a sampler constant")?;
-                let n = match self.samplers.iter().position(|w| *w == words) {
-                    Some(n) => n,
-                    None => {
-                        self.samplers.push(words);
-                        self.samplers.len() - 1
-                    }
-                };
-                if props.0 & 0x8000 != 0 {
-                    // shortcut: one sampler used with and without comparison
-                    // would need two static samplers; it becomes a comparison one.
-                    self.s.cmp_samplers |= 1 << n;
-                }
-                Ok(self.s.sampler_handle(self.cur, n as u32))
+                let n = self.constant_sampler(words, props);
+                Ok(self.s.sampler_handle(self.cur, n))
             }
             Source::Constant(_) => Err("a constant resource descriptor"),
             Source::Built { address, .. } => {
@@ -6344,6 +6341,23 @@ impl<'a> Lower<'a> {
                     }
                     _ => Err("a typed root view"),
                 }
+            }
+            Source::Phi { .. } | Source::Select { .. }
+                if sampler && constant_pair(src).is_some() =>
+            {
+                // Two immediate samplers chosen between (wrap or clamp,
+                // say): a handle cannot be chosen, so each sample is made
+                // with both and the result picked (`sample_op`).
+                let pair = constant_pair(src).ok_or("a sampler constant")?;
+                let pick = self.constant_pick(src, &pair, 8)?;
+                let one = self.s.m.i32(1);
+                let is_b = self.s.m.cmp(self.cur, pred::EQ, pick, one);
+                let na = self.constant_sampler(pair[0], props);
+                let nb = self.constant_sampler(pair[1], props);
+                let a = self.s.sampler_handle(self.cur, na);
+                let b = self.s.sampler_handle(self.cur, nb);
+                self.alt_sampler = Some((a, b, is_b));
+                Ok(a)
             }
             Source::Phi { block, args } => {
                 let _ = site;
@@ -6417,6 +6431,110 @@ impl<'a> Lower<'a> {
         let phi = self.s.m.phi(join, self.s.t.i32);
         self.s.m.set_phi(phi, incoming);
         Ok(phi)
+    }
+
+    /// The register of the immediate sampler `words` (added if new).
+    fn constant_sampler(&mut self, words: [u32; 4], props: (u32, u32)) -> u32 {
+        let n = match self.samplers.iter().position(|w| *w == words) {
+            Some(n) => n,
+            None => {
+                self.samplers.push(words);
+                self.samplers.len() - 1
+            }
+        };
+        if props.0 & 0x8000 != 0 {
+            // shortcut: one sampler used with and without comparison
+            // would need two static samplers; it becomes a comparison one.
+            self.s.cmp_samplers |= 1 << n;
+        }
+        n as u32
+    }
+
+    /// A sampling op (the sampler handle second in `args`). With `alt` (a
+    /// sampler chosen between two immediate ones: the first's handle, the
+    /// second's, and whether the second is picked) it is made with each and
+    /// the result picked: a scalar at once, a result struct channel by
+    /// channel where it is read (`alt_results`).
+    #[allow(clippy::too_many_arguments)]
+    fn sample_op(
+        &mut self,
+        alt: Option<(V, V, V)>,
+        c: usize,
+        name: &str,
+        attr: Attr,
+        ret: super::bitcode::Ty,
+        opcode: u32,
+        args: &[V],
+    ) -> V {
+        let r = self.s.op(c, name, attr, ret, opcode, args);
+        let Some((a, b, is_b)) = alt else { return r };
+        if args.get(1) != Some(&a) {
+            return r;
+        }
+        let mut other = args.to_vec();
+        other[1] = b;
+        let r2 = self.s.op(c, name, attr, ret, opcode, &other);
+        if ret == self.s.t.res_ret {
+            self.alt_results.insert(r, (r2, is_b));
+            r
+        } else {
+            self.s.m.select(c, is_b, r2, r)
+        }
+    }
+
+    /// Channel `ch` of the result struct `r`, picked between the two
+    /// samples of a chosen sampler (`sample_op`).
+    fn result_channel(&mut self, c: usize, r: V, ch: u32) -> V {
+        let x = self.s.m.extract(c, r, ch);
+        match self.alt_results.get(&r).copied() {
+            Some((r2, is_b)) => {
+                let y = self.s.m.extract(c, r2, ch);
+                self.s.m.select(c, is_b, y, x)
+            }
+            None => x,
+        }
+    }
+
+    /// 0 or 1: which of `pair` the constant sampler `src` (a choice of the
+    /// two by control flow or SCC) is where it is read.
+    fn constant_pick(&mut self, src: &Source, pair: &[[u32; 4]; 2], depth: u32) -> Result<V, Why> {
+        const WHY: Why = "a sampler chosen by control flow";
+        match src {
+            Source::Constant(w) => {
+                let k = pair.iter().position(|p| w.get(..4) == Some(&p[..])).ok_or(WHY)?;
+                Ok(self.s.m.i32(k as u32))
+            }
+            Source::Select { scc, args } => {
+                let [a, b] = &args[..] else { return Err(WHY) };
+                let cond = match self.get(*scc)? {
+                    Val::Bit(x) => x,
+                    _ => return Err("SCC without a value"),
+                };
+                let set = self.constant_pick(a, pair, depth)?;
+                let clear = self.constant_pick(b, pair, depth)?;
+                Ok(self.s.m.select(self.cur, cond, set, clear))
+            }
+            Source::Phi { block, args } if depth > 0 => {
+                let p = self.x.p;
+                let mut incoming = Vec::new();
+                for (&q, arg) in p.blocks[*block].preds.iter().zip(args) {
+                    if self.block[q].is_none() {
+                        continue;
+                    }
+                    let tail = self.tail[q].ok_or(WHY)?;
+                    let at = self.edges.get(&(q, *block)).copied().unwrap_or(tail);
+                    let here = std::mem::replace(&mut self.cur, at);
+                    let k = self.constant_pick(arg, pair, depth - 1);
+                    self.cur = here;
+                    incoming.push((k?, at));
+                }
+                let join = self.block[*block].ok_or(WHY)?;
+                let phi = self.s.m.phi(join, self.s.t.i32);
+                self.s.m.set_phi(phi, incoming);
+                Ok(phi)
+            }
+            _ => Err(WHY),
+        }
     }
 
     /// The bytes per element of the buffer view `src` names, if the program
@@ -9638,6 +9756,7 @@ impl<'a> Lower<'a> {
                 return Err("a comparison sample of 16-bit coordinates or several channels");
             }
             let sh = self.handle(site, ss, true, (14 | if cmp { 0x8000 } else { 0 }, 0))?;
+            let alt = self.alt_sampler.take().filter(|&(a, _, _)| a == sh);
             // Texel offsets (`_o`) come first: x in bits 0-5, y in 8-13,
             // signed (programmable offsets: gathers only).
             let offset_word = name.ends_with("_o");
@@ -9702,7 +9821,8 @@ impl<'a> Lower<'a> {
                 let f32t = self.s.t.f32;
                 for (k, ch) in (0..2u32).filter(|ch| dmask >> ch & 1 != 0).enumerate() {
                     let clamped = self.s.m.bool(ch == 0);
-                    let lod = self.s.op(
+                    let lod = self.sample_op(
+                        alt,
                         c,
                         "calculateLOD.f32",
                         Attr::ReadOnly,
@@ -9756,7 +9876,8 @@ impl<'a> Lower<'a> {
                 60 if !self.s.pixel => {
                     args.extend(&os);
                     args.push(self.s.m.f32(0));
-                    self.s.op(
+                    self.sample_op(
+                        alt,
                         c,
                         "sampleLevel.f32",
                         Attr::ReadOnly,
@@ -9789,8 +9910,7 @@ impl<'a> Lower<'a> {
                     }
                     args.extend(&os);
                     args.push(clamp);
-                    self.s
-                        .op(c, "sample.f32", Attr::ReadOnly, self.s.t.res_ret, 60, &args)
+                    self.sample_op(alt, c, "sample.f32", Attr::ReadOnly, self.s.t.res_ret, 60, &args)
                 }
                 61 => {
                     // With a16 the bias is an f16 in the low half of its
@@ -9806,7 +9926,8 @@ impl<'a> Lower<'a> {
                     args.extend(&os);
                     if self.s.pixel {
                         args.extend([bias, clamp]);
-                        self.s.op(
+                        self.sample_op(
+                            alt,
                             c,
                             "sampleBias.f32",
                             Attr::ReadOnly,
@@ -9817,7 +9938,8 @@ impl<'a> Lower<'a> {
                     } else {
                         // As above: the bias is the level.
                         args.push(bias);
-                        self.s.op(
+                        self.sample_op(
+                            alt,
                             c,
                             "sampleLevel.f32",
                             Attr::ReadOnly,
@@ -9863,7 +9985,8 @@ impl<'a> Lower<'a> {
                     let lod = self.s.m.bin(c, Bin::Mul, ln, per_ln2);
                     args.extend(&os);
                     args.push(lod);
-                    self.s.op(
+                    self.sample_op(
+                        alt,
                         c,
                         "sampleLevel.f32",
                         Attr::ReadOnly,
@@ -9883,7 +10006,8 @@ impl<'a> Lower<'a> {
                     args.extend(&os);
                     args.extend(g);
                     args.push(clamp);
-                    self.s.op(
+                    self.sample_op(
+                        alt,
                         c,
                         "sampleGrad.f32",
                         Attr::ReadOnly,
@@ -9903,8 +10027,7 @@ impl<'a> Lower<'a> {
                     } else {
                         "sampleCmpLevelZero.f32"
                     };
-                    self.s
-                        .op(c, name, Attr::ReadOnly, self.s.t.res_ret, op, &args)
+                    self.sample_op(alt, c, name, Attr::ReadOnly, self.s.t.res_ret, op, &args)
                 }
                 62 => {
                     let lod = if name == "image_sample_l" {
@@ -9915,7 +10038,8 @@ impl<'a> Lower<'a> {
                     };
                     args.extend(&os);
                     args.push(lod);
-                    self.s.op(
+                    self.sample_op(
+                        alt,
                         c,
                         "sampleLevel.f32",
                         Attr::ReadOnly,
@@ -10004,7 +10128,8 @@ impl<'a> Lower<'a> {
                     } else {
                         args.extend(&os[..2]);
                         args.push(self.s.m.i32(dmask.trailing_zeros()));
-                        self.s.op(
+                        self.sample_op(
+                            alt,
                             c,
                             "textureGather.f32",
                             Attr::ReadOnly,
@@ -10053,7 +10178,7 @@ impl<'a> Lower<'a> {
         for ch in channels {
             let x = match gathered {
                 Some(g) => g[ch as usize],
-                None => self.s.m.extract(c, r, ch),
+                None => self.result_channel(c, r, ch),
             };
             xs.push(if *d16 {
                 // shortcut: d16 results are taken as floats (rounded to
@@ -11893,5 +12018,23 @@ mod tests {
         assert!(f10(0x3FF).is_nan());
         // A 16-bit float is a half already, sign included.
         assert_eq!(half(0xBC00 << half_shift(16)), -1.0);
+    }
+}
+
+
+/// The two immediate samplers a sampler chosen by control flow or SCC
+/// picks between, if every choice is one of exactly two constants.
+fn constant_pair(src: &Source) -> Option<[[u32; 4]; 2]> {
+    let mut found: Vec<[u32; 4]> = Vec::new();
+    for leaf in src.leaves() {
+        let Source::Constant(w) = leaf else { return None };
+        let w: [u32; 4] = w.get(..4)?.try_into().ok()?;
+        if !found.contains(&w) {
+            found.push(w);
+        }
+    }
+    match found[..] {
+        [a, b] => Some([a, b]),
+        _ => None,
     }
 }
