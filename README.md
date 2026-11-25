@@ -32,13 +32,15 @@ Mis à jour le 25/11/2026.
 
 ## Où en est le jeu
 
-### Avancement du portage : 40 %
+### Avancement du portage : environ 59 %
 
-`████████░░░░░░░░░░░░` **40 % : dans le monde**
+`████████████░░░░░░░░` **environ 59 % : jouable** (on dirige Lucia dans le prologue)
 
 Mesuré avec le barème de [PortWatch VI](https://portwatch-vi.xyz/#method) :
 jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, le
-rendu, la vitesse et la stabilité se partagent les 50 derniers points.
+rendu, la vitesse et la stabilité se partagent les 50 derniers points. Ces
+points-là sont notre estimation : PortWatch ne les compte qu'avec une
+preuve (une vidéo).
 
 | Palier | % | État |
 |--------|---|------|
@@ -47,8 +49,11 @@ rendu, la vitesse et la stabilité se partagent les 50 derniers points.
 | Première image (logos, intro) | 20 | ✅ |
 | Menu principal | 30 | ✅ |
 | Dans le monde (le prologue se charge et s'affiche) | 40 | ✅ |
-| Jouable (on dirige un personnage) | 50 | ⏳ prochain palier |
-| Bien jouable (histoire, rendu, vitesse, stabilité) | 50-100 | ❌ |
+| Jouable (on dirige un personnage) | 50 | ✅ Lucia bouge dans le prologue |
+| Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
+| Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
+| Vitesse (10 points : images/s ÷ 30) | environ 0,7 | ❌ 2 à 2,4 images/s |
+| Stabilité (10 points) | environ 2,5 | ⚠️ pas encore mesurée sur une longue partie |
 
 ### Détail
 
@@ -57,7 +62,7 @@ rendu, la vitesse et la stabilité se partagent les 50 derniers points.
 | Démarrage, menus, écran titre | ✅ fonctionne |
 | Cinématique d'intro | ⚠️ se joue en entier, mais le logo Rockstar est mal éclairé |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
-| Premier passage jouable (prologue) | ⚠️ s'affiche : personnages, textures, ciel, extérieur au soleil |
+| Premier passage jouable (prologue) | ✅ on dirige Lucia ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
 | Images par seconde dans le monde | ❌ 2 à 2,4 (environ 420 ms par image) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
 | Mémoire | ❌ 18 à 22 Go réservés, 5 à 9 Go en RAM sur un PC de 16 Go (Windows échange avec le disque) ; au plus bas, 150 Mo restaient à engager sur 39,6 Go |
