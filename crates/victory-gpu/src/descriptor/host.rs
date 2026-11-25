@@ -1754,6 +1754,22 @@ impl HostHeap {
         self.tabled_in(index, read, crate::frame::current());
     }
 
+    /// Title slot `index`, a view of something other than a texture, is a
+    /// table's: only its stamp, so that [`HostHeap::mirror_copied`] leaves
+    /// it to the draws that read it (most of the 92,000 records a frame the
+    /// title rewrites in its per-draw tables, run essai-rt-11: 105 ms).
+    pub(crate) fn slot_tabled(&self, index: u32) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let Some(stamp) = self.tabled.get(index as usize) else {
+            return;
+        };
+        let now = (crate::frame::current() as u32).wrapping_add(1) & !TABLED_READ;
+        let old = stamp.load(Relaxed);
+        if old & !TABLED_READ != now {
+            stamp.store(now, Relaxed);
+        }
+    }
+
     /// [`HostHeap::texture_slot_tabled`] in frame `frame`.
     fn tabled_in(&self, index: u32, read: bool, frame: u64) {
         use std::sync::atomic::Ordering::Relaxed;

@@ -2686,6 +2686,10 @@ impl State {
             // Up to date by this draw: not the texture pass's to make.
             if crate::descriptor::host::is_texture_view(&view) {
                 host.texture_slot_tabled(index, true);
+            } else {
+                // A table's slot all the same: the pass over records the
+                // title copies in as bytes leaves it to its draws.
+                host.slot_tabled(index);
             }
         }
     }
@@ -2863,6 +2867,11 @@ impl State {
                         // (its texture is up to date now), and made in
                         // place as the texture pass would have made it,
                         // for a shader that picks it by index all the same.
+                        if let Some(title) = title_first
+                            && !crate::descriptor::host::is_texture_view(&view)
+                        {
+                            host.slot_tabled(title + k);
+                        }
                         if let Some(title) = title_first
                             && crate::descriptor::host::is_texture_view(&view)
                         {
