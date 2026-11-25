@@ -2965,6 +2965,9 @@ fn make(view: &View, at: D3D12_CPU_DESCRIPTOR_HANDLE) -> Option<Kept> {
                     }
                 }
                 let mut desc = desc.as_ref().map(srv_desc);
+                if let Some(gray) = crate::texture::no_textures().then(|| gray_view(texture, desc.as_ref(), at)).flatten() {
+                    return Some(Some(gray));
+                }
                 if !fits(texture, desc.as_mut().map(|d| &mut d.Format), false) {
                     return None;
                 }
@@ -3185,6 +3188,131 @@ fn magenta() -> Option<&'static ID3D12Resource> {
                 let texel = [255u8, 0, 255, 255];
                 texture.WriteToSubresource(0, None, texel.as_ptr().cast(), 4, 4).ok()?;
                 texture.Unmap(0, None);
+                Some(texture)
+            }
+        })
+        .as_ref()
+}
+
+/// With `VICTORY_NO_TEXTURES=1`: the view of a texture the title filled
+/// (no render target, depth or unordered access on it) made of a mid-grey
+/// texel of ours with the same dimension, so that surfaces show their
+/// shapes and lighting without their textures. `None` (the texture's own
+/// view) for the title's targets, multisampled views and integer reads.
+fn gray_view(
+    texture: &ID3D12Resource,
+    desc: Option<&D3D12_SHADER_RESOURCE_VIEW_DESC>,
+    at: D3D12_CPU_DESCRIPTOR_HANDLE,
+) -> Option<ID3D12Resource> {
+    if !crate::texture::title_written(texture) {
+        return None;
+    }
+    // SAFETY: a live resource.
+    let d = unsafe { texture.GetDesc() };
+    let dimension = match desc {
+        Some(v) => v.ViewDimension,
+        None => match (d.Dimension, d.DepthOrArraySize) {
+            (D3D12_RESOURCE_DIMENSION_TEXTURE1D, 1) => D3D12_SRV_DIMENSION_TEXTURE1D,
+            (D3D12_RESOURCE_DIMENSION_TEXTURE1D, _) => D3D12_SRV_DIMENSION_TEXTURE1DARRAY,
+            (D3D12_RESOURCE_DIMENSION_TEXTURE2D, 1) => D3D12_SRV_DIMENSION_TEXTURE2D,
+            (D3D12_RESOURCE_DIMENSION_TEXTURE2D, _) => D3D12_SRV_DIMENSION_TEXTURE2DARRAY,
+            (D3D12_RESOURCE_DIMENSION_TEXTURE3D, _) => D3D12_SRV_DIMENSION_TEXTURE3D,
+            _ => return None,
+        },
+    };
+    // Integer formats read as numbers, not colours.
+    let format = desc.map_or(d.Format.0, |v| v.Format.0);
+    if matches!(format, 3 | 4 | 6 | 7 | 12 | 13 | 14 | 17 | 18 | 25 | 30..=33 | 36..=38 | 42 | 43 | 50 | 51 | 52 | 57..=60 | 62..=64) {
+        return None;
+    }
+    let (kind, view) = match dimension {
+        D3D12_SRV_DIMENSION_TEXTURE1D => (Gray::D1, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            Texture1D: D3D12_TEX1D_SRV { MostDetailedMip: 0, MipLevels: 1, ResourceMinLODClamp: 0.0 },
+        }),
+        D3D12_SRV_DIMENSION_TEXTURE1DARRAY => (Gray::D1, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            Texture1DArray: D3D12_TEX1D_ARRAY_SRV { MostDetailedMip: 0, MipLevels: 1, FirstArraySlice: 0, ArraySize: 1, ResourceMinLODClamp: 0.0 },
+        }),
+        D3D12_SRV_DIMENSION_TEXTURE2D => (Gray::D2, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            Texture2D: D3D12_TEX2D_SRV { MostDetailedMip: 0, MipLevels: 1, PlaneSlice: 0, ResourceMinLODClamp: 0.0 },
+        }),
+        D3D12_SRV_DIMENSION_TEXTURE2DARRAY => (Gray::D2, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            Texture2DArray: D3D12_TEX2D_ARRAY_SRV { MostDetailedMip: 0, MipLevels: 1, FirstArraySlice: 0, ArraySize: 1, PlaneSlice: 0, ResourceMinLODClamp: 0.0 },
+        }),
+        D3D12_SRV_DIMENSION_TEXTURECUBE => (Gray::Cube, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            TextureCube: D3D12_TEXCUBE_SRV { MostDetailedMip: 0, MipLevels: 1, ResourceMinLODClamp: 0.0 },
+        }),
+        D3D12_SRV_DIMENSION_TEXTURECUBEARRAY => (Gray::Cube, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            TextureCubeArray: D3D12_TEXCUBE_ARRAY_SRV { MostDetailedMip: 0, MipLevels: 1, First2DArrayFace: 0, NumCubes: 1, ResourceMinLODClamp: 0.0 },
+        }),
+        D3D12_SRV_DIMENSION_TEXTURE3D => (Gray::D3, D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+            Texture3D: D3D12_TEX3D_SRV { MostDetailedMip: 0, MipLevels: 1, ResourceMinLODClamp: 0.0 },
+        }),
+        _ => return None,
+    };
+    let gray = gray(kind)?;
+    let srv = D3D12_SHADER_RESOURCE_VIEW_DESC {
+        Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+        ViewDimension: dimension,
+        Shader4ComponentMapping: D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+        Anonymous: view,
+    };
+    // SAFETY: a slot of our heap and a live texture the view fits.
+    unsafe { host()?.device.CreateShaderResourceView(gray, Some(&srv), at) };
+    Some(gray.clone())
+}
+
+#[derive(Clone, Copy)]
+enum Gray {
+    D1,
+    D2,
+    Cube,
+    D3,
+}
+
+/// A 1x1 mid-grey texture of ours of `kind` (cubes: six faces), in memory
+/// the CPU wrote once; shaders read it from the common state.
+fn gray(kind: Gray) -> Option<&'static ID3D12Resource> {
+    static TEXTURES: [std::sync::OnceLock<Option<ID3D12Resource>>; 4] = [const { std::sync::OnceLock::new() }; 4];
+    let (i, dimension, slices) = match kind {
+        Gray::D1 => (0, D3D12_RESOURCE_DIMENSION_TEXTURE1D, 1u16),
+        Gray::D2 => (1, D3D12_RESOURCE_DIMENSION_TEXTURE2D, 1),
+        Gray::Cube => (2, D3D12_RESOURCE_DIMENSION_TEXTURE2D, 6),
+        Gray::D3 => (3, D3D12_RESOURCE_DIMENSION_TEXTURE3D, 1),
+    };
+    TEXTURES[i]
+        .get_or_init(|| {
+            let heap = D3D12_HEAP_PROPERTIES {
+                Type: D3D12_HEAP_TYPE_CUSTOM,
+                CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_WRITE_BACK,
+                MemoryPoolPreference: D3D12_MEMORY_POOL_L0,
+                ..Default::default()
+            };
+            let desc = D3D12_RESOURCE_DESC {
+                Dimension: dimension,
+                Width: 1,
+                Height: 1,
+                DepthOrArraySize: slices,
+                MipLevels: 1,
+                Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+                ..Default::default()
+            };
+            let mut texture: Option<ID3D12Resource> = None;
+            // SAFETY: valid descriptions and an out pointer; the texels are
+            // written before any view of the texture exists.
+            unsafe {
+                host()?
+                    .device
+                    .CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, None, &mut texture)
+                    .ok()?;
+                let texture = texture?;
+                let texel = [128u8, 128, 128, 255];
+                for sub in 0..u32::from(slices) {
+                    texture.Map(sub, None, None).ok()?;
+                    texture.WriteToSubresource(sub, None, texel.as_ptr().cast(), 4, 4).ok()?;
+                    texture.Unmap(sub, None);
+                }
+                tracing::info!(slices, "VICTORY_NO_TEXTURES=1: the title's textures show as grey");
                 Some(texture)
             }
         })

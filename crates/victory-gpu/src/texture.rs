@@ -722,6 +722,15 @@ pub(crate) fn forget(resource: usize) {
 
 /// Whether `resource`'s host copy takes its contents from title memory:
 /// a texture the host GPU does not render to or write.
+/// `VICTORY_NO_TEXTURES=1`: the textures the title fills are neither sent
+/// to the card nor shown; views of them read a grey texel
+/// (`descriptor::host::gray_view`). For tests: shapes and lighting only,
+/// less to copy each frame.
+pub(crate) fn no_textures() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_NO_TEXTURES").is_some_and(|v| v == "1"))
+}
+
 pub(crate) fn title_written(texture: &ID3D12Resource) -> bool {
     const TARGET_DEPTH_UNORDERED: i32 = 0x7;
     // SAFETY: a live resource.
@@ -740,6 +749,9 @@ pub(crate) fn upload(list: &HostList, resource: This, texture: &ID3D12Resource) 
 /// placed texture the title may have no memory for the larger ones, and
 /// what lies there is another texture's.
 pub(crate) fn upload_from(list: &HostList, resource: This, texture: &ID3D12Resource, first: u32) {
+    if no_textures() && title_written(texture) {
+        return;
+    }
     let host_written = HOST_WRITTEN
         .lock()
         .unwrap_or_else(|e| e.into_inner())

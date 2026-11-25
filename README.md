@@ -1,4 +1,34 @@
-# VIctory : GTA VI (Xbox Series) sur PC, avancement
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=VIctory%20FR&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=GTA%20VI%20(Xbox%20Series)%20sur%20PC&descAlignY=58&animation=fadeIn" alt="VIctory FR" width="100%"/>
+
+<a href="#où-en-est-le-jeu"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=Le+prologue+se+joue+%3A+on+dirige+Lucia;2%2C3+images%2Fs+aujourd'hui%2C+plafond+mesur%C3%A9+%3A+20;Un+lanceur+en+Rust+avec+pr%C3%A9sence+Discord;Modes+de+test+%3A+sans+textures%2C+sans+dessin" alt="animation"/></a>
+
+<p>
+  <a href="README.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-actuel-0055A4?style=for-the-badge" alt="Français"/></a>
+  <a href="README.en.md"><img src="https://img.shields.io/badge/English-read-C8102E?style=for-the-badge" alt="English"/></a>
+  <a href="../../releases/latest"><img src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-lanceur%20%2B%20build-2ea44f?style=for-the-badge" alt="Télécharger"/></a>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/avancement-59%25-ffc371?style=flat-square" alt="avancement 59 %"/>
+  <img src="https://img.shields.io/badge/images%2Fs-2%2C3%20(max%20mesur%C3%A9%2020)-ff5f6d?style=flat-square" alt="images/s"/>
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
+  <img src="https://img.shields.io/badge/carte-RTX%2020%2B%20%2F%20mesh%20shaders-76B900?style=flat-square&logo=nvidia" alt="RTX 20+"/>
+  <img src="https://img.shields.io/badge/Rust-1.98-B7410E?style=flat-square&logo=rust" alt="Rust"/>
+  <img src="https://img.shields.io/badge/licence-GPL--3.0-845ec2?style=flat-square" alt="GPL-3.0"/>
+</p>
+
+<p>
+  <a href="#lancer"><img src="https://img.shields.io/badge/%E2%96%B6%20Lancer-222?style=for-the-badge" alt="Lancer"/></a>
+  <a href="#le-lanceur-lanceurexe"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Lanceur-222?style=for-the-badge" alt="Lanceur"/></a>
+  <a href="#vitesse"><img src="https://img.shields.io/badge/%E2%9A%A1%20Vitesse-222?style=for-the-badge" alt="Vitesse"/></a>
+  <a href="#mémoire"><img src="https://img.shields.io/badge/%F0%9F%A7%A0%20M%C3%A9moire-222?style=for-the-badge" alt="Mémoire"/></a>
+  <a href="#image"><img src="https://img.shields.io/badge/%F0%9F%96%BC%20Image-222?style=for-the-badge" alt="Image"/></a>
+  <a href="#ce-qui-reste-à-faire"><img src="https://img.shields.io/badge/%F0%9F%93%8B%20%C3%80%20faire-222?style=for-the-badge" alt="À faire"/></a>
+</p>
+
+</div>
 
 Version de travail de [VIctory](https://github.com/Marvisak/VIctory), qui fait
 tourner la version Xbox Series de Grand Theft Auto VI directement sous Windows,
@@ -8,11 +38,19 @@ tourner la version Xbox Series de Grand Theft Auto VI directement sous Windows,
 vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
 `fx-heapmap`).
 
-**Ce dépôt ne contient aucun fichier du jeu** : ni exécutable, ni données, ni
-shaders extraits. Il faut sa propre copie du jeu. Ce projet n'est ni affilié à
-Rockstar Games ou Take-Two Interactive, ni approuvé par eux.
+> [!NOTE]
+> **Nouveau le 25/11 au soir** : un [lanceur](#le-lanceur-lanceurexe) avec
+> présence Discord et sauvegardes par endroit, deux [modes de test](#modes-de-test)
+> (sans textures, sans dessin), et la mesure de [ce que coûte le jeu
+> seul](#le-2511-au-soir--ce-que-coûte-le-jeu-seul-et-ce-que-coûte-notre-couche).
 
-Mis à jour le 25/11/2026.
+> [!IMPORTANT]
+> **Ce dépôt ne contient aucun fichier du jeu** : ni exécutable, ni données, ni
+> shaders extraits. Il faut sa propre copie du jeu. Ce projet n'est ni affilié à
+> Rockstar Games ou Take-Two Interactive, ni approuvé par eux.
+
+Mis à jour le 25/11/2026 au soir (lanceur, modes de test, mesures du jeu
+seul, FSR expérimental).
 
 ## Crédits et licence
 
@@ -78,6 +116,15 @@ pie showData
 
 ## Lancer
 
+**Le plus simple** : télécharger le paquet de la
+[dernière version](../../releases/latest), le décompresser, mettre le dossier
+du jeu dans `victory.toml` (`[paths] game_dir = '...'`), lancer
+`Prechauffer.cmd` une fois (quelques minutes), puis `Lanceur.exe`. Il faut une
+carte RTX 20 ou plus récente, 16 Go de RAM ou plus, un fichier d'échange de
+32 Go et le « Visual C++ Redistributable » x64 de Microsoft.
+
+**Depuis les sources** :
+
 ```powershell
 cargo build --profile diag -p victory --features diagnostics
 target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute
@@ -85,6 +132,47 @@ target\diag\victory.exe run "D:\chemin\vers\game_scarlett_master.exe" --execute
 
 Le chemin du jeu peut aussi être mis dans `victory.toml` (modèle :
 `victory.example.toml`).
+
+### Le lanceur (`Lanceur.exe`)
+
+Une fenêtre en Rust (`apps/lanceur`) pour jouer sans PowerShell :
+
+- **modes tout prêts** (ceux de `Lancer.cmd`, plus deux modes de test) et
+  **réglages à la main** : console S ou X, résolution interne (0,2 à 1,0),
+  upscaler du jeu, textures, éclairage, compteur, FSR d'AMD (expérimental),
+  variables `VICTORY_…` en plus ;
+- **images/s en direct** pendant la partie (ms par image, dessins, monde ou
+  menus, temps de jeu, dernières lignes du journal) ; le journal complet va
+  dans `logs\partie-lanceur-<date>.txt` ;
+- **présence Discord** : « Joue à Grand Theft Auto VI », d'après la fiche
+  que Discord a déjà dans sa liste publique de jeux (rien à créer), avec
+  l'endroit (monde ou menus), les images/s, le mode et le temps de jeu ;
+- **sauvegardes par endroit** : « Garder l'état actuel » sous un nom
+  (cellule, cafétéria, bateau...), puis repartir de là au lancement suivant
+  (les sauvegardes d'avant vont dans `_avant-restauration`).
+
+Il retient ses réglages dans `%LOCALAPPDATA%\victory\lanceur.toml`. Pour le
+compiler (application à part, hors de l'espace de travail du jeu) :
+
+```powershell
+cd apps\lanceur
+cargo build --release
+```
+
+puis copier `target\release\lanceur.exe` à la racine sous le nom
+`Lanceur.exe`.
+
+**Ce qu'il ne fait pas** : choisir un chapitre (le jeu n'en a pas ; les
+sauvegardes par endroit en tiennent lieu), téléporter ou rendre invincible
+(il faudrait trouver dans la mémoire du jeu, sans symboles, la position et
+la santé du joueur).
+
+### Modes de test
+
+| Option | Effet |
+|---|---|
+| `VICTORY_NO_TEXTURES=1` | les textures du jeu ne sont ni envoyées à la carte ni montrées : chaque vue lit une petite texture grise de la même forme (2D, tableau, cube, 3D). Les cibles de rendu, la profondeur et ce que la carte écrit restent |
+| `VICTORY_NO_DRAWS=1` | ni pipelines ni shaders : chaque dessin du jeu est jeté, l'écran reste noir (le compteur s'affiche). Le jeu tourne quand même : sert à mesurer ce que coûte le jeu seul |
 
 ### Réglages conseillés (PC de 16 Go)
 
@@ -161,6 +249,61 @@ De 2,2 à **2,33 images/s** (431 ms : préparation 135, carte 207, recopie 50).
 | Lecture sur place (`VICTORY_INPLACE`) | carte retirée au bout de 30 s (NVIDIA verrouille la section en RAM) ; à 1 Go : 2,19 images/s | ❌ sur 16 Go |
 | Shaders : écriture de défaut seulement pour les pages absentes | carte 207 → 260 ms, 1,9 images/s | ❌ annulé |
 
+### Le 25/11 au soir : ce que coûte le jeu seul, et ce que coûte notre couche
+
+Trois essais à la cellule (RTX 3060, 16 Go), avec les modes de test :
+
+| Par image | Normal | Sans textures, résolution basse | Sans dessin (`VICTORY_NO_DRAWS`) |
+|---|---|---|---|
+| Images/s | 2,3 | **3,0** (stable) | **19 à 24** |
+| Temps par image | 431 ms | 333 ms | 42 à 53 ms |
+| Préparation (nos copies) | 135 ms | 130 ms (85 ms pour 180 Mo copiés) | 0,4 ms |
+| Carte | 207 ms | 112 ms | 0 |
+| Recopie vers le jeu | 50 ms | 34 ms | 0,1 ms |
+| RAM du jeu (réservée) | 21 Go | 14,4 Go | **6 Go** |
+| Mémoire de la carte | 8 Go | 4 Go | — |
+
+```mermaid
+xychart-beta
+    title "Temps par image à la cellule (ms), plus bas = mieux"
+    x-axis ["Normal", "Sans textures + basse résolution", "Sans dessin"]
+    y-axis "ms" 0 --> 450
+    bar [431, 333, 48]
+```
+
+Ce qu'on en tire :
+
+1. **Le plafond de ce PC est d'environ 20 images/s** : sans rien dessiner,
+   le code du jeu (monde, personnages, chargements, son) et nos services
+   système prennent 42 à 53 ms par image. Ce temps varie avec ce que le jeu
+   charge : sans dessin aussi, les images ne sont pas régulières.
+2. **Les 15 Go qui font déborder la RAM sont ceux de notre couche
+   graphique** (6 Go sans dessin, 21 Go avec), pas ceux du jeu.
+3. **Hypothèse** : textures et résolution ne sont plus le problème (sans
+   elles, la carte ne passe que de 207 à 112 ms). Ce qui reste ne dépend
+   pas des pixels :
+   - nos **copies de la mémoire du jeu vers la carte, environ 180 Mo par
+     image** (sommets, constantes, instances que le jeu change), recopiées
+     à chaque image : c'est le plus gros mur, 130 ms, et il ne bouge avec
+     aucun réglage ;
+   - **notre travail par dessin sur la carte** (environ 2 000 bornages de
+     draws indirects, chacun entouré d'une vidange, et nos comparaisons) :
+     environ 110 ms quelle que soit la résolution ;
+   - la **RAM pleine** (1 Go libre pendant ces essais) qui fait échanger
+     Windows avec le disque.
+
+   Le prochain vrai gain est donc de **garder les données du jeu sur la
+   carte au lieu de les recopier** à chaque image (ce que vise la pile de
+   ScarlettPort, et ce qui a échoué ici jusqu'à présent faute de RAM).
+
+Autres essais du soir :
+
+| Essai | Résultat |
+|---|---|
+| Bornages faits par le processeur | au plus 35 % des 2 000 bornages s'y prêtent (les autres lisent des arguments qu'un shader vient d'écrire) : au mieux environ 25 ms de carte gagnés ; pas fait |
+| Copies dans la mémoire de la carte coupées (`VICTORY_CARD_BUFFERS=0`) | carte 30 à 130 ms (la moitié de nos 207 ms est donc notre propre travail de comparaison), mais préparation 490 ms et recopie 190 ms : 0,6 à 1,6 image/s, pire |
+| Recopie qui ne compare que les pages écrites (VIctory `cd94d35`) | environ 100 conflits sur cette branche : à refaire à la main |
+
 ### Où va le temps de la carte (essai `VICTORY_GPU_TIMING=1`)
 
 Aucun programme du jeu ne domine : le plus cher prend 6 ms par image.
@@ -177,7 +320,9 @@ vidanges entre les passes.
 |---|---|---|---|
 | Ici (25/11) | RTX 3060, 16 Go | **2,3** (mesuré) | — |
 | [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) v0.2.1 | RTX 3060, 32 Go conseillés | environ 4 | recopie limitée aux tampons relus, attentes de lecture 156 → 26 ms. **Essayé ici le 25/11** avec leurs réglages : écran noir à l'intro, 0,4 à 0,8 image/s, 1 400 à 3 300 draws sautés faute de pipelines (leur préparation `warm` + `precompile-graphics` dure plus de 20 min, coupée) |
-| [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1,03 (ville) | suivi précis des écritures des shaders (`bc3cd4b`) |
+| [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1,03 (ville) | ray tracing qui tourne vraiment dans la ville (Radeon) ; suivi précis des écritures des shaders (`bc3cd4b`) |
+| [VItoriaBr](https://github.com/uiliannn/VItoriaBr) | RTX 5060 Ti, 40 Go | 3,5 à 6 | leur carte ne passe que 50 à 65 ms par image : la différence avec nous vient de nos comparaisons dans la mémoire de la carte et de la RAM (40 Go) |
+| [ztrx](https://github.com/Zettrox/ztrx) | RTX 3050 | 1 à 3 | le code de fxceless jusqu'à `4e17478` (déjà ici) ; le prologue y va de la cellule à la poursuite en bateau, 1 h 30 sans plantage |
 | [VIctory](https://github.com/Marvisak/VIctory) (`cd94d35`) | — | — | la recopie ne compare que les pages écrites |
 
 | Par image | Avant | Après |
@@ -404,6 +549,31 @@ vagues : c'est l'étape 8 de [docs/wave64-on-wave32.md](docs/wave64-on-wave32.md
 encore ouverte (risque de bloquer la carte). Dans la scène de la cellule,
 il en manque 6.
 
+### Agrandissement de l'image (FSR)
+
+En mode Series S, le jeu rend en 1280×720 et demande à **FSR 4** de l'agrandir
+en 1920×1080. FSR 4 ne tourne pas ici (ses passes demandent une fonction du
+pilote Xbox que l'on n'a pas, et ses programmes de secours sont en shader
+model 5) : un **étirement simple** le remplace (`victory-gpu/src/upscale.rs`),
+sans netteté ni accumulation. L'image est donc plus floue que sur console.
+
+Expérimental (25/11) : le module d'upstream (VIctory `0b35b7f`,
+`victory-hle/src/modules/fidelityfx.rs`) qui sert les appels du jeu avec le
+**FSR PC d'AMD** sur la carte (FSR 3.1.6 sur une RTX). Il demande le DLL
+officiel `amd_fidelityfx_upscaler_dx12.dll` du
+[FidelityFX SDK](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK)
+dans un dossier donné par `VICTORY_FIDELITYFX_DIR` ; sans lui, c'est
+l'étirement simple. Le jeu décrit ses images avec des formats console (une
+sortie R9G9B9E5 que le PC ne sait pas écrire : image verte, bleue ou rouge
+au premier essai) : les formats annoncés sont ceux de nos copies, et la
+profondeur passe par une copie R32. Le deuxième essai a perdu la carte
+graphique : **à ne pas utiliser pour jouer**. Le FSR n'apporterait de toute
+façon que de la netteté (1 à 2 ms de carte), pas d'images/s.
+
+Autre piste, pas encore faite : le jeu fournit au FSR tout ce dont le
+**DLSS** d'NVIDIA a besoin (couleur, profondeur, vecteurs de mouvement,
+jitter).
+
 ### Ray tracing
 
 Les commits `6a2d9f9` à `7b0f736` du fork sont intégrés : les programmes
@@ -423,7 +593,8 @@ très sombres : leurs visages ne sont éclairés que par les contours. Détails 
 
 ## Ce qui reste à faire
 
-1. Vitesse (de 2,3 à 15 images/s) : les trois morceaux comptent (carte
+1. Vitesse : ce PC plafonne vers 20 images/s (le jeu seul, mesuré sans
+   dessin) ; d'ici là, les trois morceaux comptent (carte
    207 ms, préparation 135, recopie 50). Côté carte : réduire nos propres
    passes autour des 4 100 draws indirects (bornages et barrières), accélérer
    les programmes de 64 fils sur une carte à 32 voies, baisser la résolution

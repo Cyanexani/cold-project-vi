@@ -80,3 +80,4 @@ Thumbs.db
 # Local run logs and backups (game shader dumps live here: never commit)
 /logs/
 /sauvegarde-avant-fork/
+/apps/lanceur/target/

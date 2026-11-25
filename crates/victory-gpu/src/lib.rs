@@ -35,6 +35,7 @@ mod hud;
 mod plaincopy;
 #[cfg(windows)]
 pub mod upscale;
+pub mod external;
 #[cfg(windows)]
 mod host;
 #[cfg(windows)]
