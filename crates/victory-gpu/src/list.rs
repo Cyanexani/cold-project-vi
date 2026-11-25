@@ -819,10 +819,71 @@ extern "system" fn copy_buffer_region(
         && let Some(to) = buffer_range(dst, dst_offset, len)
         && let Some(from) = buffer_range(src, src_offset, len)
     {
-        list.defer_copy(to, from, len as usize);
+        if !gpu_copy(list, to as u64, from as u64, len) {
+            list.defer_copy(to, from, len as usize);
+        }
     }
     #[cfg(not(windows))]
     let _ = (this, dst, dst_offset, src, src_offset, len);
+}
+
+/// A copy whose source shaders of a submission in the air may be writing,
+/// made on the card between the host copies (`VICTORY_GPU_BUFFER_COPIES=0`:
+/// never). Made at submission on the CPU, it waited for that submission to
+/// come back first: as a Series S, two such copies a frame stood the
+/// submitting thread still for 172 ms of a 370 ms frame. On the card it runs
+/// in the queue's order, as the console's does, and the destination's range
+/// goes back to title memory with the shaders' writes.
+#[cfg(windows)]
+fn gpu_copy(list: &crate::host::HostList, to: u64, from: u64, len: u64) -> bool {
+    use windows::Win32::Graphics::Direct3D12::*;
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var_os("VICTORY_GPU_BUFFER_COPIES").is_none_or(|v| v != "0")) || len == 0 {
+        return false;
+    }
+    // With finer windows (VICTORY_WINDOW_KB, VICTORY_WINDOW_TAILS) the same
+    // title memory lies in more than one copy: a write on the card reaches
+    // only the one it picks, and draws bound to another read stale data
+    // (walls gone at the window in the 25/11 run). The host copy writes
+    // title memory itself, which every copy is refreshed from.
+    if crate::shadow::fine() {
+        return false;
+    }
+    let Some(source) = crate::shadow::find_any(from, len) else { return false };
+    if source.in_place() || !source.pending_over(from, len) {
+        return false;
+    }
+    let Some(target) = crate::shadow::find_any(to, len) else { return false };
+    if target.in_place() {
+        return false;
+    }
+    let (at_from, at_to) = (source.offset(from), target.offset(to));
+    // The host cannot copy within one buffer between overlapping ranges.
+    if std::sync::Arc::ptr_eq(&source, &target) && at_from < at_to + len && at_to < at_from + len {
+        return false;
+    }
+    source.refresh(list, from, len);
+    target.refresh(list, to, len);
+    // Waits for every earlier shader write, before and after: the buffers
+    // stay in the common state (promoted as they are used), as elsewhere.
+    let barrier = D3D12_RESOURCE_BARRIER {
+        Type: D3D12_RESOURCE_BARRIER_TYPE_UAV,
+        Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+        Anonymous: D3D12_RESOURCE_BARRIER_0 {
+            UAV: std::mem::ManuallyDrop::new(D3D12_RESOURCE_UAV_BARRIER { pResource: std::mem::ManuallyDrop::new(None) }),
+        },
+    };
+    // SAFETY: an open list; both buffers are live and held by the list
+    // (their refreshes keep them until it is reset); the ranges lie in them.
+    unsafe {
+        list.list.ResourceBarrier(std::slice::from_ref(&barrier));
+        list.list.CopyBufferRegion(&target.buffer, at_to, &source.buffer, at_from, len);
+        list.list.ResourceBarrier(std::slice::from_ref(&barrier));
+    }
+    target.gpu_writes(list, to, len);
+    #[cfg(feature = "diagnostics")]
+    list.note_op(|| format!("buffer copy on the card {len:#x} bytes {from:#x} to {to:#x}"));
+    true
 }
 
 /// Whether one of two resources is a target in a stand-in format and the

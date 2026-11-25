@@ -2180,6 +2180,20 @@ impl Shadow {
     }
 
     /// Whether shaders of a submission not yet copied back may be writing
+    /// some of `[address, address + len)` (title addresses).
+    pub(crate) fn pending_over(&self, address: u64, len: u64) -> bool {
+        let (from, to) = self.inside(address as usize, len as usize);
+        let (from, to) = (from + self.start as usize, to + self.start as usize);
+        self.pending.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|&(a, b)| a < to && from < b)
+    }
+
+    /// Whether the copy is title memory itself (placed in place): no copy to
+    /// write into, no copy back.
+    pub(crate) fn in_place(&self) -> bool {
+        self.place.is_some()
+    }
+
+    /// Whether shaders of a submission not yet copied back may be writing
     /// the copy.
     pub(crate) fn writes_pending(&self) -> bool {
         !self.pending.lock().unwrap_or_else(|e| e.into_inner()).is_empty()
@@ -2941,7 +2955,7 @@ fn holder(windows: impl Iterator<Item = (u64, u64)>, address: u64, end: u64) -> 
 
 /// Whether windows may be smaller than their 4 MiB cell (a finer grid, or
 /// tails): only then is there more than one window to choose from.
-fn fine() -> bool {
+pub(crate) fn fine() -> bool {
     tails() || window() < WINDOW
 }
 
