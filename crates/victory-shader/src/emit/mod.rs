@@ -318,6 +318,35 @@ fn translate_code(container: &[u8], code: Option<Vec<u8>>) -> Result<HostShader,
     emit(&c, &native, &p, &st, &io, &res)
 }
 
+/// Programs that get the wave-wide form even with branches inside loops
+/// (as `VICTORY_WAVE_WIDE=1` gives every program), by the first hex digits
+/// of the BLAKE3 hash of their DXIL part (what `victory translate --list`
+/// prints after `~`): `VICTORY_WAVE_WIDE_FOR=<hex>,...`, empty for none.
+/// Unset: the water's three transmission volumetrics programs
+/// (CS_TransmissionVolumetrics_Tiled, its LocalLights form and
+/// CS_TransmissionVolumetricsSubmerged), which translate and validate that
+/// way and otherwise stay refused on 32-lane cards (25/11 night). Every
+/// program at once lost the card in runs 121-124 (light-atlas programs).
+fn wide_for(c: &Container) -> bool {
+    static LIST: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let list = LIST.get_or_init(|| {
+        std::env::var("VICTORY_WAVE_WIDE_FOR")
+            .unwrap_or_else(|_| "d6a72e5f,848b30db,58d713c6".to_owned())
+            .split(',')
+            .map(|s| s.trim().to_ascii_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect()
+    });
+    if list.is_empty() {
+        return false;
+    }
+    let Some(dxil) = c.part(crate::dxbc::FourCC::DXIL) else {
+        return false;
+    };
+    let code = blake3::hash(dxil.data).to_hex();
+    list.iter().any(|l| code.starts_with(l.as_str()))
+}
+
 /// Emits a program whose earlier stages already ran.
 pub fn emit(
     c: &Container,
@@ -411,7 +440,7 @@ pub fn emit(
         let (wide_on, loops_ok) = match std::env::var("VICTORY_WAVE_WIDE").as_deref() {
             Ok("1") => (true, true),
             Ok("0") => (false, false),
-            _ => (true, !has_loop(p)),
+            _ => (true, wide_for(c) || !has_loop(p)),
         };
         // exact first: each host wave on its own where that is exact (the idiom, every
         // form; no barriers), then the other exact forms; then approximate
