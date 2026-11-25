@@ -208,6 +208,59 @@ fn windows() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_INDIRECT_WINDOW").is_none_or(|v| v != "0"))
 }
 
+/// `VICTORY_INDIRECT_MERGE` (on by default, `=0` disables; needs [`windows`]):
+/// consecutive one-record indirect calls that read the next record of the
+/// same window, with the same pipeline, signature and bound state, are
+/// recorded as one `ExecuteIndirect` whose signature strides by the
+/// window's step and whose most commands is the run's length
+/// (`victory_core::batch`).
+pub(crate) fn merge() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        let asked = std::env::var_os("VICTORY_INDIRECT_MERGE").is_none_or(|v| v != "0");
+        let on = asked && windows();
+        if on {
+            tracing::info!("consecutive indirect calls on one window of records joined into one (VICTORY_INDIRECT_MERGE=1)");
+        } else if asked {
+            tracing::warn!("VICTORY_INDIRECT_MERGE=1 needs VICTORY_INDIRECT_WINDOW=1: not joined");
+        }
+        on
+    })
+}
+
+/// Indirect ops in, host `ExecuteIndirect` calls out, runs by length.
+static BATCH: victory_core::batch::Stats = victory_core::batch::Stats::new();
+
+/// Logs how indirect calls were joined since the last frame-rate line.
+pub(crate) fn batch_line(frames: f64) {
+    if !merge() || frames <= 0.0 {
+        return;
+    }
+    let (ops, calls, runs) = BATCH.take();
+    if ops == 0 {
+        return;
+    }
+    let by_len: String = victory_core::batch::BUCKET_NAMES
+        .iter()
+        .zip(runs)
+        .filter(|&(_, n)| n > 0)
+        .map(|(name, n)| format!("{name}: {:.0}", n as f64 / frames))
+        .collect::<Vec<_>>()
+        .join(", ");
+    tracing::info!(
+        "indirect calls joined per frame (VICTORY_INDIRECT_MERGE=1): {:.0} ops -> {:.0} host calls ({by_len})",
+        ops as f64 / frames,
+        calls as f64 / frames,
+    );
+}
+
+/// Indirect calls held back to be joined into one host call, and the scratch
+/// buffer they read.
+struct Held {
+    run: victory_core::batch::Run,
+    scratch: ID3D12Resource,
+}
+
 /// What one title list has set, and what its host list was last given.
 #[derive(Default)]
 pub(crate) struct State {
@@ -239,8 +292,14 @@ pub(crate) struct State {
     stencil: Option<u32>,
     depth_bounds: Option<[f32; 2]>,
     /// The indirect records clamped last, if later draws may still read
-    /// them ([`windows`]).
+    /// them ([`windows`]). While `Some`, `window.scratch` remains in
+    /// `INDIRECT_ARGUMENT` until [`State::end_window`] transitions it back
+    /// to `COMMON`.
     window: Option<Window>,
+    /// Generation bumped by everything other than indirect calls ([`State::touched`]).
+    epoch: u64,
+    /// Consecutive indirect calls held back to be issued as one host call.
+    held: Option<Held>,
     /// What the host list has: pipeline, root signature, heaps.
     host_pipeline: usize,
     /// Graphics, compute.
@@ -1431,55 +1490,108 @@ impl State {
         }
         let started = std::time::Instant::now();
         // Per host heap: the host copy and range each slot's buffer view
-        // reads, kept from pass to pass. Only the slots written since the
-        // last pass are looked at again (83,000 slots a pass otherwise, 0.1 s
-        // at best); all of them every 16 passes, because a view of a
-        // released resource goes stale without a write, and a slot written
-        // before its memory had a host copy is only made then.
-        type Ranges = std::collections::HashMap<u32, (std::sync::Arc<crate::shadow::Shadow>, u64, u64)>;
-        static RANGES: std::sync::Mutex<Option<std::collections::HashMap<usize, (u64, Ranges)>>> =
-            std::sync::Mutex::new(None);
-        let mut kept = RANGES.lock().unwrap_or_else(|e| e.into_inner());
-        let (passes, ranges) = kept
-            .get_or_insert_with(Default::default)
-            .entry(std::ptr::from_ref(host) as usize)
-            .or_insert_with(|| (0, Ranges::new()));
-        let changed = host.buffer_changes();
-        let slots = if *passes == 0 {
-            ranges.clear();
-            host.buffer_slots()
-        } else {
-            // Incremental 1/64th rolling refresh per pass: visits and prunes
-            // every slot over 64 frames (~1,300 slots/frame instead of 5,200),
-            // eliminating steady-state overhead and spikes.
-            let bucket = (*passes % 64) as u32;
-            let mut batch: Vec<u32> = changed;
-            let mut seen: std::collections::HashSet<u32> = batch.iter().copied().collect();
-            let all = host.buffer_slots();
-            let mut live_bucket = std::collections::HashSet::new();
-            for index in all {
-                if index % 64 == bucket {
-                    live_bucket.insert(index);
-                    if seen.insert(index) {
-                        batch.push(index);
-                    }
+        // reads, partitioned into 64 buckets with per-bucket cached shadow
+        // spans so steady-state frames only inspect changed slots plus 1/64th
+        // of live slots (and skip unchanged slots without rebuilding spans
+        // across all 83,000 entries every frame).
+        type BucketMap = std::collections::HashMap<u32, (u64, std::sync::Arc<crate::shadow::Shadow>, u64, u64)>;
+        type SpanList = Vec<(std::sync::Arc<crate::shadow::Shadow>, u64, u64)>;
+        struct HeapBufferCache {
+            passes: u64,
+            buckets: [BucketMap; 64],
+            bucket_spans: [SpanList; 64],
+        }
+        impl HeapBufferCache {
+            fn new() -> Self {
+                Self {
+                    passes: 0,
+                    buckets: std::array::from_fn(|_| BucketMap::new()),
+                    bucket_spans: std::array::from_fn(|_| Vec::new()),
                 }
             }
-            ranges.retain(|&index, _| index % 64 != bucket || live_bucket.contains(&index));
+            fn rebuild_bucket(&mut self, b: usize) {
+                let mut map: std::collections::HashMap<usize, (std::sync::Arc<crate::shadow::Shadow>, u64, u64)> =
+                    std::collections::HashMap::new();
+                for (_, shadow, from, to) in self.buckets[b].values() {
+                    let key = std::sync::Arc::as_ptr(shadow) as usize;
+                    let span = map.entry(key).or_insert_with(|| (shadow.clone(), *from, *to));
+                    span.1 = span.1.min(*from);
+                    span.2 = span.2.max(*to);
+                }
+                self.bucket_spans[b] = map.into_values().collect();
+            }
+        }
+        static RANGES: std::sync::Mutex<Option<std::collections::HashMap<usize, HeapBufferCache>>> =
+            std::sync::Mutex::new(None);
+        let mut kept = RANGES.lock().unwrap_or_else(|e| e.into_inner());
+        let cache = kept
+            .get_or_insert_with(Default::default)
+            .entry(std::ptr::from_ref(host) as usize)
+            .or_insert_with(HeapBufferCache::new);
+        let changed = host.buffer_changes();
+        let mut dirty_buckets: u64 = 0;
+        // `(index, force_refresh)`: changed slots always re-mirror; rolling
+        // slots use the fast unchanged check against their cached descriptor key.
+        let slots: Vec<(u32, bool)> = if cache.passes == 0 {
+            for b in 0..64 {
+                cache.buckets[b].clear();
+                cache.bucket_spans[b].clear();
+            }
+            dirty_buckets = u64::MAX;
+            host.buffer_slots().into_iter().map(|i| (i, true)).collect()
+        } else {
+            let bucket = (cache.passes & 63) as usize;
+            let mut batch: Vec<(u32, bool)> = Vec::with_capacity(changed.len() + 2048);
+            let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::with_capacity(changed.len());
+            for index in changed {
+                if seen.insert(index) {
+                    batch.push((index, true));
+                }
+            }
+            let rolling = host.buffer_slots_bucket(bucket as u32);
+            let live_bucket: std::collections::HashSet<u32> = rolling.iter().copied().collect();
+            let before_len = cache.buckets[bucket].len();
+            cache.buckets[bucket].retain(|index, _| live_bucket.contains(index));
+            if cache.buckets[bucket].len() != before_len {
+                dirty_buckets |= 1u64 << bucket;
+            }
+            for index in rolling {
+                if seen.insert(index) {
+                    batch.push((index, false));
+                }
+            }
             batch
         };
-        *passes += 1;
+        cache.passes += 1;
         // Whether the device was there before the pass: a view that removes
         // it is named below.
         static GONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
         let mut alive = !GONE.load(Ordering::Relaxed) && crate::descriptor::host::device_removed().is_none();
-        for (n, &index) in slots.iter().enumerate() {
-            ranges.remove(&index);
+        for (n, &(index, force)) in slots.iter().enumerate() {
+            let b = (index & 63) as usize;
             let Some(handle) = heap.handle(index) else {
+                if cache.buckets[b].remove(&index).is_some() {
+                    dirty_buckets |= 1u64 << b;
+                }
                 continue;
             };
-            let Some(view) = host.mirror(index, handle, true) else {
-                continue;
+            let cached_key = if force {
+                0
+            } else {
+                cache.buckets[b]
+                    .get(&index)
+                    .filter(|(_, s, _, _)| !s.in_place())
+                    .map_or(0, |(k, _, _, _)| *k)
+            };
+            let (key, view) = match host.mirror_buffer(index, handle, cached_key) {
+                crate::descriptor::host::BufferMirror::Unchanged => continue,
+                crate::descriptor::host::BufferMirror::Empty => {
+                    if cache.buckets[b].remove(&index).is_some() {
+                        dirty_buckets |= 1u64 << b;
+                    }
+                    continue;
+                }
+                crate::descriptor::host::BufferMirror::Changed(key, view) => (key, view),
             };
             // Every 64 views while the device lives (a cheap query).
             if alive
@@ -1490,7 +1602,7 @@ impl State {
                 GONE.store(true, Ordering::Relaxed);
                 let last: Vec<String> = slots[n - 63..=n]
                     .iter()
-                    .filter_map(|&i| crate::descriptor::view(heap.handle(i)?).map(|v| format!("{i}: {v:?}")))
+                    .filter_map(|&(i, _)| crate::descriptor::view(heap.handle(i)?).map(|v| format!("{i}: {v:?}")))
                     .map(|s| s.chars().take(200).collect())
                     .collect();
                 tracing::error!(why, slot = index, "the host device went while buffer views of the heap were made; one of: {last:#?}");
@@ -1499,23 +1611,36 @@ impl State {
             // The copy the slot shows (`buffer_copy`), not the one the
             // view's range alone would find.
             let Some((shadow, address, len)) = crate::descriptor::host::buffer_copy(&view) else {
+                if cache.buckets[b].remove(&index).is_some() {
+                    dirty_buckets |= 1u64 << b;
+                }
                 continue;
             };
             #[cfg(feature = "diagnostics")]
             if host.shows(index, &shadow.buffer) == Some(false) {
                 HEAP_VIEWS_ELSEWHERE.fetch_add(1, Ordering::Relaxed);
             }
-            ranges.insert(index, (shadow, address, address + len));
+            cache.buckets[b].insert(index, (key, shadow, address, address + len));
+            dirty_buckets |= 1u64 << b;
         }
-        let views = ranges.len() as u32;
-        // Per host copy, the span its picked views cover.
+        let mut mask = dirty_buckets;
+        while mask != 0 {
+            let b = mask.trailing_zeros() as usize;
+            mask &= mask - 1;
+            cache.rebuild_bucket(b);
+        }
+        let views: u32 = cache.buckets.iter().map(|b| b.len() as u32).sum();
+        // Per host copy, the span its picked views cover (merged from 64
+        // pre-aggregated bucket span lists instead of scanning 83,000 slots).
         let mut spans: std::collections::HashMap<usize, (std::sync::Arc<crate::shadow::Shadow>, u64, u64)> =
             std::collections::HashMap::new();
-        for (shadow, from, to) in ranges.values() {
-            let key = std::sync::Arc::as_ptr(shadow) as usize;
-            let span = spans.entry(key).or_insert_with(|| (shadow.clone(), *from, *to));
-            span.1 = span.1.min(*from);
-            span.2 = span.2.max(*to);
+        for bucket_span in &cache.bucket_spans {
+            for (shadow, from, to) in bucket_span {
+                let key = std::sync::Arc::as_ptr(shadow) as usize;
+                let span = spans.entry(key).or_insert_with(|| (shadow.clone(), *from, *to));
+                span.1 = span.1.min(*from);
+                span.2 = span.2.max(*to);
+            }
         }
         drop(kept);
         let bytes: u64 = spans.values().map(|s| s.2 - s.1).sum();
@@ -2037,7 +2162,7 @@ impl State {
     /// Runs a dispatch on the host.
     pub(crate) fn dispatch(&mut self, list: &HostList, x: u32, y: u32, z: u32) {
         // It may write the arguments a window holds clamped.
-        self.window = None;
+        self.end_window(list);
         #[cfg(feature = "diagnostics")]
         if crate::pipeline::is_skipped(self.pipeline as This) {
             DROPPED.fetch_add(1, Ordering::Relaxed);
@@ -2355,6 +2480,53 @@ impl State {
         )
     }
 
+    /// The title sets or records something other than an indirect call on
+    /// the list: indirect calls held back are recorded first, and later
+    /// ones are not joined to them ([`merge`]).
+    pub(crate) fn touched(&mut self, list: &HostList) {
+        self.epoch = self.epoch.wrapping_add(1);
+        self.flush_held(list);
+    }
+
+    /// Before closing or cutting a host list: flushes any held indirect run
+    /// and transitions an active window's scratch buffer back to `COMMON`.
+    pub(crate) fn finish_list(&mut self, list: &HostList) {
+        self.flush_held(list);
+        self.end_window(list);
+    }
+
+    /// Transitions the active window's scratch buffer back from
+    /// `INDIRECT_ARGUMENT` to `COMMON` and clears the window.
+    fn end_window(&mut self, list: &HostList) {
+        if let Some(w) = self.window.take() {
+            crate::indirect::done(list, &w.scratch);
+        }
+    }
+
+    /// Records the indirect calls held back as one host call.
+    fn flush_held(&mut self, list: &HostList) {
+        let Some(Held { run, scratch }) = self.held.take() else {
+            return;
+        };
+        const MESH: u32 = 10;
+        let (step, count, at) = run.call();
+        // Held only with a signature for the step (`execute_indirect`).
+        if let Some(signature) = host_signature(run.first.kind, step) {
+            // SAFETY: an open list with everything set when the run started
+            // and nothing recorded or set since; the scratch buffer is the
+            // list's and holds the window clamped in `INDIRECT_ARGUMENT`.
+            unsafe { list.list.ExecuteIndirect(&signature, count, &scratch, at, None, 0) };
+            BATCH.recorded(count);
+            self.note_writes(list);
+        }
+        if run.first.kind == MESH {
+            self.mesh_scissor(list, false);
+        }
+        if self.window.as_ref().is_none_or(|w| w.scratch != scratch) {
+            crate::indirect::done(list, &scratch);
+        }
+    }
+
     /// A mesh draw under `VICTORY_MESH_TEST=scissor` rasterises one pixel:
     /// the scissors before it (`on`), the title's after it.
     fn mesh_scissor(&self, list: &HostList, on: bool) {
@@ -2372,7 +2544,7 @@ impl State {
     /// Runs a mesh dispatch of `x` groups on the host (the title's mesh
     /// programs are one-dimensional).
     pub(crate) fn dispatch_mesh(&mut self, list: &HostList, x: u32) {
-        self.window = None;
+        self.end_window(list);
         #[cfg(feature = "diagnostics")]
         self.trace("mesh", x, 0);
         let ran = mesh_test() != 1
@@ -2764,7 +2936,7 @@ impl State {
         first: u32,
         first_instance: u32,
     ) {
-        self.window = None;
+        self.end_window(list);
         #[cfg(feature = "diagnostics")]
         self.trace("draw", vertices, first);
         let ready = self.prepare(list, false);
@@ -2870,7 +3042,7 @@ impl State {
         base: i32,
         first_instance: u32,
     ) {
-        self.window = None;
+        self.end_window(list);
         #[cfg(feature = "diagnostics")]
         self.trace("indexed", indices, first);
         // Indexed rectangles are drawn by the rectangle geometry stage
@@ -3011,8 +3183,37 @@ impl State {
             && !p.stages.iter().any(|stage| stage.translated().stores);
         // Another host list (a new one after a cut, or this one after its
         // reset) has another scratch buffer, or this one's with old bytes.
-        if !windowed || list.first_use(WINDOW_USE) {
+        if list.first_use(WINDOW_USE) {
             self.window = None;
+        } else if !windowed {
+            self.flush_held(list);
+            self.end_window(list);
+        }
+        // Joined to the calls held back, or those recorded first.
+        let joining = merge() && windowed && parts.is_none() && max == 1 && count.is_none();
+        let (pipeline, epoch) = (self.pipeline, self.epoch);
+        let this_call = |w: &Window| victory_core::batch::Call {
+            pipeline,
+            kind,
+            stride,
+            epoch,
+            copy: w.copy,
+            base: w.base,
+            step: w.step,
+            records: w.records,
+            offset,
+        };
+        if self.held.is_some() {
+            let next = self.window.as_ref().map(this_call);
+            let joined = joining
+                && next.is_some_and(|next| self.held.as_mut().is_some_and(|held| held.run.push(&next)));
+            if joined {
+                #[cfg(feature = "diagnostics")]
+                list.note_op(|| self.op_text(format!("indirect kind {kind} max {max} at {arguments:#x} (joined)"), false));
+                DRAWN.fetch_add(1, Ordering::Relaxed);
+                return true;
+            }
+            self.flush_held(list);
         }
         let same = |w: &Window| w.copy == args.id() && w.kind == kind && w.stride == stride;
         let hit = self
@@ -3045,6 +3246,9 @@ impl State {
                     }
                     _ => (stride, max),
                 };
+                // Transition the previous window's scratch buffer back to
+                // `COMMON` before the next clamp pass transitions it to `UAV`.
+                self.end_window(list);
                 args.refresh(list, arguments, len.max(u64::from(step) * u64::from(records)));
                 if let Some((s, at)) = &counter {
                     s.refresh(list, *at, 4);
@@ -3066,7 +3270,6 @@ impl State {
                     crate::indirect::bound(list, (&args.buffer, offset), count_arg, (kind, step, records), own)
                 };
                 let Some(bounded) = bounded else {
-                    self.window = None;
                     why("not bounded (no clamp, or arguments not 4-byte aligned)");
                     return false;
                 };
@@ -3100,7 +3303,9 @@ impl State {
             _ => false,
         };
         if !ran {
-            crate::indirect::done(list, &bounded);
+            if self.window.as_ref().is_none_or(|w| w.scratch != bounded) {
+                crate::indirect::done(list, &bounded);
+            }
             why("prepare failed");
             return false;
         }
@@ -3110,6 +3315,22 @@ impl State {
         });
         if kind == MESH {
             self.mesh_scissor(list, true);
+        }
+        // A run that later calls may join: held back with the scratch
+        // buffer it reads.
+        if joining {
+            let run = self
+                .window
+                .as_ref()
+                .filter(|w| w.scratch == bounded)
+                .map(this_call)
+                .and_then(victory_core::batch::Run::start)
+                .filter(|r| r.call().2 == at && host_signature(kind, r.first.step).is_some());
+            if let Some(run) = run {
+                self.held = Some(Held { run, scratch: bounded });
+                DRAWN.fetch_add(1, Ordering::Relaxed);
+                return true;
+            }
         }
         // SAFETY: an open list with everything set; the scratch buffer and
         // host copies are kept alive by the list, and the signature is cached.
@@ -3132,11 +3353,14 @@ impl State {
                 )
             }
         };
+        BATCH.recorded(1);
         self.note_writes(list);
         if kind == MESH {
             self.mesh_scissor(list, false);
         }
-        crate::indirect::done(list, &bounded);
+        if self.window.as_ref().is_none_or(|w| w.scratch != bounded) {
+            crate::indirect::done(list, &bounded);
+        }
         if kind == DISPATCH {
             DISPATCHED.fetch_add(1, Ordering::Relaxed);
         } else {
