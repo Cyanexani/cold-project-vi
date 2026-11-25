@@ -108,13 +108,16 @@ pub(crate) fn creating_readback() -> bool {
     let creator = match CREATOR.get() {
         Some(c) => *c,
         None => {
-            let mut frame = std::ptr::null_mut();
-            // SAFETY: room for one frame: the creation method's caller.
-            if unsafe { RtlCaptureStackBackTrace(1, 1, &mut frame, std::ptr::null_mut()) } != 1 {
-                return false;
-            }
-            let Some(c) = creator_from(frame as usize) else {
-                // A caller outside the executable (a title DLL): ask again later.
+            // The frames up the stack: the first ones are ours (the creation
+            // method and its callers here), then the title's. Looking at the
+            // direct caller alone found our own executable every time, so no
+            // buffer was ever tagged (run of 2026-11-26: nothing copied back,
+            // nothing drawn).
+            let mut frames = [std::ptr::null_mut(); 32];
+            // SAFETY: room for the frames asked for.
+            let n = unsafe { RtlCaptureStackBackTrace(1, frames.len() as u32, frames.as_mut_ptr(), std::ptr::null_mut()) };
+            let Some(c) = frames[..n as usize].iter().find_map(|&f| creator_from(f as usize)) else {
+                // No frame in the title executable yet: ask again later.
                 return false;
             };
             tracing::warn!(begin = format_args!("{:#x}", c.0), end = format_args!("{:#x}", c.1), "read-back creator found");
@@ -163,6 +166,12 @@ fn overlaps(t: &BTreeMap<u64, u64>, start: u64, end: u64) -> bool {
 /// with the switch off; with it on, only where a read-back buffer lies.
 pub(crate) fn copy_back(start: u64, len: u64) -> bool {
     if !enabled() {
+        return true;
+    }
+    // Until the title's creator is found (or if this is not the build it was
+    // found in), nothing is known to be read back: everything is copied back,
+    // as with the switch off.
+    if !matches!(CREATOR.get(), Some(Some(_))) {
         return true;
     }
     let back = overlaps(&TAGGED.lock().unwrap_or_else(|e| e.into_inner()), start, start.saturating_add(len));
