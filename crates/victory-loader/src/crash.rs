@@ -24,7 +24,26 @@ use windows_sys::Win32::System::LibraryLoader::{
     GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
     GetModuleFileNameW, GetModuleHandleExW,
 };
-use windows_sys::Win32::System::Threading::GetCurrentThreadStackLimits;
+use windows_sys::Win32::System::Threading::{GetCurrentThreadStackLimits, SetThreadStackGuarantee};
+
+/// Keeps stack for a crash report on the calling thread: a stack overflow
+/// is dispatched on what is left of the stack, which the report (its text,
+/// the unwinding) outgrows, and a second overflow ends the process with no
+/// report at all, the window just gone. A sixteenth of the thread's stack,
+/// at most 64 KB; none for stacks under 128 KB, which titles size tightly.
+/// Uses no heap and no Rust thread state (called from the TLS callback).
+pub(crate) fn keep_stack_for_report() {
+    let (mut low, mut high) = (0, 0);
+    // SAFETY: writes the current thread's stack bounds.
+    unsafe { GetCurrentThreadStackLimits(&mut low, &mut high) };
+    let reserve = high.saturating_sub(low);
+    if reserve < 128 * 1024 {
+        return;
+    }
+    let mut bytes = (reserve / 16).min(64 * 1024) as u32;
+    // SAFETY: a plain call on the current thread.
+    unsafe { SetThreadStackGuarantee(&mut bytes) };
+}
 
 const EXCEPTION_CONTINUE_SEARCH: i32 = 0;
 /// Frames listed per report.
@@ -110,6 +129,7 @@ fn title_output() -> String {
 
 /// Installs the handlers; call once before running title code.
 pub fn report_crashes() {
+    keep_stack_for_report();
     unsafe extern "system" fn filter(info: *const EXCEPTION_POINTERS) -> i32 {
         // SAFETY: the system passes the exception being dispatched.
         unsafe { report_unhandled(info) };
@@ -371,7 +391,14 @@ unsafe extern "system" fn handler(info: *mut EXCEPTION_POINTERS) -> i32 {
         return -1; // EXCEPTION_CONTINUE_EXECUTION
     }
     // SAFETY: as above.
-    if FATAL.contains(&unsafe { (*(*info).ExceptionRecord).ExceptionCode }) {
+    let code = unsafe { (*(*info).ExceptionRecord).ExceptionCode };
+    if code == EXCEPTION_STACK_OVERFLOW {
+        // First a line that needs no formatting or heap, in case the full
+        // report below overflows what stack is left.
+        use std::io::Write;
+        let _ = std::io::stderr().write_all(b"VIctory: stack overflow (0xc00000fd); the report follows if the stack allows\n");
+    }
+    if FATAL.contains(&code) {
         // SAFETY: as above.
         unsafe { report("first-chance exception", info, false) };
     }
@@ -679,6 +706,45 @@ mod tests {
     use windows_sys::Win32::System::Diagnostics::Debug::{
         EXCEPTION_RECORD, RtlCaptureContext, RtlCaptureStackBackTrace,
     };
+
+    /// In a child process of the next test: a thread the system starts (as
+    /// title threads are, not through Rust's std) overflows its stack.
+    #[test]
+    fn overflow_child() {
+        if std::env::var_os("VICTORY_OVERFLOW_CHILD").is_none() {
+            return;
+        }
+        #[inline(never)]
+        fn deeper(n: u64) -> u64 {
+            let pad = std::hint::black_box([n; 64]);
+            std::hint::black_box(deeper(n + 1)) + pad[3]
+        }
+        unsafe extern "system" fn run(_: *mut std::ffi::c_void) -> u32 {
+            deeper(0) as u32
+        }
+        report_crashes();
+        use windows_sys::Win32::System::Threading::{CreateThread, INFINITE, WaitForSingleObject};
+        // SAFETY: a thread of 1 MB running `run`, waited for.
+        unsafe {
+            let t = CreateThread(null_mut(), 1 << 20, Some(run), null_mut(), 0, null_mut());
+            WaitForSingleObject(t, INFINITE);
+        }
+    }
+
+    #[test]
+    fn a_stack_overflow_is_reported() {
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "crash::tests::overflow_child", "--nocapture"])
+            .env("VICTORY_OVERFLOW_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(!out.status.success(), "the overflow ends the process");
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(err.contains("VIctory: stack overflow"), "{err}");
+        // The full report fit in the stack kept for it: its frames are listed.
+        assert!(err.contains("first-chance exception 0xc00000fd"), "{err}");
+        assert!(err.contains("  #5 "), "{err}");
+    }
 
     #[test]
     #[inline(never)]

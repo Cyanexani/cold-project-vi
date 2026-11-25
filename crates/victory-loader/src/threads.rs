@@ -241,6 +241,9 @@ unsafe extern "system" fn on_thread(_: *mut c_void, reason: u32, _: *mut c_void)
     if reason != DLL_THREAD_ATTACH && reason != DLL_THREAD_DETACH {
         return;
     }
+    if reason == DLL_THREAD_ATTACH {
+        crate::crash::keep_stack_for_report();
+    }
     if EXITING.load(Ordering::SeqCst) {
         return; // our exit watchdog, or threads ending with the process
     }
