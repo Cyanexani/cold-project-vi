@@ -127,6 +127,9 @@ pub(crate) enum C {
     WaitsForGroups,
     WaitsForBuffers,
     IndirectBounded,
+    /// Indirect commands clamped in a list before their own
+    /// (`crate::indirect::hoisting`).
+    IndirectHoisted,
 }
 const COUNTERS: usize = 80;
 static COUNT: [AtomicU64; COUNTERS] = [const { AtomicU64::new(0) }; COUNTERS];
@@ -1299,10 +1302,13 @@ pub(crate) fn log(frames: f64) {
     tracing::info!(
         "  waits for every earlier shader write, per frame: {:.0} for the title's barrier groups, {:.0} \
          for its barriers on buffers; {:.0} indirect commands bounded (a dispatch of ours between two \
-         such waits each); barrier experiment {}",
+         such waits each), {:.0} clamped in a list before theirs ({:.0} such lists, {:.0} lists cut for them);          barrier experiment {}",
         c[C::WaitsForGroups as usize],
         c[C::WaitsForBuffers as usize],
         c[C::IndirectBounded as usize],
+        c[C::IndirectHoisted as usize],
+        crate::host::HOISTED_LISTS.swap(0, Relaxed) as f64 / frames,
+        crate::host::HOIST_CUTS.swap(0, Relaxed) as f64 / frames,
         barrier_test()
     );
     // What is compared after submissions, largest first, and how much of

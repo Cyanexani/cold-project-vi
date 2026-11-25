@@ -239,7 +239,7 @@ fn min_stride(kind: u32) -> Option<u32> {
 }
 
 /// Validates record alignment and returns the scratch byte size `stride * records`.
-fn validate_layout(
+pub(crate) fn validate_layout(
     (kind, stride, records): (u32, u32, u32),
     src_offset: u64,
     count_offset: Option<u64>,
@@ -399,6 +399,100 @@ pub(crate) fn bound_split(
     let recorded = record_clamp_waits(c, &list.list, &dst, budget, src, None, spec, IN_PARTS, waits);
     clamp_recorded(list, waits, recorded);
     recorded.then_some(dst)
+}
+
+/// Whether the clamps of indirect draws run in a list of their own before
+/// the host list that draws ([`crate::host::HostList::hoist_room`]), as long
+/// as nothing in that list may have written buffers before the draw
+/// (`VICTORY_HOIST_CLAMPS=1`; off by default: each clamp before its draw).
+///
+/// Off since the user's run of 2026-11-25 (hoist-toi): objects flickered,
+/// and while the card's time a frame went from about 315 to 263 ms the
+/// frame rate did not move (1.9 against 2.0 fps): the CPU's preparation
+/// and copy-back, slowed by paging on a 16 GB PC, took what was saved.
+///
+/// Each clamp between two draws was a compute dispatch with waits around
+/// it: the card drained its graphics work, ran our pass and started again,
+/// 2,000 to 2,400 times a frame at the cell. NVIDIA writes a timestamp when
+/// it reaches it, so the timing runs never showed this: the noted commands
+/// summed 147 ms of the 375 the submissions took (run claude-timing3).
+/// Idea and measurements from Belobug's fork (VIctory-Belobug-AMD
+/// `ccab973`, `76387c2`: 225 to 72-80 ms of GPU time a frame there, with the
+/// clamps run one after another so that the list's budget is charged in
+/// the draws' order).
+pub(crate) fn hoisting() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_HOIST_CLAMPS").is_some_and(|v| v == "1"))
+}
+
+/// [`bound`] (or [`bound_ahead`] with `ahead`), recorded in the list of
+/// hoisted clamps `l` that runs before `list`: the records go to `dst` at
+/// `at` (in `UNORDERED_ACCESS` until that list ends, then indirect
+/// arguments) and are charged to `list`'s budget. A wait after the pass,
+/// so that the budget is charged in the order of the draws.
+pub(crate) fn bound_hoisted(
+    list: &HostList,
+    (l, dst, at): (&ID3D12GraphicsCommandList, &ID3D12Resource, u64),
+    (src, src_offset): (&ID3D12Resource, u64),
+    count: Option<(&ID3D12Resource, u64)>,
+    (kind, stride, records): (u32, u32, u32),
+    ahead: bool,
+) -> bool {
+    let Some(bytes) = validate_layout((kind, stride, records), src_offset, count.map(|(_, off)| off)) else {
+        return false;
+    };
+    let (Some(c), Some(budget)) = (clamp(), list.budget()) else {
+        return false;
+    };
+    // SAFETY: live buffers.
+    let (src_base, dst_gpu) = unsafe { (src.GetGPUVirtualAddress(), dst.GetGPUVirtualAddress() + at) };
+    if !src_base.is_multiple_of(4) || !dst_gpu.is_multiple_of(4) || !budget.is_multiple_of(4) {
+        return false;
+    }
+    // Offsets the shader adds are 32 bits: past them, the address itself.
+    let fits = |offset: u64, len: u64| offset.checked_add(len).is_some_and(|end| end <= u64::from(u32::MAX));
+    let (src_gpu, args_offset) = if fits(src_offset, bytes) {
+        (src_base, src_offset as u32)
+    } else {
+        let Some(rebased) = src_base.checked_add(src_offset) else { return false };
+        (rebased, 0)
+    };
+    let (count_gpu, has_count, count_offset) = match count {
+        Some((buf, off)) => {
+            // SAFETY: a live buffer.
+            let base = unsafe { buf.GetGPUVirtualAddress() };
+            if !base.is_multiple_of(4) {
+                return false;
+            }
+            if fits(off, 4) {
+                (base, 1u32, off as u32)
+            } else {
+                let Some(rebased) = base.checked_add(off) else { return false };
+                (rebased, 1, 0)
+            }
+        }
+        None => (src_gpu, 0, 0),
+    };
+    let how = if ahead { AHEAD } else { 0 };
+    let constants = [kind, stride, records, args_offset, has_count | how, count_offset];
+    #[cfg(feature = "diagnostics")]
+    crate::copystat::add(crate::copystat::C::IndirectHoisted, 1);
+    // SAFETY: an open list; our root signature and pipeline; live source,
+    // count, destination (in `UNORDERED_ACCESS` there) and budget buffers.
+    unsafe {
+        if records > 0 {
+            l.SetComputeRootSignature(&c.root);
+            l.SetPipelineState(&c.pso);
+            l.SetComputeRoot32BitConstants(0, 6, constants.as_ptr().cast(), 0);
+            l.SetComputeRootShaderResourceView(1, src_gpu);
+            l.SetComputeRootShaderResourceView(2, count_gpu);
+            l.SetComputeRootUnorderedAccessView(3, dst_gpu);
+            l.SetComputeRootUnorderedAccessView(4, budget);
+            l.Dispatch(records.div_ceil(64), 1, 1);
+        }
+        l.ResourceBarrier(&[uav_barrier()]);
+    }
+    true
 }
 
 /// Bits of the clamp's `has_count`.
@@ -591,7 +685,7 @@ fn uav_barrier_on(resource: &ID3D12Resource) -> D3D12_RESOURCE_BARRIER {
     }
 }
 
-fn uav_barrier() -> D3D12_RESOURCE_BARRIER {
+pub(crate) fn uav_barrier() -> D3D12_RESOURCE_BARRIER {
     D3D12_RESOURCE_BARRIER {
         Type: D3D12_RESOURCE_BARRIER_TYPE_UAV,
         Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,

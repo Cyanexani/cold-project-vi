@@ -875,6 +875,12 @@ pub(crate) struct HostList {
     /// last global UAV barrier (`barrier_merge`). Starts `true` after reset so
     /// the first barrier in a list stays conservative across list boundaries.
     uav_pending: std::sync::atomic::AtomicBool,
+    /// Commands recorded since the reset that may write buffers (copies,
+    /// shaders that store): hoisted clamps ([`HostList::hoist_room`]) only
+    /// before the first.
+    writes: std::sync::atomic::AtomicU64,
+    /// The list of hoisted clamps that runs right before this one.
+    before: Mutex<Option<Before>>,
     /// Counts the list in [`ALIVE`] while it lives.
     _alive: Counted,
     /// The texts of the markers `note_op` set, in order (for device-removed
@@ -889,6 +895,28 @@ pub(crate) struct HostList {
 
 /// A list's prelude: an allocator and a closed list.
 type Prelude = (ID3D12CommandAllocator, ID3D12GraphicsCommandList);
+
+/// A host list's list of hoisted clamps (`crate::indirect::hoisting`).
+struct Before {
+    allocator: ID3D12CommandAllocator,
+    list: ID3D12GraphicsCommandList,
+    /// The buffer clamps write into, and its size.
+    room: Option<(ID3D12Resource, u64)>,
+    /// Since the list's reset: the bytes taken in `room`, and the buffers
+    /// written in this recording (moved to indirect arguments at its end);
+    /// `None` while nothing was hoisted.
+    used: Option<(u64, Vec<ID3D12Resource>)>,
+    /// Whether the list is open for recording (from the first hoisted clamp
+    /// after a reset to the host list's close).
+    open: bool,
+}
+
+/// Lists of hoisted clamps closed, since the last frame line.
+pub(crate) static HOISTED_LISTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Title lists cut so that the clamps of the draws after the cut are hoisted
+/// (`crate::list::hoist_cut`).
+pub(crate) static HOIST_CUTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Whether a host list's prelude is made when the list first needs one. A
 /// prelude runs the texture transitions and twin copies a list needs before
@@ -3295,6 +3323,8 @@ impl Host {
                 budget: OnceLock::new(),
                 indirect_args: Mutex::default(),
                 uav_pending: std::sync::atomic::AtomicBool::new(true),
+                writes: std::sync::atomic::AtomicU64::new(0),
+                before: Mutex::new(None),
                 _alive: Counted::new(),
                 #[cfg(feature = "diagnostics")]
                 notes: Mutex::default(),
@@ -4678,6 +4708,9 @@ impl Host {
             if let Some(prelude) = list.prelude() {
                 lists.push(Some(prelude));
             }
+            if let Some(before) = list.before_list() {
+                lists.push(Some(before));
+            }
             lists.push(list.list.cast().ok());
         }
         batch.flush();
@@ -5233,6 +5266,7 @@ impl HostList {
 
     pub(crate) fn close(&self) {
         self.twins_to_depth();
+        self.close_before();
         #[cfg(feature = "diagnostics")]
         if let Some((heap, back)) = self.stamps() {
             let count = (self.notes.lock().unwrap_or_else(|e| e.into_inner()).len() as u32).min(STAMPS - 1);
@@ -5251,6 +5285,119 @@ impl HostList {
         }
     }
 
+    /// A command that may write buffers was recorded ([`HostList::hoist_room`]).
+    pub(crate) fn wrote(&self) {
+        self.writes.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Commands that may write buffers recorded since the reset.
+    pub(crate) fn writes(&self) -> u64 {
+        self.writes.load(Ordering::Relaxed)
+    }
+
+    /// Where a clamp of indirect arguments goes so that it runs before the
+    /// list's first command instead of between its draws
+    /// (`crate::indirect::hoisting`): the open list of hoisted clamps, a
+    /// buffer in `UNORDERED_ACCESS` there and the offset of `bytes` free in
+    /// it. `None` once the list recorded a command that may write buffers
+    /// (it may write the arguments the clamp reads).
+    pub(crate) fn hoist_room(&self, bytes: u64) -> Option<(ID3D12GraphicsCommandList, ID3D12Resource, u64)> {
+        if self.writes.load(Ordering::Relaxed) != 0 {
+            return None;
+        }
+        let mut slot = self.before.lock().unwrap_or_else(|e| e.into_inner());
+        if slot.is_none() {
+            let (allocator, list) = host()?.make_prelude()?;
+            *slot = Some(Before { allocator, list, room: None, used: None, open: false });
+        }
+        let before = slot.as_mut()?;
+        if before.used.is_some() && !before.open {
+            // Closed: the host list was closed and is recorded into again
+            // without a reset.
+            return None;
+        }
+        if before.used.is_none() {
+            // SAFETY: the list's last submission has run (it is reset only then).
+            unsafe {
+                before.allocator.Reset().ok()?;
+                before.list.Reset(&before.allocator, None).ok()?;
+                // What earlier lists wrote (the title's argument passes) first.
+                before.list.ResourceBarrier(&[crate::indirect::uav_barrier()]);
+            }
+            before.used = Some((0, Vec::new()));
+            before.open = true;
+        }
+        let align = |n: u64| n.next_multiple_of(256);
+        let (used, rooms) = before.used.as_mut()?;
+        let fits = !rooms.is_empty() && before.room.as_ref().is_some_and(|(_, cap)| align(*used) + bytes <= *cap);
+        if !fits {
+            // The room of the last recording again if it is large enough,
+            // else a new one twice as large (the old one stays alive as long
+            // as this list: clamps of this recording may be in it).
+            let room = match &before.room {
+                Some((buffer, cap)) if rooms.is_empty() && *cap >= bytes => (buffer.clone(), *cap),
+                last => {
+                    let cap = bytes.max(last.as_ref().map_or(1 << 20, |(_, cap)| cap * 2)).next_multiple_of(64 << 10);
+                    let buffer = host()?.uav_buffer(cap)?;
+                    name(&buffer, || format!("hoisted indirect arguments {cap:#x}"));
+                    (buffer, cap)
+                }
+            };
+            // SAFETY: an open list; a buffer in the common state (buffers
+            // decay to it when the submission that used them has run).
+            unsafe {
+                before.list.ResourceBarrier(&[transition(
+                    &room.0,
+                    D3D12_RESOURCE_STATE_COMMON,
+                    D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                )]);
+            }
+            rooms.push(room.0.clone());
+            before.room = Some(room);
+            *used = 0;
+        }
+        let at = align(*used);
+        *used = at + bytes;
+        let buffer = before.room.as_ref()?.0.clone();
+        Some((before.list.clone(), buffer, at))
+    }
+
+    /// Ends the list of hoisted clamps, if one was opened since the reset:
+    /// what it wrote becomes indirect arguments.
+    fn close_before(&self) {
+        let mut slot = self.before.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(before) = slot.as_mut() else { return };
+        if !before.open {
+            return;
+        }
+        before.open = false;
+        let Some((_, rooms)) = before.used.as_mut() else { return };
+        // The buffers stay in `rooms` until the reset: the list reads them.
+        let barriers: Vec<_> = rooms
+            .iter()
+            .map(|room| {
+                transition(&room, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT)
+            })
+            .collect();
+        // SAFETY: an open list and live buffers in `UNORDERED_ACCESS`.
+        let closed = unsafe {
+            before.list.ResourceBarrier(&barriers);
+            before.list.Close()
+        };
+        if let Err(e) = closed {
+            fail(format_args!("the list of hoisted clamps did not close ({e})"));
+        }
+        HOISTED_LISTS.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// The list of hoisted clamps to run right before this one, if any.
+    pub(crate) fn before_list(&self) -> Option<ID3D12CommandList> {
+        let slot = self.before.lock().unwrap_or_else(|e| e.into_inner());
+        let before = slot.as_ref()?;
+        before.used.as_ref()?;
+        before.list.cast().ok()
+    }
+
     /// Only after the list's last submission finished (every one is waited
     /// for).
     pub(crate) fn uav_pending(&self) -> bool {
@@ -5263,6 +5410,10 @@ impl HostList {
 
     pub(crate) fn reset(&self) {
         self.uav_pending.store(true, Ordering::Relaxed);
+        self.writes.store(0, Ordering::Relaxed);
+        if let Some(before) = self.before.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+            before.used = None;
+        }
         #[cfg(feature = "diagnostics")]
         let started = std::time::Instant::now();
         self._alive.used();

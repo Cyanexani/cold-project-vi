@@ -137,6 +137,11 @@ struct Window {
     base: u64,
     records: u32,
     scratch: ID3D12Resource,
+    /// Where the window's first record is in `scratch`.
+    at: u64,
+    /// Whether `scratch` is a buffer of hoisted clamps
+    /// (`crate::indirect::hoisting`): it stays in indirect arguments.
+    hoisted: bool,
 }
 
 /// The most records clamped in one pass ([`windows`]):
@@ -259,6 +264,7 @@ pub(crate) fn batch_line(frames: f64) {
 struct Held {
     run: victory_core::batch::Run,
     scratch: ID3D12Resource,
+    hoisted: bool,
 }
 
 /// What one title list has set, and what its host list was last given.
@@ -2257,12 +2263,19 @@ impl State {
     /// textures (`Translated::writes`; unknown pipelines count as writing).
     fn note_writes(&self, list: &HostList) {
         if !crate::host::barrier_merge() {
+            // Hoisted clamps stop at the first command that may write.
+            let writes = crate::pipeline::host_pipeline(self.pipeline as This)
+                .is_none_or(|p| p.stages.iter().any(|stage| stage.translated().writes));
+            if writes {
+                list.wrote();
+            }
             return;
         }
         let writes = crate::pipeline::host_pipeline(self.pipeline as This)
             .is_none_or(|p| p.stages.iter().any(|stage| stage.translated().writes));
         if writes {
             list.set_uav_pending(true);
+            list.wrote();
         }
     }
 
@@ -2521,14 +2534,16 @@ impl State {
     /// Transitions the active window's scratch buffer back from
     /// `INDIRECT_ARGUMENT` to `COMMON` and clears the window.
     fn end_window(&mut self, list: &HostList) {
-        if let Some(w) = self.window.take() {
+        if let Some(w) = self.window.take()
+            && !w.hoisted
+        {
             crate::indirect::done(list, &w.scratch);
         }
     }
 
     /// Records the indirect calls held back as one host call.
     fn flush_held(&mut self, list: &HostList) {
-        let Some(Held { run, scratch }) = self.held.take() else {
+        let Some(Held { run, scratch, hoisted }) = self.held.take() else {
             return;
         };
         const MESH: u32 = 10;
@@ -2545,7 +2560,7 @@ impl State {
         if run.first.kind == MESH {
             self.mesh_scissor(list, false);
         }
-        if self.window.as_ref().is_none_or(|w| w.scratch != scratch) {
+        if !hoisted && self.window.as_ref().is_none_or(|w| w.scratch != scratch) {
             crate::indirect::done(list, &scratch);
         }
     }
@@ -3256,8 +3271,8 @@ impl State {
             .as_ref()
             .filter(|w| same(w) && offset >= w.base)
             .filter(|w| (offset - w.base) % u64::from(w.step) == 0 && (offset - w.base) / u64::from(w.step) < u64::from(w.records))
-            .map(|w| (w.scratch.clone(), offset - w.base));
-        let (bounded, at) = match hit {
+            .map(|w| (w.scratch.clone(), w.at + offset - w.base, w.hoisted));
+        let (bounded, at, hoisted) = match hit {
             Some(hit) => hit,
             None => {
                 // A record a short step after the last window's last one
@@ -3295,6 +3310,37 @@ impl State {
                 // Dedicated buffers (not placed over title memory that other
                 // buffers alias): the clamp may wait on them alone.
                 let own = !args.in_place() && counter.as_ref().is_none_or(|(s, _)| !s.in_place());
+                // In the list before this one, if nothing here may have
+                // written the arguments yet (`crate::indirect::hoisting`):
+                // nothing of ours between the draws, no state to set again.
+                let lifted = (crate::indirect::hoisting() && parts.is_none() && kind != DISPATCH)
+                    .then(|| crate::indirect::validate_layout((kind, step, records), offset, count_arg.map(|(_, at)| at)))
+                    .flatten()
+                    .and_then(|bytes| list.hoist_room(bytes))
+                    .filter(|(l, dst, at)| {
+                        crate::indirect::bound_hoisted(
+                            list,
+                            (l, dst, *at),
+                            (&args.buffer, offset),
+                            count_arg,
+                            (kind, step, records),
+                            windowed && records > 1,
+                        )
+                    });
+                if let Some((_, dst, room_at)) = lifted {
+                    self.window = windowed.then(|| Window {
+                        copy: args.id(),
+                        kind,
+                        stride,
+                        step,
+                        base: offset,
+                        records,
+                        scratch: dst.clone(),
+                        at: room_at,
+                        hoisted: true,
+                    });
+                    (dst, room_at, true)
+                } else {
                 // More than the record asked for: a window clamped ahead,
                 // whose unfilled slots must not spend the list's budget.
                 let bounded = if parts.is_some() {
@@ -3327,8 +3373,11 @@ impl State {
                     base: offset,
                     records,
                     scratch: bounded.clone(),
+                    at: 0,
+                    hoisted: false,
                 });
-                (bounded, 0)
+                (bounded, 0, false)
+                }
             }
         };
         let ran = match kind {
@@ -3338,7 +3387,7 @@ impl State {
             _ => false,
         };
         if !ran {
-            if self.window.as_ref().is_none_or(|w| w.scratch != bounded) {
+            if !hoisted && self.window.as_ref().is_none_or(|w| w.scratch != bounded) {
                 crate::indirect::done(list, &bounded);
             }
             why("prepare failed");
@@ -3362,7 +3411,7 @@ impl State {
                 .and_then(victory_core::batch::Run::start)
                 .filter(|r| r.call().2 == at && host_signature(kind, r.first.step).is_some());
             if let Some(run) = run {
-                self.held = Some(Held { run, scratch: bounded });
+                self.held = Some(Held { run, scratch: bounded, hoisted });
                 DRAWN.fetch_add(1, Ordering::Relaxed);
                 return true;
             }
@@ -3393,7 +3442,7 @@ impl State {
         if kind == MESH {
             self.mesh_scissor(list, false);
         }
-        if self.window.as_ref().is_none_or(|w| w.scratch != bounded) {
+        if !hoisted && self.window.as_ref().is_none_or(|w| w.scratch != bounded) {
             crate::indirect::done(list, &bounded);
         }
         if kind == DISPATCH {
