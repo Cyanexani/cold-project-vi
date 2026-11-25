@@ -66,6 +66,9 @@ thread_local! {
     /// While a stage's tables are walked (`State::tables`): whether that
     /// stage's shader can store to buffers (`Translated::stores`).
     static STORES: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+    /// While a stage's tables are walked: whether its stores stay out of
+    /// title memory (`pipeline::builder_quarantined`).
+    static QUARANTINED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// While `State::early_textures` runs the texture pass: the
     /// milliseconds and the bytes that run may take, in place of the
     /// pass's own per frame.
@@ -987,11 +990,14 @@ impl State {
             list.keep(&p.pso);
             list.keep(&p.root);
         }
+        let quarantined = crate::pipeline::builder_quarantined(self.pipeline as This);
         for stage in &p.stages {
             let t = stage.translated();
             STORES.set(t.stores);
+            QUARANTINED.set(quarantined);
             let made = self.tables(list, &t.used, &t.host.root_indexed_views, compute);
             STORES.set(true);
+            QUARANTINED.set(false);
             if made.iter().any(|m| m.1 == u32::MAX) {
                 once!("a draw whose descriptor table found no free slots is dropped");
                 return false;
@@ -3118,7 +3124,11 @@ fn readable(list: &HostList, kind: ResourceType, view: &View) {
     // what shaders write through unordered access goes back to it after.
     if let Some((shadow, address, len)) = crate::descriptor::host::buffer_copy(view) {
         shadow.refresh(list, address, len);
-        if kind == ResourceType::Uav {
+        // The builder's stores in quarantine (`VICTORY_BVH_QUARANTINE=1`) stay
+        // in the host's copies, through tables too: only its root views and
+        // raw addresses were kept out, and its table stores still reached the
+        // title's objects (26/11: f16 node bounds read as pointers).
+        if kind == ResourceType::Uav && !QUARANTINED.get() {
             // A shader that cannot store to buffers leaves the range as
             // the title has it: nothing to find afterwards.
             if STORES.get() || !write_skip() {
