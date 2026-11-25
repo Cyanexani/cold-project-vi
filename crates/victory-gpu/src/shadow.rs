@@ -1965,7 +1965,6 @@ impl Shadow {
                     *h = merged;
                 }
                 if differs != 0 {
-                    back_trace(start + at, n);
                     crate::watch::writing(start + at, n);
                     crate::host::write_mapped((start + at) as *mut u8, title.as_ptr(), n);
                     written += n;
@@ -3314,7 +3313,7 @@ pub(crate) fn near(va: u64) -> String {
 /// memory (address, bytes, frame, when in microseconds), for a crash report
 /// to name those near the faulting thread's registers ([`crash_note`]): the
 /// ray-tracing builder's runs ended with title objects holding floats.
-static BACK_RING: Mutex<std::collections::VecDeque<(u64, u64, u64, u64)>> = Mutex::new(std::collections::VecDeque::new());
+static BACK_RING: Mutex<std::collections::VecDeque<(u64, u64, u64, u64, u8)>> = Mutex::new(std::collections::VecDeque::new());
 const BACK_RING_LEN: usize = 1 << 16;
 
 fn back_trace_on() -> bool {
@@ -3322,7 +3321,9 @@ fn back_trace_on() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_BACK_TRACE").is_some_and(|v| v == "1"))
 }
 
-fn back_trace(address: usize, len: usize) {
+/// `kind`: 0 shader writes put back (`host::write_mapped`), 1 a copy of the
+/// title's own (`host::copy_mapped`).
+pub(crate) fn back_trace(address: usize, len: usize, kind: u8) {
     if !back_trace_on() {
         return;
     }
@@ -3330,7 +3331,7 @@ fn back_trace(address: usize, len: usize) {
     if ring.len() == BACK_RING_LEN {
         ring.pop_front();
     }
-    ring.push_back((address as u64, len as u64, crate::frame::current(), crate::host::now_us()));
+    ring.push_back((address as u64, len as u64, crate::frame::current(), crate::host::now_us(), kind));
 }
 
 /// For a crash report: the puts-back of [`BACK_RING`] that touched the
@@ -3370,10 +3371,11 @@ pub fn crash_note(regs: &[u64; 16]) -> String {
     );
     let mut found = 0;
     for (what, at, len) in &spots {
-        for &(a, n, frame, when) in ring.iter().rev() {
+        for &(a, n, frame, when, kind) in ring.iter().rev() {
             if a < at + len && *at < a + n {
+                let how = if kind == 0 { "shader writes put back" } else { "title copy" };
                 out += &format!(
-                    "  {what} ({at:#x}+{len:#x}) put back at {a:#x}+{n:#x}, frame {frame}, {:.1} ms ago
+                    "  {what} ({at:#x}+{len:#x}): {how} at {a:#x}+{n:#x}, frame {frame}, {:.1} ms ago
 ",
                     now.saturating_sub(when) as f64 / 1000.0
                 );
