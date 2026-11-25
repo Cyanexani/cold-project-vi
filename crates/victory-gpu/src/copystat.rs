@@ -799,6 +799,11 @@ fn log_memory() {
         made[4],
         mb(made[5]),
     );
+    tracing::info!(
+        "memory, CPU sides of host copies in the card's memory as ordinary memory (VICTORY_CARD_PAGEABLE): {} alive {:.0} MB",
+        crate::shadow::PAGEABLE[0].load(Relaxed),
+        mb(crate::shadow::PAGEABLE[1].load(Relaxed)),
+    );
     {
         let up: Vec<u64> = crate::host::UPLOAD_MADE.iter().map(|a| a.load(Relaxed)).collect();
         let pool: Vec<u64> = crate::texture::POOL_USE.iter().map(|a| a.load(Relaxed)).collect();

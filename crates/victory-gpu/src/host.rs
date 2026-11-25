@@ -3556,12 +3556,38 @@ impl Host {
                 (|| -> windows::core::Result<()> {
                     allocator.Reset()?;
                     list.Reset(allocator, None)?;
+                    // The bytes of copies whose CPU side is ordinary memory
+                    // go up through this list's upload ring.
+                    let ring_bytes: u64 = dirty
+                        .iter()
+                        .filter(|(s, _)| s.card_sides().is_some_and(|(staging, _, _)| staging.is_none()))
+                        .flat_map(|(_, r)| r.iter().map(|&(a, b)| (b - a) as u64))
+                        .sum();
+                    let ring = if ring_bytes > 0 { self.card_upload_ring(list, ring_bytes) } else { None };
+                    let mut ring_at = 0u64;
                     for (shadow, ranges) in &dirty {
                         let Some((staging, before, size)) = shadow.card_sides() else {
                             continue;
                         };
                         for &(a, b) in ranges {
-                            list.CopyBufferRegion(&shadow.buffer, a as u64, staging, a as u64, (b - a) as u64);
+                            match (staging, &ring) {
+                                (Some(staging), _) => {
+                                    list.CopyBufferRegion(&shadow.buffer, a as u64, staging, a as u64, (b - a) as u64);
+                                }
+                                (None, Some((ring, data))) => {
+                                    let bytes = shadow.card_cpu_bytes(a, b);
+                                    std::ptr::copy_nonoverlapping(
+                                        bytes.as_ptr(),
+                                        (*data + ring_at as usize) as *mut u8,
+                                        bytes.len(),
+                                    );
+                                    list.CopyBufferRegion(&shadow.buffer, a as u64, ring, ring_at, bytes.len() as u64);
+                                    ring_at += bytes.len() as u64;
+                                }
+                                (None, None) => {
+                                    fail(format_args!("no upload ring to send {ring_bytes} bytes of host copies up to the card"));
+                                }
+                            }
                             crate::shadow::CARD_STATS[0].fetch_add((b - a) as u64, Ordering::Relaxed);
                         }
                         crate::shadow::CARD_STATS[1].fetch_add(ranges.len() as u64, Ordering::Relaxed);
@@ -6642,6 +6668,24 @@ impl Host {
                 None
             }
         }
+    }
+
+    /// The upload ring of the card sync list `list`, of at least `bytes`:
+    /// the list's last run has finished when it is recorded again, so its
+    /// ring is free to fill (`crate::shadow::Pageable`).
+    pub(crate) fn card_upload_ring(&self, list: &ID3D12GraphicsCommandList, bytes: u64) -> Option<(ID3D12Resource, usize)> {
+        static RINGS: Mutex<Vec<(usize, ID3D12Resource, usize, u64)>> = Mutex::new(Vec::new());
+        let key = list.as_raw() as usize;
+        let mut rings = RINGS.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(r) = rings.iter().find(|r| r.0 == key && r.3 >= bytes) {
+            return Some((r.1.clone(), r.2));
+        }
+        rings.retain(|r| r.0 != key);
+        let size = bytes.next_multiple_of(16 << 20);
+        let (buffer, data) = self.upload_buffer(size)?;
+        name(&buffer, || "upload ring of host copies in the card's memory".into());
+        rings.push((key, buffer.clone(), data as usize, size));
+        Some((buffer, data as usize))
     }
 
     pub(crate) fn upload_buffer(&self, size: u64) -> Option<(ID3D12Resource, *mut u8)> {
