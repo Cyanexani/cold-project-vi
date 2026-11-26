@@ -128,7 +128,15 @@ if (!$Nosso) { $SeriesS = $true }
 $opcoes = @{ Exe = $exe; More = $more; Console = $(if ($SeriesS) { 'series-s' } else { 'series-x' }) }
 if (!$Nosso) {
     $opcoes.Cgbj = $true
-    if ($Minutos -gt 0) { $more.VICTORY_LOG = 'warn,victory_gpu::host=info,victory_gpu::copystat=info' }
+    # Como o atalho "VIctory cgbj (original)" (VIctory-cgbj.cmd): 1080p e 1,5 GB de buffers na placa.
+    $more.VICTORY_DISPLAY_MODE = '1920x1080'
+    $more.VICTORY_CARD_BUFFERS_MB = '1536'
+    if ($Minutos -gt 0) {
+        $more.VICTORY_LOG = 'warn,victory_gpu::host=info,victory_gpu::copystat=info'
+        # Experiencia: 4 blocos de texturas feitos a frente em vez de 12 (768 MB de VRAM vazia
+        # numa placa de 12 GB cheia), para caberem mais texturas.
+        $more.VICTORY_RIPE_BLOCKS = '4'
+    }
     else { $opcoes.Build = 'release' }
 }
 # Maximo: sem os contadores de diagnostico e sem as milhares de linhas de log por segundo
