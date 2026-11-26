@@ -3106,6 +3106,7 @@ fn lookup(address: u64, len: u64, any: bool) -> Option<Arc<Shadow>> {
             }
             None => {
                 let (buffer, data) = host()?.shared_buffer(size)?;
+                crate::census::tag(&buffer, crate::census::COPIES, size);
                 crate::host::name(&buffer, || format!("title buffer {:#x}+{len:#x}", key.0));
                 (buffer, data, None)
             }
@@ -3193,6 +3194,7 @@ fn cpu_side(
         tracing::warn!(size, "no ordinary memory for a copy's CPU side: a shared buffer instead");
     }
     let (buffer, data) = host()?.shared_buffer(size)?;
+    crate::census::tag(&buffer, crate::census::COPIES, size);
     crate::host::name(&buffer, name);
     Some((data, Some(buffer), None))
 }
@@ -3208,6 +3210,7 @@ fn rebar_copy(kind: crate::rebar::Kind, start: u64, len: u64, size: u64, window:
         crate::rebar::released(size);
         return None;
     };
+    crate::census::tag(&buffer, crate::census::REBAR, size);
     crate::host::name(&buffer, || {
         format!(
             "title {} {start:#x}+{len:#x} (rebar)",
@@ -3423,6 +3426,7 @@ fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Sha
         }
         None => {
             let (buffer, data) = host()?.shared_buffer(len)?;
+            crate::census::tag(&buffer, crate::census::COPIES, len as u64);
             crate::host::name(&buffer, || format!("title memory {start:#x}+{len:#x}"));
             (buffer, data, None)
         }

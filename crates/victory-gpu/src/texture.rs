@@ -559,7 +559,9 @@ fn take_upload(host: &crate::host::Host, class: u64) -> Option<(ID3D12Resource, 
         }
     }
     POOL_USE[1].fetch_add(1, Relaxed);
-    host.upload_buffer(class)
+    let made = host.upload_buffer(class)?;
+    crate::census::tag(&made.0, crate::census::STAGING, class);
+    Some(made)
 }
 
 /// For the memory line: staging buffers alive, their bytes, and how many

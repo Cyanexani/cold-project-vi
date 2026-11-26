@@ -1651,6 +1651,7 @@ fn take_chunk(host: &Host, size: u64) -> Option<Chunk> {
     }
     let (buffer, data) = host.upload_buffer(size)?;
     name(&buffer, || "list scratch".into());
+    crate::census::tag(&buffer, crate::census::SCRATCH, size);
     // SAFETY: a live buffer.
     let gpu = unsafe { buffer.GetGPUVirtualAddress() };
     ALIVE[1].fetch_add(1, Ordering::Relaxed);
@@ -3893,6 +3894,7 @@ impl Host {
         // in one submission.
         const RESULTS: u64 = 1 << 20;
         let (differs, data) = self.shared_buffer(RESULTS).ok_or_else(windows::core::Error::empty)?;
+        crate::census::tag(&differs, crate::census::COMPARE, RESULTS);
         name(&differs, || "card compare results".into());
         let (inline_buf, inline_slots) = if card_inline_fetch() {
             let inline_bytes = CARD_INLINE_HEADER as u64 + u64::from(CARD_INLINE_SLOTS) * CARD_INLINE_STRIDE as u64;
@@ -4686,7 +4688,10 @@ impl Host {
             };
             if f.buffer.as_ref().is_none_or(|b| b.2 < fallback_total) {
                 let size = fallback_total.next_multiple_of(16 << 20);
-                f.buffer = self.shared_buffer(size).map(|(buffer, data)| (buffer, data as usize, size));
+                f.buffer = self.shared_buffer(size).map(|(buffer, data)| {
+                    crate::census::tag(&buffer, crate::census::FETCH, size);
+                    (buffer, data as usize, size)
+                });
             }
             let Some((buffer, data, _)) = f.buffer.clone() else {
                 fail(format_args!("no memory to fetch what shaders wrote to the card's memory ({fallback_total} bytes, VICTORY_RELAY=1)"));
@@ -4986,7 +4991,10 @@ impl Host {
         if !pieces.is_empty() {
             if work.fetched.as_ref().is_none_or(|f| f.2 < total) {
                 let size = total.next_multiple_of(16 << 20);
-                work.fetched = self.shared_buffer(size).map(|(buffer, data)| (buffer, data as usize, size));
+                work.fetched = self.shared_buffer(size).map(|(buffer, data)| {
+                    crate::census::tag(&buffer, crate::census::FETCH, size);
+                    (buffer, data as usize, size)
+                });
             }
             let Some((fetched, data, _)) = &work.fetched else {
                 fail(format_args!("no memory to fetch what shaders wrote to the card's memory ({total} bytes)"));
@@ -6709,6 +6717,7 @@ impl HostList {
         UPLOAD_MADE[1].fetch_add(1, Ordering::Relaxed);
         let (buffer, data) = host.upload_buffer(size)?;
         name(&buffer, || format!("list upload {size:#x}"));
+        crate::census::tag(&buffer, crate::census::ONE_OFF, size);
         self.deferred().hold_upload(buffer.clone(), size);
         Some((buffer, data))
     }
@@ -6723,6 +6732,7 @@ impl HostList {
             UPLOAD_MADE[2].fetch_add(1, Ordering::Relaxed);
             let (buffer, data) = host.upload_buffer(len)?;
             name(&buffer, || format!("list scratch {len:#x}"));
+            crate::census::tag(&buffer, crate::census::SCRATCH, len);
             // SAFETY: a live buffer.
             let gpu = unsafe { buffer.GetGPUVirtualAddress() };
             self.deferred().hold_upload(buffer, len);
@@ -7457,10 +7467,23 @@ impl Host {
         if let Some(r) = rings.iter().find(|r| r.0 == key && r.3 >= bytes) {
             return Some((r.1.clone(), r.2));
         }
-        rings.retain(|r| r.0 != key);
+        // A ring past 32 MB serves this send alone and goes once it has run:
+        // kept, each list's ring stayed at the size of its largest send
+        // ever (7 rings held 1,008 MB of the PC's memory at the cell, run
+        // "recense", while a send is a few MB).
+        const KEEP: u64 = 32 << 20;
         let size = bytes.next_multiple_of(16 << 20);
+        if size > KEEP {
+            let (buffer, data) = self.upload_buffer(size)?;
+            name(&buffer, || "upload ring of host copies in the card's memory (one send)".into());
+            crate::census::tag(&buffer, crate::census::RING, size);
+            retire(buffer.clone());
+            return Some((buffer, data as usize));
+        }
+        rings.retain(|r| r.0 != key);
         let (buffer, data) = self.upload_buffer(size)?;
         name(&buffer, || "upload ring of host copies in the card's memory".into());
+        crate::census::tag(&buffer, crate::census::RING, size);
         rings.push((key, buffer.clone(), data as usize, size));
         Some((buffer, data as usize))
     }
@@ -7506,7 +7529,11 @@ impl Host {
         };
         UPLOAD_MADE[0].fetch_add(began.elapsed().as_micros() as u64, Ordering::Relaxed);
         match made {
-            Ok(()) => Some((buffer?, data.cast())),
+            Ok(()) => {
+                let buffer = buffer?;
+                crate::census::tag(&buffer, crate::census::UPLOAD, size);
+                Some((buffer, data.cast()))
+            }
             Err(e) => {
                 tracing::warn!(error = %e, size, "no upload buffer");
                 None
@@ -7738,6 +7765,7 @@ impl Meter {
                 slow[1] as f64 / 1e3 / frames,
                 slow[2] as f64 / 1e3
             );
+            tracing::info!("{}", crate::census::line());
             if crate::shadow::cards() {
                 let per_frame = |i: usize| card[i] as f64 / frames;
                 tracing::info!(
@@ -8250,7 +8278,11 @@ impl Host {
                 })
         };
         match made {
-            Ok(()) => Some((buffer?, data.cast())),
+            Ok(()) => {
+                let buffer = buffer?;
+                crate::census::tag(&buffer, crate::census::SHARED, size);
+                Some((buffer, data.cast()))
+            }
             Err(e) => {
                 tracing::warn!(error = %e, size, "no shared buffer");
                 None

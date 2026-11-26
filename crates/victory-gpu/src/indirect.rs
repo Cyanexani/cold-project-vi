@@ -1534,6 +1534,7 @@ void main() {
         let Some((src_buf, src_ptr)) = host.shared_buffer(256 << 10) else {
             return;
         };
+        crate::census::tag(&src_buf, crate::census::INDIRECT, 256 << 10);
         let Some((count_buf, count_ptr)) = host.shared_buffer(256) else {
             return;
         };

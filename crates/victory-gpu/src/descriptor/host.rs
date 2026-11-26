@@ -1052,6 +1052,7 @@ impl HostHeap {
                 tracing::warn!(bytes, "no heap map: title slots past the window read the null slot");
                 return None;
             };
+            crate::census::tag(&buffer, crate::census::DESCRIPTORS, bytes);
             // SAFETY: the buffer's whole mapping.
             unsafe { std::ptr::write_bytes(at, 0, bytes as usize) };
             crate::host::name(&buffer, || "heap map".to_owned());
@@ -1063,6 +1064,7 @@ impl HostHeap {
                 // (`victory_shader::emit::SLOT_ADDRESSES`).
                 let bytes = u64::from(victory_shader::emit::SLOT_STRIDES_DWORDS) * 4;
                 let (buffer, data) = host.upload_buffer(bytes)?;
+                crate::census::tag(&buffer, crate::census::DESCRIPTORS, bytes);
                 // SAFETY: the buffer's whole mapping; a live buffer.
                 let gpu = unsafe {
                     std::ptr::write_bytes(data, 0, bytes as usize);
