@@ -21,6 +21,10 @@ set "VICTORY_PIPELINE_BOOK=1"
 rem Mais VRAM para texturas: 4 blocos de texturas feitos a frente em vez de 12 (512 MB a mais numa
 rem placa de 12 GB cheia). Os blocos a frente protegem de perdas da placa: se a placa se perder, volta a 12.
 set "VICTORY_RIPE_BLOCKS=4"
+rem Texturas a velocidade normal enquanto houver 1 GB de RAM livre (o cgbj travava-as abaixo de 3 GB
+rem e so as soltava aos 5 GB: com 32 GB o jogo ficava sempre travado, a ~2 GB livres).
+set "VICTORY_PRESSURE_FREE_MB=1024"
+set "VICTORY_PRESSURE_CLEAR_MB=2048"
 rem "VIctory-cgbj.cmd rt": com o ray tracing do jogo (luz indireta: salas menos escuras; mais lento).
 if /i "%~1"=="rt" set "VICTORY_BVH_BUILDER=1"
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (

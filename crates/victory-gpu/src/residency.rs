@@ -96,11 +96,27 @@ pub(crate) fn limited_host_ram() -> bool {
 }
 
 fn next_pressure(was: bool, physical: u64, commit: u64) -> bool {
+    let (enter, leave) = pressure_lines();
     if was {
-        physical < 5 * GIB || commit < 6 * GIB
+        physical < leave || commit < 6 * GIB
     } else {
-        physical <= 3 * GIB || commit <= 4 * GIB
+        physical <= enter || commit <= 4 * GIB
     }
+}
+
+/// Free physical memory at or under which texture prefetch is limited, and
+/// over which the limit ends: 3 and 5 GiB, or `VICTORY_PRESSURE_FREE_MB` and
+/// `VICTORY_PRESSURE_CLEAR_MB`. With 32 GB the title and this layer leave
+/// about 2 GiB free, so at 3 GiB the limit never ended and textures arrived
+/// at a trickle (RTX 5070 Ti laptop, 2026-11-26).
+fn pressure_lines() -> (u64, u64) {
+    static LINES: OnceLock<(u64, u64)> = OnceLock::new();
+    *LINES.get_or_init(|| {
+        let mb = |name: &str| std::env::var(name).ok().and_then(|v| v.trim().parse::<u64>().ok()).map(|mb| mb << 20);
+        let enter = mb("VICTORY_PRESSURE_FREE_MB").unwrap_or(3 * GIB);
+        let leave = mb("VICTORY_PRESSURE_CLEAR_MB").unwrap_or(5 * GIB).max(enter);
+        (enter, leave)
+    })
 }
 
 /// Called by the once-per-second submission sweep. A failed sample keeps the last good state.
