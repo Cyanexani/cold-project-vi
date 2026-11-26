@@ -8645,6 +8645,9 @@ struct Presenter {
     width: u32,
     height: u32,
     format: DXGI_FORMAT,
+    /// The swap chain's buffers: the frame's size, or with [`borderless`]
+    /// the window's (the frame scaled into them, [`crate::compose`]).
+    out: (u32, u32),
     copy: HostList,
     /// With presents sent ahead ([`late_free_present`]): a list for each
     /// present in the air, and the submission it last flew as (it is used
@@ -9038,16 +9041,17 @@ impl Host {
             // Presents sent ahead hold back buffers until they have run.
             settle_now(WHY_SYNC);
             // SAFETY: no back buffer is held; every submission was waited for.
+            let out = presented_size(p.hwnd, (width, height));
             let resized = unsafe {
                 p.swap_chain
-                    .ResizeBuffers(BUFFERS, width, height, format, DXGI_SWAP_CHAIN_FLAG(0))
+                    .ResizeBuffers(BUFFERS, out.0, out.1, format, DXGI_SWAP_CHAIN_FLAG(0))
             };
             match resized {
                 Ok(()) => {
                     if p.format != format {
                         p.composer = None;
                     }
-                    (p.width, p.height, p.format) = (width, height, format);
+                    (p.width, p.height, p.format, p.out) = (width, height, format, out);
                     tracing::info!(
                         width,
                         height,
@@ -9163,6 +9167,42 @@ impl Host {
             } else {
                 false
             };
+            // A borderless window larger than the frame: the frame scaled
+            // into the buffers, its shape kept ([`borderless`]).
+            let fit_view = if !composed && p.out != (width, height) { crate::compose::view(&desc) } else { None };
+            if let Some(view) = fit_view
+                && p.composer.is_none()
+            {
+                match crate::compose::Composer::new(self, format) {
+                    Ok(c) => p.composer = Some(c),
+                    Err(e) => tracing::warn!(error = %e, "no scaler for the borderless window; the frame goes to its corner"),
+                }
+                let _ = view;
+            }
+            let composed = composed
+                || match (fit_view, p.composer.as_mut()) {
+                    (Some(view), Some(composer)) => {
+                        let mut pre = Vec::with_capacity(2);
+                        if state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE {
+                            pre.push(transition(texture, state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+                        }
+                        pre.push(transition(&back, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+                        list.ResourceBarrier(&pre);
+                        let fit_slot = slot.map_or(0, |i| i + 1);
+                        let drawn = composer.record_fit(self, fit_slot, list, (texture, view), &back, (width, height), p.out);
+                        let mut post = Vec::with_capacity(2);
+                        if state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE {
+                            post.push(transition(texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, state));
+                        }
+                        post.push(transition(&back, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST));
+                        list.ResourceBarrier(&post);
+                        if let Err(e) = drawn {
+                            tracing::warn!(error = %e, "the frame was not scaled into the borderless window");
+                        }
+                        true
+                    }
+                    _ => false,
+                };
             if !composed {
                 let mut pre = Vec::with_capacity(2);
                 if state != D3D12_RESOURCE_STATE_COPY_SOURCE {
@@ -9174,7 +9214,26 @@ impl Host {
                     D3D12_RESOURCE_STATE_COPY_DEST,
                 ));
                 list.ResourceBarrier(&pre);
-                list.CopyResource(&back, texture);
+                if p.out == (width, height) {
+                    list.CopyResource(&back, texture);
+                } else {
+                    // (No scaler: as much of the frame as fits, at the corner.)
+                    let region = D3D12_BOX {
+                        left: 0,
+                        top: 0,
+                        front: 0,
+                        right: width.min(p.out.0),
+                        bottom: height.min(p.out.1),
+                        back: 1,
+                    };
+                    let at = |texture: &ID3D12Resource| D3D12_TEXTURE_COPY_LOCATION {
+                        // SAFETY: a borrowed pointer the location never releases.
+                        pResource: std::mem::transmute_copy(texture),
+                        Type: D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+                        Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 { SubresourceIndex: 0 },
+                    };
+                    list.CopyTextureRegion(&at(&back), 0, 0, 0, &at(texture), Some(&region));
+                }
             }
             #[cfg(feature = "diagnostics")]
             let capture = crate::capture::wanted(frame)
@@ -9280,12 +9339,13 @@ impl Host {
             None => window(width, height)?,
         };
         self.log_video_memory("right before the swap chain is made");
+        let out = presented_size(hwnd, (width, height));
         // SAFETY: plain object creation for our window.
         unsafe {
             let factory: IDXGIFactory2 = CreateDXGIFactory2(DXGI_CREATE_FACTORY_FLAGS(0))?;
             let desc = DXGI_SWAP_CHAIN_DESC1 {
-                Width: width,
-                Height: height,
+                Width: out.0,
+                Height: out.1,
                 Format: format,
                 SampleDesc: DXGI_SAMPLE_DESC {
                     Count: 1,
@@ -9301,13 +9361,14 @@ impl Host {
                 .cast::<IDXGISwapChain3>()?;
             let copy = self.new_list()?;
             copy.close();
-            tracing::info!(width, height, format = format.0, "presenting to a window");
+            tracing::info!(width, height, ?out, format = format.0, "presenting to a window");
             self.log_video_memory("right after the swap chain is made");
             Ok(Presenter {
                 swap_chain,
                 width,
                 height,
                 format,
+                out,
                 copy,
                 ahead: Vec::new(),
                 hwnd,
@@ -9322,6 +9383,30 @@ impl Host {
 
 /// A visible top-level window of this process: the one the title made, if
 /// it made one.
+/// Whether the title's window is borderless and as large as the screen
+/// (`VICTORY_BORDERLESS`, on unless `0`; the window is made so in
+/// `victory_hle::modules::lifecycle`). NVIDIA Smooth Motion only adds
+/// frames to a swap chain the system flips on its own ("independent
+/// flip"), which a window with a frame never is.
+pub(crate) fn borderless() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_BORDERLESS").is_none_or(|v| v != "0"))
+}
+
+/// The swap chain's size for a frame of `frame`: the window's client area
+/// when [`borderless`], else the frame's.
+fn presented_size(hwnd: HWND, frame: (u32, u32)) -> (u32, u32) {
+    if !borderless() {
+        return frame;
+    }
+    let mut rect = RECT::default();
+    // SAFETY: a plain query of a live window.
+    match unsafe { GetClientRect(hwnd, &mut rect) } {
+        Ok(()) if rect.right > 0 && rect.bottom > 0 => (rect.right as u32, rect.bottom as u32),
+        _ => frame,
+    }
+}
+
 fn title_window() -> Option<HWND> {
     extern "system" fn visit(hwnd: HWND, found: LPARAM) -> windows::core::BOOL {
         let mut process = 0;

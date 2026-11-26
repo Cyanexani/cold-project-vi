@@ -110,7 +110,7 @@ pub extern "system" fn CreateWindowExW(
     instance: HINSTANCE,
     param: *const c_void,
 ) -> HWND {
-    let (x, y, width, height) = fit(parent, x, y, width, height);
+    let (ex_style, style, x, y, width, height) = place(parent, ex_style, style, x, y, width, height);
     // SAFETY: the title's own arguments, forwarded (the size fitted).
     let hwnd = unsafe {
         wm::CreateWindowExW(
@@ -136,7 +136,7 @@ pub extern "system" fn CreateWindowExA(
     instance: HINSTANCE,
     param: *const c_void,
 ) -> HWND {
-    let (x, y, width, height) = fit(parent, x, y, width, height);
+    let (ex_style, style, x, y, width, height) = place(parent, ex_style, style, x, y, width, height);
     // SAFETY: the title's own arguments, forwarded (the size fitted).
     let hwnd = unsafe {
         wm::CreateWindowExA(
@@ -153,6 +153,43 @@ pub extern "system" fn CreateWindowExA(
 /// its proportions, and centred; what it shows is scaled to it (the swap
 /// chain stretches). `VICTORY_WINDOW_MAX=WIDTHxHEIGHT` applies a smaller
 /// limit without changing the title's render targets.
+/// Where and how a title window is made: borderless over the whole primary
+/// screen (`VICTORY_BORDERLESS`, on unless `0`), which lets the system flip
+/// the swap chain on its own, as NVIDIA Smooth Motion needs; else fitted to
+/// the work area ([`fit`]). The process is made aware of the screen's
+/// scaling first, so the window and the swap chain have its real pixels.
+fn place(
+    parent: HWND,
+    ex_style: u32,
+    style: u32,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> (u32, u32, i32, i32, i32, i32) {
+    let top_level = parent.is_null() && style & wm::WS_CHILD == 0 && style & wm::WS_CAPTION != 0;
+    if top_level && std::env::var_os("VICTORY_BORDERLESS").is_none_or(|v| v != "0") {
+        static AWARE: std::sync::Once = std::sync::Once::new();
+        AWARE.call_once(|| {
+            use windows_sys::Win32::UI::HiDpi::{
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+            };
+            // SAFETY: plain call; refused if the awareness was set already.
+            let ok = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
+            tracing::info!(ok, "aware of the screen's scaling (borderless window)");
+        });
+        // SAFETY: plain queries.
+        let (w, h) = unsafe { (wm::GetSystemMetrics(wm::SM_CXSCREEN), wm::GetSystemMetrics(wm::SM_CYSCREEN)) };
+        if w > 0 && h > 0 {
+            tracing::info!(width, height, screen = ?(w, h), "title window made borderless over the screen (VICTORY_BORDERLESS=0: a framed window)");
+            let ex = ex_style & !(wm::WS_EX_WINDOWEDGE | wm::WS_EX_CLIENTEDGE | wm::WS_EX_DLGMODALFRAME);
+            return (ex, wm::WS_POPUP | (style & wm::WS_VISIBLE), 0, 0, w, h);
+        }
+    }
+    let (x, y, width, height) = fit(parent, x, y, width, height);
+    (ex_style, style, x, y, width, height)
+}
+
 fn fit(parent: HWND, x: i32, y: i32, width: i32, height: i32) -> (i32, i32, i32, i32) {
     let mut area = RECT::default();
     // SAFETY: `area` receives the primary monitor's work area.

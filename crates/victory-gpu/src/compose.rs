@@ -29,11 +29,17 @@ float4 ps(V v) : SV_Target {
     float4 o = over.SampleLevel(smooth_, v.uv, 0);
     return float4(saturate(o.rgb + s.rgb * (1 - saturate(o.a))), 1);
 }
+[RootSignature(RS)]
+float4 fit(V v) : SV_Target {
+    return float4(scene.SampleLevel(smooth_, v.uv, 0).rgb, 1);
+}
 "#;
 
 pub(crate) struct Composer {
     root: ID3D12RootSignature,
     pso: ID3D12PipelineState,
+    /// One plane scaled into a part of the target ([`Self::record_fit`]).
+    fit_pso: ID3D12PipelineState,
     views: Vec<ID3D12DescriptorHeap>,
     step: u32,
 }
@@ -66,9 +72,10 @@ fn compile(entry: PCSTR, target: PCSTR) -> windows::core::Result<ID3DBlob> {
 
 impl Composer {
     pub(crate) fn new(host: &Host, format: DXGI_FORMAT) -> windows::core::Result<Self> {
-        let (vs, ps) = (
+        let (vs, ps, fit) = (
             compile(s!("vs"), s!("vs_5_1"))?,
             compile(s!("ps"), s!("ps_5_1"))?,
+            compile(s!("fit"), s!("ps_5_1"))?,
         );
         // SAFETY: the blobs' own bytes, alive through the calls.
         unsafe {
@@ -103,9 +110,12 @@ impl Composer {
             desc.BlendState.RenderTarget[0].RenderTargetWriteMask =
                 D3D12_COLOR_WRITE_ENABLE_ALL.0 as u8;
             let pso = device.CreateGraphicsPipelineState(&desc)?;
+            desc.PS = code(&fit);
+            let fit_pso = device.CreateGraphicsPipelineState(&desc)?;
             Ok(Composer {
                 root,
                 pso,
+                fit_pso,
                 views: Vec::new(),
                 step: device
                     .GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
@@ -183,6 +193,45 @@ impl Composer {
                 top: 0,
                 right: width as i32,
                 bottom: height as i32,
+            }]);
+            list.DrawInstanced(3, 1, 0, 0);
+        }
+        Ok(())
+    }
+}
+
+impl Composer {
+    /// The frame `plane` (`size`) drawn over the whole of `back` (`out`), as
+    /// large as it fits with its shape kept, the rest black: a borderless
+    /// window as large as the screen ([`crate::host`] `borderless`).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn record_fit(
+        &mut self,
+        host: &Host,
+        slot: usize,
+        list: &ID3D12GraphicsCommandList,
+        plane: (&ID3D12Resource, DXGI_FORMAT),
+        back: &ID3D12Resource,
+        size: (u32, u32),
+        out: (u32, u32),
+    ) -> windows::core::Result<()> {
+        // The views, root, pipeline and a viewport over all of `back`.
+        self.record(host, slot, list, [plane, plane], back, out)?;
+        let scale = (out.0 as f32 / size.0.max(1) as f32).min(out.1 as f32 / size.1.max(1) as f32);
+        let (w, h) = (size.0 as f32 * scale, size.1 as f32 * scale);
+        let (x, y) = ((out.0 as f32 - w) / 2.0, (out.1 as f32 - h) / 2.0);
+        // SAFETY: an open list with `back` bound as its target by `record`.
+        unsafe {
+            let rtv = host.rtv(Some(back), None);
+            list.ClearRenderTargetView(rtv, &[0.0, 0.0, 0.0, 1.0], None);
+            list.SetPipelineState(&self.fit_pso);
+            list.RSSetViewports(&[D3D12_VIEWPORT {
+                TopLeftX: x.floor(),
+                TopLeftY: y.floor(),
+                Width: w.round(),
+                Height: h.round(),
+                MaxDepth: 1.0,
+                ..Default::default()
             }]);
             list.DrawInstanced(3, 1, 0, 0);
         }
