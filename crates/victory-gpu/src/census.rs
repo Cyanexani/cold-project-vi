@@ -133,7 +133,7 @@ pub(crate) fn line() -> String {
         .map(|i| (BYTES[i].load(Ordering::Relaxed), COUNT[i].load(Ordering::Relaxed), KINDS[i]))
         .filter(|k| k.1 > 0)
         .collect();
-    kinds.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+    kinds.sort_unstable_by_key(|k| std::cmp::Reverse(k.0));
     let total: u64 = kinds.iter().map(|k| k.0).sum();
     let parts: Vec<String> = kinds.iter().map(|(b, n, k)| format!("{k} {} MB in {n}", b >> 20)).collect();
     format!("our buffers in the PC's memory alive: {} MB: {}", total >> 20, parts.join("; "))

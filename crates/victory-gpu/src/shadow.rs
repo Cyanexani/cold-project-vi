@@ -3426,7 +3426,7 @@ fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Sha
         }
         None => {
             let (buffer, data) = host()?.shared_buffer(len)?;
-            crate::census::tag(&buffer, crate::census::COPIES, len as u64);
+            crate::census::tag(&buffer, crate::census::COPIES, len);
             crate::host::name(&buffer, || format!("title memory {start:#x}+{len:#x}"));
             (buffer, data, None)
         }
