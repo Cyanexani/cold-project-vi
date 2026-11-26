@@ -10,9 +10,10 @@
 #   Jogar.cmd -Com1c8          pipelines substitutos (vazios) no metodo 0x1c8: so para medir; deixa a imagem preta
 #   Jogar.cmd -SlotsDinamicos 393216   descritores dinamicos na NVIDIA (padrao 262144; o resto fica para o jogo)
 #   Jogar.cmd -Minutos 5       teste sozinho: Enter automatico e o jogo fecha-se ao fim de 5 min
+#   Jogar.cmd -Nosso           as nossas definicoes (1080p, buffers na placa...) em vez das do cgbj
 #   Jogar.cmd -SeriesS         simula a Series S (menos memoria e mais FPS; intro preta e graficos piores: usa o 0x1c8)
 #   Jogar.cmd -MemoriaNormal   sem o perfil de pouca memoria (feito para 64 GB / 24 GB de VRAM)
-param([switch] $Seguro, [switch] $RayTracing, [switch] $SemEnter, [switch] $MemoriaNormal, [switch] $SeriesS, [switch] $Maximo, [switch] $Com1c8, [int] $SlotsDinamicos = 0, [int] $Minutos = 0,
+param([switch] $Seguro, [switch] $RayTracing, [switch] $SemEnter, [switch] $MemoriaNormal, [switch] $SeriesS, [switch] $Maximo, [switch] $Com1c8, [switch] $Nosso, [int] $SlotsDinamicos = 0, [int] $Minutos = 0,
       [string] $PastaJogo = (Join-Path $env:USERPROFILE 'Downloads\dump private build'),
       [string] $PastaCorrida = (Join-Path $env:USERPROFILE '.codex\visualizations\2026\11\22\01a2020d-43d5-7ec3-a9e8-d56142dd6f82\victory-xtx-run'),
       # Abaixo disto (MiB livres) em 3 amostras seguidas, o jogo e fechado para o PC nao bloquear.
@@ -37,7 +38,7 @@ if (Get-Process -Name victory -ErrorAction SilentlyContinue) {
 }
 Push-Location -LiteralPath $repo
 try {
-    if ($Maximo) { & cargo build --locked --release -p victory }
+    if ($Maximo -or (!$Nosso -and $Minutos -eq 0)) { & cargo build --locked --release -p victory }
     else { & cargo build --locked --profile diag -p victory --features diagnostics }
     if ($LASTEXITCODE -ne 0) { throw 'A compilacao falhou.' }
 } finally { Pop-Location }
@@ -51,19 +52,21 @@ $more = @{ VICTORY_PIPELINE_BOOK = '1' }
 # 3 GB na placa, para a VRAM nao transbordar para a RAM (placa a 5 % e 1 s por frame).
 # (Largar texturas apos 5 s, VICTORY_TEXTURE_KEEP=0, ficou de fora: a sessao de 2026-11-26
 # 03:59 perdeu a placa aos 16 min, e o fork guarda memoria libertada contra essas perdas.)
-# Para este portatil (medido 2026-11-26: de ~3 para ~9 FPS no mundo, sem crash):
-# - 1080p em vez da TV 4K que o jogo julgava ter (4x menos pixeis);
-# - buffers do jogo na placa e nao na RAM do PC (os padroes de placas <= 12 GB deixavam-nos
-#   do lado do PC, lidos pelo barramento);
-# - 64 listas no ar em vez de 256, para os descritores dinamicos voltarem mais cedo.
-$more.VICTORY_DISPLAY_MODE = '1920x1080'
-$more.VICTORY_CARD_BUFFERS_MIN_MB = '1'
-$more.VICTORY_CARD_BUFFERS_MB = '1536'
-$more.VICTORY_LATE_WAIT_LISTS = '64'
-# Do launcher desta versao (cgbj, afinada numa RTX 5090 com 32 GB): niveis de texturas a pedido e o ar.
-$more.VICTORY_LEVELS_ON_DEMAND = '1'
-$more.VICTORY_AMBIENT_AIR = '1.5'
-if (!$MemoriaNormal) {
+if ($Nosso) {
+    # Para este portatil (medido 2026-11-26: de ~3 para ~9 FPS no mundo, sem crash):
+    # - 1080p em vez da TV 4K que o jogo julgava ter (4x menos pixeis);
+    # - buffers do jogo na placa e nao na RAM do PC (os padroes de placas <= 12 GB deixavam-nos
+    #   do lado do PC, lidos pelo barramento);
+    # - 64 listas no ar em vez de 256, para os descritores dinamicos voltarem mais cedo.
+    $more.VICTORY_DISPLAY_MODE = '1920x1080'
+    $more.VICTORY_CARD_BUFFERS_MIN_MB = '1'
+    $more.VICTORY_CARD_BUFFERS_MB = '1536'
+    $more.VICTORY_LATE_WAIT_LISTS = '64'
+    # Do launcher desta versao (cgbj, afinada numa RTX 5090 com 32 GB): niveis de texturas a pedido e o ar.
+    $more.VICTORY_LEVELS_ON_DEMAND = '1'
+    $more.VICTORY_AMBIENT_AIR = '1.5'
+}
+if ($Nosso -and !$MemoriaNormal) {
     $more.VICTORY_TEXTURE_BUDGET_MB = '3072'
 }
 # No teste sozinho, Enter a cada 8 s ate ao fim (a intro so avanca com Enter).
@@ -118,7 +121,16 @@ if ($Minutos -gt 0) {
 }
 # Series X por defeito: na Series S o jogo desenha a intro e outras coisas com pipelines do
 # metodo 0x1c8 (ainda sem shaders), e a imagem fica pior.
+# Por defeito exatamente como o launcher do cgbj: Series S, as definicoes dele (play.ps1 -Cgbj) e,
+# a jogar a serio, a build release. O teste em ciclo fica na build de diagnostico (Enter
+# automatico e capturas so existem nela), com o log das linhas de FPS.
+if (!$Nosso) { $SeriesS = $true }
 $opcoes = @{ Exe = $exe; More = $more; Console = $(if ($SeriesS) { 'series-s' } else { 'series-x' }) }
+if (!$Nosso) {
+    $opcoes.Cgbj = $true
+    if ($Minutos -gt 0) { $more.VICTORY_LOG = 'warn,victory_gpu::host=info,victory_gpu::copystat=info' }
+    else { $opcoes.Build = 'release' }
+}
 # Maximo: sem os contadores de diagnostico e sem as milhares de linhas de log por segundo
 # (fica so a linha de FPS); o Enter automatico so existe na build de diagnostico.
 if ($Maximo) {
