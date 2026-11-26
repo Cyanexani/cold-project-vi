@@ -563,7 +563,16 @@ pub fn emit(
                 [0x58, 0x1d, 0xab, 0x2c, 0xd8, 0xbc, 0xf2, 0x2e, 0x5c, 0x96, 0x4b, 0x98, 0xe9, 0x03, 0x48, 0xd1]
                     | [0x24, 0x31, 0xbb, 0xe7, 0xdc, 0x15, 0x4a, 0xd7, 0x59, 0xd2, 0x0b, 0xc9, 0x54, 0x82, 0x9c, 0x1c]
             );
-        let wide_on = wide_option.as_ref().map_or(scene_kernel, |v| v == "1");
+        // LOCAL: `VICTORY_WAVE_WIDE_DIGESTS`, container digests (32 hex digits, comma separated)
+        // of programs taken wave-wide while the switch stays off for the rest: the form lost
+        // the card with particle programs, so only programs checked one by one get it.
+        let digest_hex: String = c.digest.iter().map(|b| format!("{b:02x}")).collect();
+        if why {
+            eprintln!("WAVE64-DIGEST {digest_hex}");
+        }
+        let listed = std::env::var("VICTORY_WAVE_WIDE_DIGESTS")
+            .is_ok_and(|v| v.split(',').any(|d| d.trim().eq_ignore_ascii_case(&digest_hex)));
+        let wide_on = wide_option.as_ref().map_or(scene_kernel || listed, |v| v == "1");
         // A single guest wave can iterate an active-lane loop until both host
         // halves have finished. The precise latch and convergence conditions
         // for the driver compute route are checked by widen().

@@ -69,6 +69,7 @@ fn build() -> [u8; 32] {
             // LOCAL (fxceless #1216): constant buffer slots marked.
             "VICTORY_CONSTANT_MARKS",
             "VICTORY_WAVE_WIDE",
+            "VICTORY_WAVE_WIDE_DIGESTS",
             "VICTORY_WAVE_DEEP_SKIPS",
             "VICTORY_WAVE_OWN_BITS",
             "VICTORY_WAVE_LOCAL",
