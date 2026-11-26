@@ -46,9 +46,11 @@ from many other forks, named in each commit. *La même page en français :
 
 > [!NOTE]
 > **New on 26 November**: 4.6-4.7 fps in the cell (an 85 ms wait per frame
-> removed), a 22-minute run without a crash from a new game through the intro
-> cutscene, sharper reflections and fixed shadows, and
-> [`Tester.cmd`](#test-your-pc-testercmd) to measure your own PC.
+> removed), 16- and 22-minute runs without a crash from a new game through the
+> intro cutscene, night scenes lit (an ambient light floor), textures that
+> arrive in seconds instead of minutes, sharper reflections and fixed shadows,
+> [`Tester.cmd`](#test-your-pc-testercmd) to measure your own PC, and
+> [the plan](#the-plan-normal-pcs-first).
 >
 > **25 November**: a [launcher](#the-launcher) with Discord presence and
 > saves by place, two [test modes](#test-modes) (no textures, no drawing), and
@@ -56,9 +58,9 @@ from many other forks, named in each commit. *La même page en français :
 
 ## Where the game stands
 
-### Progress: about 60 %
+### Progress: about 62 %
 
-`████████████░░░░░░░░` **about 60 %: playable** (you control the heroine in the prologue)
+`████████████░░░░░░░░` **about 62 %: playable** (you control the heroine in the prologue)
 
 Measured on [PortWatch VI](https://portwatch-vi.xyz/#method)'s scale: up to
 50 %, each step needs the one before; beyond that, story, picture, speed and
@@ -74,9 +76,9 @@ them only with proof (a video).
 | In the world (the prologue loads and shows) | 40 | ✅ |
 | Playable (you control a character) | 50 | ✅ the heroine moves in the prologue |
 | Story (17.5 points) | 0 | ⏳ still in the opening; finishing the prologue is worth about 3 |
-| Picture (12.5 points) | about 6 | ⚠️ lit, but big effects are missing (shadows, ray tracing) |
+| Picture (12.5 points) | about 6.5 | ⚠️ lit, night scenes lit by an ambient floor (26/11), but ray-traced light and shadows are missing: car and indoor night shots stay dark, some sunny interiors look washed out |
 | Speed (10 points: fps ÷ 30) | about 1.5 | ❌ 4.6-4.7 fps in the cell, 1.4-3 in cutscenes (26/11); goal 10, then 15 |
-| Stability (10 points) | about 3.5 | ⚠️ 22 minutes without a crash from a new game (26/11); a few stalls of 4-12 s |
+| Stability (10 points) | about 4 | ⚠️ 16 and 22 minutes without a crash from a new game (26/11); a few stalls of 4-12 s |
 
 | Step | State |
 |---|---|
@@ -84,7 +86,8 @@ them only with proof (a video).
 | Intro cutscene | ✅ plays through with its credits from a new game (26/11), at 1.4-3 fps; night shots are far too dark and the arrival at the prison is washed out (no indirect light without ray tracing); the heroine's outfit shows a wrong texture for a while before the inmate one |
 | Saves | ✅ the game saves and reloads a checkpoint |
 | Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
-| Light in the shade | ⚠️ fallback light by default: interiors and faces are lit, but some night cutscenes stay almost black (the game's ray tracing does not run yet) |
+| Light in the shade | ⚠️ fallback light and an ambient floor by default (`VICTORY_AMBIENT_STUB=0` turns the floor off): the intro's night scenes now show lit faces; car and indoor night shots stay dark and the arrival at the prison is washed out (the game's ray tracing does not run yet) |
+| Textures | ⚠️ the catch-up has no time limit any more: a new scene's textures arrive in seconds (the oldest waiting 8-42 frames, it was up to 1,115). Many are still let go and made again when the 16 GB PC runs out of RAM |
 | Frame rate in the world | ❌ 4.6-4.7 fps in the cell (215-220 ms a frame: preparing 110, GPU 87, copy-back 65) on an RTX 3060 with 16 GB of RAM, dropping to about 3.7 after 15-20 minutes as memory settles; 30 in the menus. Other PCs: an RTX 3070 Ti + i5-14400F + 16 GB got 4.8 in its first test and 3 in a heavier scene, its GPU taking only 60 ms a frame: on 16 GB our preparing and the RAM limit, not the card |
 | Memory | ⚠️ about 22-25 GB committed on a 16 GB PC. The CPU side of the copies that live on the GPU is now ordinary memory Windows can page out (it was 3-4.5 GB locked for the GPU): at the end of a 10-minute run the game still has about 5 GB in RAM instead of under 1 GB |
 | Stability | ⚠️ 22 minutes in a row without a crash, from a new game through the intro cutscene into the cell (26/11), with a few stalls of 4-12 s; a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
@@ -393,6 +396,22 @@ bit on the GPU over 311 cases. The builder is **off by default**
 Meanwhile a **fallback light** is on: the ray test answers "nothing hit",
 which lights shaded areas without ray-traced shadows (`VICTORY_RT_MISS=0`
 turns it off). Details: [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
+
+## The plan: normal PCs first
+
+Our goal is a game that runs on **normal PCs** (16 GB of RAM, a mid-range
+card), not only on big rigs. It already does: in game on an RTX 3060 with
+16 GB, from a new game through the whole intro cutscene, without crashing.
+
+Another port, **CGBJ** (built on VIctory and XCL), reports about 25 fps with
+8 GB of RAM and a 16 GB card: it keeps the game's graphics memory on the card
+instead of copying it every frame, which is exactly our wall on 16 GB (about
+21 GB committed, ~200 MB copied up and ~40 MB back a frame). Its code was
+public for a few minutes on 26/11 and is private again; we did not take it.
+We expect it to open once it reaches 100 % on big rigs. When it does, we will
+check its license and bring what it allows into this repository (parts that
+come from XCL, GPL-2.0-only, can only be rewritten, not copied), adapted to
+low-end PCs. Until then we keep working on speed, textures and lighting here.
 
 ## What is left
 

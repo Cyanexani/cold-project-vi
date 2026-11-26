@@ -41,10 +41,12 @@ vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
 
 > [!NOTE]
 > **Nouveau le 26/11** : 4,6 à 4,7 images/s dans la cellule (une attente de
-> 85 ms par image supprimée), 22 minutes sans plantage depuis une nouvelle
-> partie jusqu'à la cellule en passant par la cinématique d'intro, reflets plus
-> nets et ombres corrigées, et [`Tester.cmd`](#tester-ton-pc-testercmd) pour
-> mesurer ton PC.
+> 85 ms par image supprimée), des parties de 16 et 22 minutes sans plantage
+> depuis une nouvelle partie jusqu'à la cellule, les scènes de nuit éclairées
+> (un plancher de lumière ambiante), des textures qui arrivent en secondes au
+> lieu de minutes, reflets plus nets et ombres corrigées,
+> [`Tester.cmd`](#tester-ton-pc-testercmd) pour mesurer ton PC, et
+> [le plan](#le-plan--dabord-les-pc-normaux).
 >
 > **25/11 au soir** : un [lanceur](#le-lanceur-lanceurexe) avec
 > présence Discord et sauvegardes par endroit, deux [modes de test](#modes-de-test)
@@ -83,9 +85,9 @@ un, `%LOCALAPPDATA%\victory\data\7952987A\crashes.log`.
 
 ## Où en est le jeu
 
-### Avancement du portage : environ 60 %
+### Avancement du portage : environ 62 %
 
-`████████████░░░░░░░░` **environ 60 % : jouable** (on dirige l'héroïne dans le prologue)
+`████████████░░░░░░░░` **environ 62 % : jouable** (on dirige l'héroïne dans le prologue)
 
 Mesuré avec le barème de [PortWatch VI](https://portwatch-vi.xyz/#method) :
 jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, le
@@ -102,9 +104,9 @@ preuve (une vidéo).
 | Dans le monde (le prologue se charge et s'affiche) | 40 | ✅ |
 | Jouable (on dirige un personnage) | 50 | ✅ l'héroïne bouge dans le prologue |
 | Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
-| Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
+| Rendu (12,5 points) | environ 6,5 | ⚠️ éclairé, scènes de nuit éclairées par un plancher de lumière ambiante (26/11), mais la lumière et les ombres du ray tracing manquent : plans de nuit en voiture et en intérieur sombres, certains intérieurs au soleil voilés |
 | Vitesse (10 points : images/s ÷ 30) | environ 1,5 | ❌ 4,6 à 4,7 images/s dans la cellule, 1,4 à 3 dans les cinématiques (26/11) ; objectif 10, puis 15 |
-| Stabilité (10 points) | environ 3,5 | ⚠️ 22 minutes sans plantage depuis une nouvelle partie (26/11) ; quelques blocages de 4 à 12 s |
+| Stabilité (10 points) | environ 4 | ⚠️ 16 et 22 minutes sans plantage depuis une nouvelle partie (26/11) ; quelques blocages de 4 à 12 s |
 
 ### Détail
 
@@ -114,7 +116,8 @@ preuve (une vidéo).
 | Cinématique d'intro | ✅ se joue en entier avec ses crédits depuis une nouvelle partie (26/11), à 1,4-3 images/s ; les plans de nuit sont beaucoup trop sombres et l'arrivée à la prison est voilée (pas d'éclairage indirect sans ray tracing) ; la tenue de l'héroïne garde un moment une mauvaise texture avant celle de détenue |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
-| Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
+| Textures | ⚠️ le rattrapage n'a plus de limite de temps : les textures d'une nouvelle scène arrivent en quelques secondes (la plus vieille en attente 8 à 42 images, contre jusqu'à 1 115). Beaucoup sont encore jetées puis refaites quand le PC de 16 Go manque de RAM |
+| Lumière dans l'ombre | ⚠️ lumière de secours et plancher de lumière ambiante par défaut (`VICTORY_AMBIENT_STUB=0` coupe le plancher) : les scènes de nuit de l'intro montrent maintenant des visages éclairés ; les plans de nuit en voiture et en intérieur restent sombres et l'arrivée à la prison est voilée (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
 | Images par seconde dans le monde | ❌ 4,6 à 4,7 dans la cellule (215 à 220 ms par image : préparation 110, carte 87, recopie 65) sur RTX 3060 et 16 Go de RAM, vers 3,7 après 15-20 minutes quand la mémoire se tasse ; 30 dans les menus. Autres PC : une RTX 3070 Ti + i5-14400F + 16 Go a fait 4,8 au premier test et 3 dans une scène plus lourde, sa carte ne prenant que 60 ms par image : sur 16 Go, c'est notre préparation et la RAM qui limitent, pas la carte |
 | Mémoire | ⚠️ 22 à 25 Go réservés sur un PC de 16 Go. Le côté processeur des copies qui vivent sur la carte est maintenant de la mémoire ordinaire que Windows peut mettre sur le disque (avant : 3 à 4,5 Go bloqués pour la carte) : à la fin d'une partie de 10 minutes, le jeu garde environ 5 Go en RAM au lieu de moins de 1 Go |
 | Stabilité | ⚠️ 22 minutes d'affilée sans plantage, d'une nouvelle partie à la cellule en passant par la cinématique d'intro (26/11), avec quelques blocages de 4 à 12 s ; une partie complète de 10 minutes dans le monde sans arrêt (25/11 au soir), là où le jeu s'arrêtait net vers 9 minutes. `VICTORY_HOLD=71B6330:1` met en pause le chien de garde du jeu et `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` agrandit deux réserves d'objets qui se vidaient (idées de Tejvardhan-717) ; un fichier d'échange de 32 Go au moins aide encore. Un débordement de pile est rapporté au lieu de fermer la fenêtre en silence |
@@ -622,6 +625,25 @@ répond « rien touché », ce qui éclaire les zones à l'ombre sans ombres de
 ray tracing (`VICTORY_RT_MISS=0` la coupe). Les cinématiques de nuit restent
 très sombres : leurs visages ne sont éclairés que par les contours. Détails :
 [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
+
+## Le plan : d'abord les PC normaux
+
+Notre but est un jeu qui tourne sur des **PC normaux** (16 Go de RAM, une
+carte milieu de gamme), pas seulement sur de grosses configs. C'est déjà le
+cas : en jeu sur une RTX 3060 avec 16 Go, d'une nouvelle partie jusqu'à la
+cellule en passant par toute la cinématique d'intro, sans plantage.
+
+Un autre portage, **CGBJ** (basé sur VIctory et XCL), annonce environ
+25 images/s avec 8 Go de RAM et une carte de 16 Go : il garde la mémoire
+graphique du jeu sur la carte au lieu de la recopier à chaque image, ce qui
+est exactement notre mur sur 16 Go (environ 21 Go réservés, ~200 Mo envoyés
+et ~40 Mo recopiés par image). Son code a été public quelques minutes le
+26/11 puis est redevenu privé ; nous ne l'avons pas pris. Il devrait ouvrir
+quand il sera à 100 % sur de grosses configs, où il risque de mal tourner sur
+les petites. À ce moment-là, nous vérifierons sa licence et reprendrons ici
+ce qu'elle permet (les parties venant de XCL, en GPL-2.0 seulement, ne
+peuvent qu'être réécrites, pas copiées), adapté aux petits PC. D'ici là, nous
+continuons la vitesse, les textures et la lumière.
 
 ## Ce qui reste à faire
 
