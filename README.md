@@ -12,6 +12,7 @@ on menus it goes from 30-32/33fps
 > **Ramo `edupode`:** cgbj + luz do fork VIctory-NVIDIA, afinado para uma RTX 5070 Ti portátil (12 GB):
 > 24-26 FPS no mundo aberto. Como montar, teclas e o que falta: [docs/LUZ-24FPS.md](docs/LUZ-24FPS.md)
 > (`Jogar-Luz.cmd`).
+> **English guide (setup and how to get close to 30 FPS): [docs/GUIDE-30FPS.md](docs/GUIDE-30FPS.md).**
 
 ## Run the codec_d Windows build
 
