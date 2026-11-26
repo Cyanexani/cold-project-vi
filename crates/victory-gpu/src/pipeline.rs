@@ -517,10 +517,19 @@ fn parse_skip_hashes(value: &str) -> Vec<String> {
 
 #[cfg(all(windows, feature = "diagnostics"))]
 fn skipped_shader(p: &Pipeline) -> Option<&str> {
-    static HASHES: OnceLock<Vec<String>> = OnceLock::new();
+    // A set: draws ask this every time, and the ray-tracing list has 1,034.
+    static HASHES: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
     let hashes = HASHES.get_or_init(|| {
-        let value = std::env::var("VICTORY_SKIP_PIPELINES").unwrap_or_default();
-        parse_skip_hashes(&value)
+        let mut value = std::env::var("VICTORY_SKIP_PIPELINES").unwrap_or_default();
+        // LOCAL: "@<file>" reads the list from a file (a cmd line holds at
+        // most 8,191 characters; the ray-tracing list is 17,578).
+        if let Some(path) = value.strip_prefix('@') {
+            value = std::fs::read_to_string(path.trim()).unwrap_or_else(|e| {
+                tracing::warn!(path, %e, "VICTORY_SKIP_PIPELINES file not read");
+                String::new()
+            });
+        }
+        parse_skip_hashes(&value).into_iter().collect()
     });
     if hashes.is_empty() {
         return None;
