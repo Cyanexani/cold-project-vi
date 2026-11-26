@@ -136,6 +136,11 @@ if (!$Nosso) {
         # Experiencia: 4 blocos de texturas feitos a frente em vez de 12 (768 MB de VRAM vazia
         # numa placa de 12 GB cheia), para caberem mais texturas.
         $more.VICTORY_RIPE_BLOCKS = '4'
+        # Experiencia: buffers de vertices/constantes ("janelas") direto na VRAM pelo Resizable BAR
+        # (activo neste portatil: 16 GB de BAR), sem a copia do lado do PC.
+        $more.VICTORY_WINDOWS_BAR_MB = '1024'
+        $more.VICTORY_PRESSURE_FREE_MB = '1024'
+        $more.VICTORY_PRESSURE_CLEAR_MB = '2048'
     }
     else { $opcoes.Build = 'release' }
 }
