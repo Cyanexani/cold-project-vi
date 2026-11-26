@@ -1358,7 +1358,13 @@ mod host {
             // SAFETY: plain query.
             let down = focused && unsafe { GetAsyncKeyState(vk) } < 0;
             if down && !held.swap(true, Relaxed) {
-                super::VEHICLE.fetch_xor(true, Relaxed);
+                let now = !super::VEHICLE.fetch_xor(true, Relaxed);
+                tracing::info!(vehicle = now, "keyboard scheme switched (F or Caps Lock)");
+                // Heard, not seen: high for vehicles, low on foot.
+                std::thread::spawn(move || {
+                    // SAFETY: plain call.
+                    unsafe { windows_sys::Win32::System::Diagnostics::Debug::Beep(if now { 1200 } else { 500 }, 90) };
+                });
             } else if !down {
                 held.store(false, Relaxed);
             }

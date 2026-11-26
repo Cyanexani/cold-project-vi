@@ -27,7 +27,7 @@ if not defined RUN set "RUN=%LOCALAPPDATA%\VIctory\luz"
 if not exist "%RUN%\logs" mkdir "%RUN%\logs"
 if not defined VICTORY_CACHE_DIR set "VICTORY_CACHE_DIR=%RUN%\cache"
 if not defined VICTORY_DATA_DIR set "VICTORY_DATA_DIR=%RUN%\data"
-if not defined VICTORY_LOG set "VICTORY_LOG=warn,victory_gpu::host=info,victory_gpu::copystat=info"
+if not defined VICTORY_LOG set "VICTORY_LOG=warn,victory_gpu::host=info,victory_gpu::copystat=info,victory_hle::modules::gameinput=info"
 rem --- Placa de 12 GB: 1080p (o jogo julga ter uma TV 4K), 1 GB de buffers do jogo na placa ---
 set "VICTORY_DISPLAY_MODE=1920x1080"
 set "VICTORY_CARD_BUFFERS_MB=1024"
