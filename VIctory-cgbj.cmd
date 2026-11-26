@@ -18,6 +18,11 @@ set "VICTORY_CARD_BUFFERS_MB=1024"
 rem Regista os pipelines que o jogo cria; ao fechar, sao preparados para a proxima sessao
 rem (sem isto, caras e objetos de cenas novas ficam por desenhar enquanto o driver os compila).
 set "VICTORY_PIPELINE_BOOK=1"
+rem Mais VRAM para texturas: 4 blocos de texturas feitos a frente em vez de 12 (512 MB a mais numa
+rem placa de 12 GB cheia). Os blocos a frente protegem de perdas da placa: se a placa se perder, volta a 12.
+set "VICTORY_RIPE_BLOCKS=4"
+rem "VIctory-cgbj.cmd rt": com o ray tracing do jogo (luz indireta: salas menos escuras; mais lento).
+if /i "%~1"=="rt" set "VICTORY_BVH_BUILDER=1"
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
   echo Ja ha um VIctory a correr. Fecha-o primeiro ^(ou carrega em H no ciclo^).
   pause

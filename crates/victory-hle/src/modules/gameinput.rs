@@ -62,11 +62,13 @@ const HISTORY: usize = 256;
 const POLL: Duration = Duration::from_millis(8);
 
 /// The keyboard's stand-in gamepad (virtual key, button); README lists it.
-/// Sticks: W/A/S/D left, I/J/K/L right; triggers Z and C.
-const FALLBACK_BUTTONS: [(u8, u32); 14] = [
+/// Sticks: W/A/S/D left, I/J/K/L right; triggers Z and C, or the right
+/// (LT, aim) and left (RT, shoot) mouse buttons ([`MOUSE_BUTTONS`]).
+const FALLBACK_BUTTONS: [(u8, u32); 15] = [
     (0x1B, MENU), // Esc
     (0x09, VIEW), // Tab
     (0x0D, A),    // Enter
+    (0x20, A),    // Space
     (0x08, B),    // Backspace
     (b'X', X),
     (b'Y', Y),
@@ -115,7 +117,13 @@ trait Source: Send {
     fn rumble(&mut self, slot: usize, low: u16, high: u16);
 }
 
+/// The mouse buttons held while one of our windows has the focus: bit 0 the
+/// left, bit 1 the right. Read by the stand-in pad as RT and LT.
+static MOUSE_BUTTONS: AtomicU32 = AtomicU32::new(0);
+
 fn fallback(keys: &[KeyState]) -> PadState {
+    let mouse = MOUSE_BUTTONS.load(Ordering::Relaxed);
+    let button = |bit: u32| if mouse & bit != 0 { 1.0f32 } else { 0.0 };
     let on = |vk: u8| {
         if keys.iter().any(|k| k.virtual_key == vk) {
             1.0
@@ -128,8 +136,8 @@ fn fallback(keys: &[KeyState]) -> PadState {
             .iter()
             .filter(|(vk, _)| on(*vk) != 0.0)
             .fold(0, |all, (_, bit)| all | bit),
-        left_trigger: on(b'Z'),
-        right_trigger: on(b'C'),
+        left_trigger: f32::max(on(b'Z'), button(2)),
+        right_trigger: f32::max(on(b'C'), button(1)),
         left_x: on(b'D') - on(b'A'),
         left_y: on(b'W') - on(b'S'),
         right_x: on(b'L') - on(b'J'),
@@ -1209,6 +1217,15 @@ mod host {
 
         fn keys(&mut self) -> Vec<KeyState> {
             let mut down = scripted();
+            // The mouse buttons, for the stand-in pad's triggers (not keys).
+            let mouse = if focused() {
+                // SAFETY: plain queries.
+                let held = |vk: i32| unsafe { GetAsyncKeyState(vk) } < 0;
+                u32::from(held(0x01)) | u32::from(held(0x02)) << 1
+            } else {
+                0
+            };
+            super::MOUSE_BUTTONS.store(mouse, std::sync::atomic::Ordering::Relaxed);
             if focused() {
                 // Left/right modifier keys only, as devices report them; no
                 // mouse buttons (below 0x08).
