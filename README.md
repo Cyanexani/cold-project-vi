@@ -1,7 +1,7 @@
 # VIctory on an RX 7900 XTX
 
 > **Ramo `edupode`:** cgbj + luz do fork VIctory-NVIDIA, afinado para uma RTX 5070 Ti portátil (12 GB):
-> ~24 FPS no mundo aberto. Como montar, teclas e o que falta: [docs/LUZ-24FPS.md](docs/LUZ-24FPS.md)
+> 24-26 FPS no mundo aberto. Como montar, teclas e o que falta: [docs/LUZ-24FPS.md](docs/LUZ-24FPS.md)
 > (`Jogar-Luz.cmd`).
 
 ## Run the codec_d Windows build

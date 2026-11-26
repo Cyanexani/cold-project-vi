@@ -1,12 +1,11 @@
 @echo off
 rem VIctory "cgbj + luz NVIDIA": o ramo cgbj (pareto-residency) com a luz do fork VIctory-NVIDIA,
-rem afinado para uma RTX 5070 Ti portatil (12 GB) com 32 GB de RAM. ~24 FPS no mundo aberto (2026-11-26).
+rem afinado para uma RTX 5070 Ti portatil (12 GB) com 32 GB de RAM. 24-26 FPS no mundo aberto (2026-11-26).
 rem Guia completo: docs\LUZ-24FPS.md
 rem
 rem   set VICTORY_GAME_DIR=D:\Jogos\MeuDump          (pasta com game_scarlett_master.exe)
 rem   Jogar-Luz.cmd preparar                         (1.a vez e depois de cada recompilacao: traduz shaders)
 rem   Jogar-Luz.cmd                                  (jogar)
-rem   Jogar-Luz.cmd teste                            (so 1 dos 2 shaders de volumetria: teste da agua)
 setlocal
 if not defined VICTORY_GAME_DIR (
   echo Define VICTORY_GAME_DIR com a pasta do teu dump ^(onde esta game_scarlett_master.exe^).
@@ -52,9 +51,9 @@ set "VICTORY_DYNAMIC_SLOTS=524288"
 set "VICTORY_SKIP_PIPELINES=@%~dp0scripts\rt_off_hashes.txt"
 rem --- Shaders de 64 threads que a NVIDIA recusa, traduzidos com ramos da onda inteira ---
 rem  24126c14... TransmissionVolumetrics_Tiled, 7099a57f... ..._LocalLights, f1f161e4... ...Submerged.
-rem  Nenhum: agua certa, ~1 FPS no mundo aberto. Os 3: manchas pretas na agua. Estes 2: 24 FPS, manchas ainda.
-set "VICTORY_WAVE_WIDE_DIGESTS=24126c14dc7619b082ef571296038890,7099a57fded142613b44f410463d6be6"
-if /i "%~1"=="teste" set "VICTORY_WAVE_WIDE_DIGESTS=24126c14dc7619b082ef571296038890"
+rem  Nenhum: agua certa, ~1 FPS no mundo aberto. So _Tiled: quadrados pretos na agua e ~1 FPS.
+rem  _Tiled + _LocalLights: 24 FPS com quadrados. So _LocalLights: agua certa e ~26 FPS (fica este).
+set "VICTORY_WAVE_WIDE_DIGESTS=7099a57fded142613b44f410463d6be6"
 rem --- Definicoes do launcher do cgbj (Play-VIctory.cmd) ---
 set "VICTORY_TEXTURE_NO_WAIT=1"
 set "VICTORY_RELAY=2"

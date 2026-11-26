@@ -19,8 +19,8 @@ Medido no portátil acima, com Windows 11, 1080p e o perfil Series S.
 | Cena | FPS |
 |---|---|
 | Prisão, interiores (cutscenes) | 18-22 |
-| Mundo aberto, barco | ~24 |
-| Mundo aberto sem os 2 shaders de volumetria | ~1 (ver abaixo) |
+| Mundo aberto, barco | 24-26 |
+| Cutscenes | ~26 |
 
 A luz e as texturas estão próximas do fork NVIDIA, e os FPS são os do cgbj ou
 melhores. As sessões de 30-40 minutos correram sem crashes.
@@ -110,15 +110,23 @@ Commits deste ramo, por cima do cgbj e das ferramentas de teste:
 
 ## O que ainda falta resolver
 
-1. **Manchas pretas na água.** Com os shaders `TransmissionVolumetrics_Tiled`
-   (`24126c14…`) e `…_LocalLights` (`7099a57f…`) traduzidos em modo
-   wave-wide, aparecem retângulos pretos na água. Sem eles a água fica certa,
-   mas o mundo aberto cai para ~1 FPS: a placa fica a 250-600 ms por frame,
-   provavelmente porque os passos seguintes leem listas por preencher. O
-   `Jogar-Luz.cmd teste` liga só o `_Tiled` para saber qual dos dois estraga
-   a água. A solução de fundo é traduzir estes programas de 64 threads
-   corretamente para ondas de 32 (`crates/victory-shader/src/emit/mod.rs`,
-   `widen`).
+1. **Shaders de volumetria da água (resolvido por agora).** Três programas
+   de 64 threads (`TransmissionVolumetrics_Tiled` `24126c14…`, `…_LocalLights`
+   `7099a57f…` e `…Submerged` `f1f161e4…`) traduzem-se para ondas de 32 em modo
+   "wave-wide" (`VICTORY_WAVE_WIDE_DIGESTS`). Testados um a um:
+
+   | Ligados | Água | FPS no mundo aberto |
+   |---|---|---|
+   | nenhum | certa | ~1 (placa a 250-600 ms por frame) |
+   | só `_Tiled` | quadrados pretos | ~1 |
+   | `_Tiled` + `_LocalLights` | quadrados pretos | ~24 |
+   | os 3 | quadrados pretos | ~14 |
+   | **só `_LocalLights`** | **certa** | **~26** |
+
+   O launcher usa só o `_LocalLights`. O `_Tiled` continua mal traduzido: as
+   duas metades de 32 de cada grupo dão resultados diferentes, e isso aparece
+   como retângulos do tamanho dos azulejos. A correção de fundo é traduzi-lo
+   corretamente (`crates/victory-shader/src/emit/mod.rs`, `widen`).
 2. **Dois shaders de 64 threads ainda sem tradução:** `DefragHeap`
    (`02384a60…`, grupos de 128) e `CollectTriangles_Meshlets` (`6b82bc7d…`,
    grupos de 1024). Têm várias ondas de 64 por grupo, e o tradutor ainda não
@@ -140,7 +148,11 @@ Commits deste ramo, por cima do cgbj e das ferramentas de teste:
    threads que a NVIDIA recusa. Os resolves de ray tracing ficam de fora, por
    isso faltam os reflexos de ray tracing (na água, por exemplo) e algumas
    salas ficam mais escuras.
-8. **Geração de frames.** O DLSS Frame Generation (Streamline) precisa de
+8. **Objetos e fumo escuros.** Às vezes, numa cutscene, aparece um fumo ou
+   "areia" escura em alguns objetos. Ainda está por investigar: pode ser a
+   volumetria sem o `_Tiled` ou o `VICTORY_NAN_SCRUB`, que põe a 0 (preto) os
+   valores inválidos.
+9. **Geração de frames.** O DLSS Frame Generation (Streamline) precisa de
    vetores de movimento, profundidade e imagem sem HUD, que o VIctory não sabe
    identificar entre os buffers do jogo. O NVIDIA Smooth Motion (no driver,
    pela NVIDIA App, perfil para `victory.exe`) é a alternativa sem código.
