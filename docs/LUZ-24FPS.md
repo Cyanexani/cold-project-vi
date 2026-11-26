@@ -20,7 +20,8 @@ Medido no portátil acima, com Windows 11, 1080p e o perfil Series S.
 |---|---|
 | Prisão, interiores (cutscenes) | 18-22 |
 | Mundo aberto, barco | 24-26 |
-| Cutscenes | ~26 |
+| Cutscenes | ~26 (31-32 no modo rápido) |
+| Modo rápido (540p + upscaler do jogo), mundo aberto parado / a andar / de carro | 25-29 / ~15 / ~10 |
 
 A luz e as texturas estão próximas do fork NVIDIA, e os FPS são os do cgbj ou
 melhores. As sessões de 30-40 minutos correram sem crashes.
@@ -89,6 +90,7 @@ abertas, o Windows passa memória para o disco e os FPS caem.
   volta a prendê-lo.
 - **Veículos:** o jogo conduz com os gatilhos. O **F** (entrar ou sair) liga e
   desliga sozinho o modo veículo, em que o W e o S passam a acelerar e travar.
+  Ouve-se um bip agudo ao entrar no modo veículo e um bip grave ao sair.
   Basta segurar o W. Se o modo ficar trocado (por exemplo, se o F não te pôs
   no carro), carrega no **Caps Lock** para o corrigir. Para falar com pessoas
   sem mudar de modo, usa o **E**.
