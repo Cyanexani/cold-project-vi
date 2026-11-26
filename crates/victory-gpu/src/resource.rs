@@ -1663,9 +1663,8 @@ pub(crate) fn let_go_idle() {
     // Under 85% of the budget: 30 s and 20 frames. As a Series S the card stayed at 77%
     // and 60,000 copies went, 9,007 of them made again (7.8 GB) when a shot came back:
     // at 2-3 frames a second a texture off screen for a few seconds was gone.
-    let share = crate::host::host()
-        .and_then(|h| h.video_memory())
-        .map_or(0, |[budget, used, ..]| used.saturating_mul(100) / budget.max(1));
+    let card = crate::host::host().and_then(|h| h.video_memory());
+    let share = card.map_or(0, |[budget, used, ..]| used.saturating_mul(100) / budget.max(1));
     // The share counts the card's own memory only: what the system moved into the PC's
     // memory once the card was full shows as the PC running out of free memory. In the
     // run of 2026-11-26 the card held 8.5 GB of textures at 70-85% of its budget while
@@ -1694,17 +1693,43 @@ pub(crate) fn let_go_idle() {
         _ if tight(6144, 1024) => (5_000, 4),
         _ => (30_000, 20),
     };
+    // Under pressure (the short idle times above), only as many bytes as
+    // needed go, the least recently used first (`VICTORY_TEXTURE_SWEEP_ALL=1`:
+    // every idle copy, as before): down to 78% of the card's budget, or a
+    // GB a sweep when the PC's memory is what is short. Letting every copy
+    // idle for a second go at once threw away 96,000 copies (37 GB) in a
+    // 22-minute run of 2026-11-26 and made 31,000 again (17 GB): textures
+    // a shot did not show for four frames came back low or wrong.
+    static ALL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let need: u64 = if idle_ms >= 30_000 || *ALL.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_SWEEP_ALL").is_some_and(|v| v == "1")) {
+        u64::MAX
+    } else {
+        let over = card.map_or(0, |[budget, used, ..]| used.saturating_sub(budget / 100 * 78));
+        over.max(if tight(COMMIT_FLOOR_MB, 512) || tight(6144, 1024) { 1 << 30 } else { 256 << 20 })
+    };
     // For the trail (`crate::host::trail`): how many went, their bytes,
     // and the first one.
     let (mut went, mut bytes, mut first) = (0u64, 0u64, None);
     let all = textures();
-    for &at in all.iter() {
+    // The idle ones, least recently used first.
+    let mut order: Vec<(u64, usize)> = all
+        .iter()
+        .filter_map(|&at| {
+            // SAFETY: as below.
+            let r = unsafe { &*(at as *const Resource) };
+            let used = r.host.used.load(Relaxed);
+            (fills(&r.desc) && !crate::texture::host_wrote(at) && crate::host::long_ago(used, idle_ms, idle_frames))
+                .then_some((used, at))
+        })
+        .collect();
+    order.sort_unstable();
+    for (_, at) in order {
+        if bytes >= need {
+            break;
+        }
         // SAFETY: a texture leaves the table before it is freed, under the
         // lock held here (`Drop for Resource`).
         let r = unsafe { &*(at as *const Resource) };
-        if !fills(&r.desc) || crate::texture::host_wrote(at) {
-            continue;
-        }
         let gone = {
             let mut made = r.host.made.lock().unwrap_or_else(|e| e.into_inner());
             let idle = made.as_ref().is_some_and(|(host, _)| {

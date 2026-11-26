@@ -448,12 +448,20 @@ fn catching_up(more: std::time::Duration) -> bool {
     static SPENT: AtomicU64 = AtomicU64::new(0);
     static TOTAL: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     let total = *TOTAL.get_or_init(|| {
+        // 0, the default since 26/11: no limit. With 60 s (the value
+        // before) the catch-up was spent in the opening cutscene's first
+        // scenes, and every later scene's backlog (8,000-10,000 slots, the
+        // oldest waiting 1,115 frames, over four minutes at 4 fps) drained
+        // at the plain 24 ms a pass: wrong or low textures for minutes.
         let seconds = std::env::var("VICTORY_TEXTURE_GATE_S")
             .ok()
             .and_then(|v| v.trim().parse::<u64>().ok())
-            .unwrap_or(60);
+            .unwrap_or(0);
         seconds * 1000
     });
+    if total == 0 {
+        return true;
+    }
     let more = more.as_millis() as u64;
     SPENT.fetch_add(more, Ordering::Relaxed) + more < total
 }
@@ -1966,13 +1974,21 @@ impl State {
         // 80 ms/pass so streaming never causes multi-second frame freezes.
         // `VICTORY_TEXTURE_CATCHUP=0` keeps the plain budget.
         const PER_FRAME_CATCHING_UP: u64 = 128 << 20;
-        const SPAN_CATCHING_UP: std::time::Duration = std::time::Duration::from_millis(80);
-        const LONG: u64 = 2_000;
+        // `VICTORY_TEXTURE_CATCHUP_MS` (80) and from how many waiting slots
+        // (`VICTORY_TEXTURE_CATCHUP_FROM`, 500; it was 2,000).
+        static SPAN_UP: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+        let span_catching_up = std::time::Duration::from_millis(*SPAN_UP.get_or_init(|| {
+            std::env::var("VICTORY_TEXTURE_CATCHUP_MS").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(80)
+        }));
+        static FROM: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+        let long = *FROM.get_or_init(|| {
+            std::env::var("VICTORY_TEXTURE_CATCHUP_FROM").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(500)
+        });
         static CATCHUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
         let catchup = *CATCHUP.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_CATCHUP").is_none_or(|v| v != "0"));
         let plain = span;
-        let (per_frame, span) = if catchup && census[0] > LONG && catching_up(std::time::Duration::ZERO) {
-            (per_frame.max(PER_FRAME_CATCHING_UP), span.max(SPAN_CATCHING_UP))
+        let (per_frame, span) = if catchup && census[0] > long && catching_up(std::time::Duration::ZERO) {
+            (per_frame.max(PER_FRAME_CATCHING_UP), span.max(span_catching_up))
         } else {
             (per_frame, span)
         };

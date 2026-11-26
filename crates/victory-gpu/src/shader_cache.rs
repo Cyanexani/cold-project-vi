@@ -140,8 +140,9 @@ pub(crate) fn host_shader_cached(container: &[u8]) -> Result<(HostShader, bool),
 }
 
 /// Optional stand-ins from `victory_shader::emit::stand_in`:
-/// - `VICTORY_AMBIENT_STUB=1`: replaces diffuse GI temporal resolve passes with
-///   a constant ambient light floor (`VICTORY_AMBIENT_STUB_VALUE`, default 0.1).
+/// - `VICTORY_AMBIENT_STUB` (on by default without the structure builder,
+///   `=0` off): replaces diffuse GI temporal resolve passes with a constant
+///   ambient light floor (`VICTORY_AMBIENT_STUB_VALUE`, default 0.1).
 /// - `VICTORY_SHADOWMASK_STUB=1`: replaces RT distant shadow passes with 1.0
 ///   (lit) (`VICTORY_SHADOWMASK_STUB_VALUE`, default 1.0).
 #[cfg(windows)]
@@ -153,7 +154,20 @@ fn stand_in(container: &[u8]) -> Option<HostShader> {
         ("VICTORY_SHADOWMASK_STUB", s::SHADOWMASK_HASHES, s::SHADOWMASK_VALUE, s::SHADOWMASK_SLOTS),
     ];
     for (name, hashes, value, defaults) in kinds {
-        if std::env::var(name).ok().as_deref().map(str::trim) != Some("1") {
+        // The ambient floor is on by default while the ray-tracing structure
+        // builder is off (`VICTORY_AMBIENT_STUB=0` turns it off): without
+        // structures every ray misses, so the diffuse light of the night
+        // shots was the black night sky and faces were black; with the floor
+        // they are lit (run "ambiant", 26/11). Other stand-ins only when asked.
+        let asked = std::env::var(name).ok();
+        let on = match asked.as_deref().map(str::trim) {
+            Some(v) => v == "1",
+            None => {
+                name == "VICTORY_AMBIENT_STUB"
+                    && std::env::var_os("VICTORY_BVH_BUILDER").is_none_or(|v| v != "1")
+            }
+        };
+        if !on {
             continue;
         }
         let listed = match std::env::var(format!("{name}_HASHES")) {
