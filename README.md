@@ -58,9 +58,9 @@ from many other forks, named in each commit. *La même page en français :
 
 ## Where the game stands
 
-### Progress: about 62 %
+### Progress: about 65 %
 
-`████████████░░░░░░░░` **about 62 %: playable** (you control the heroine in the prologue)
+`█████████████░░░░░░░` **about 65 %: playable** (you control the heroine in the prologue)
 
 Measured on [PortWatch VI](https://portwatch-vi.xyz/#method)'s scale: up to
 50 %, each step needs the one before; beyond that, story, picture, speed and
@@ -75,7 +75,7 @@ them only with proof (a video).
 | Main menu | 30 | ✅ |
 | In the world (the prologue loads and shows) | 40 | ✅ |
 | Playable (you control a character) | 50 | ✅ the heroine moves in the prologue |
-| Story (17.5 points) | 0 | ⏳ still in the opening; finishing the prologue is worth about 3 |
+| Story (17.5 points) | about 3 | ⚠️ past the prologue: a community capture (26/11) shows the boat mission ("Collect the package") in game with this code; not confirmed further |
 | Picture (12.5 points) | about 6.5 | ⚠️ lit, night scenes lit by an ambient floor (26/11), but ray-traced light and shadows are missing: car and indoor night shots stay dark, some sunny interiors look washed out |
 | Speed (10 points: fps ÷ 30) | about 1.5 | ❌ 4.6-4.7 fps in the cell, 1.4-3 in cutscenes (26/11); goal 10, then 15 |
 | Stability (10 points) | about 4 | ⚠️ 16 and 22 minutes without a crash from a new game (26/11); a few stalls of 4-12 s |
@@ -88,7 +88,7 @@ them only with proof (a video).
 | Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
 | Light in the shade | ⚠️ fallback light and an ambient floor by default (`VICTORY_AMBIENT_STUB=0` turns the floor off): the intro's night scenes now show lit faces; car and indoor night shots stay dark and the arrival at the prison is washed out (the game's ray tracing does not run yet) |
 | Textures | ⚠️ the catch-up has no time limit any more: a new scene's textures arrive in seconds (the oldest waiting 8-42 frames, it was up to 1,115). Many are still let go and made again when the 16 GB PC runs out of RAM |
-| Frame rate in the world | ❌ 4.6-4.7 fps in the cell (215-220 ms a frame: preparing 110, GPU 87, copy-back 65) on an RTX 3060 with 16 GB of RAM, dropping to about 3.7 after 15-20 minutes as memory settles; 30 in the menus. Other PCs: an RTX 3070 Ti + i5-14400F + 16 GB got 4.8 in its first test and 3 in a heavier scene, its GPU taking only 60 ms a frame: on 16 GB our preparing and the RAM limit, not the card |
+| Frame rate in the world | ❌ 4.6-4.7 fps in the cell (215-220 ms a frame: preparing 110, GPU 87, copy-back 65) on an RTX 3060 with 16 GB of RAM, dropping to about 3.7 after 15-20 minutes as memory settles; 30 in the menus. Other PCs: an RTX 3070 Ti + i5-14400F + 16 GB got 4.8 in its first test and 3 in a heavier scene, its GPU taking only 60 ms a frame: on 16 GB our preparing and the RAM limit, not the card. **Community capture (26/11, not a controlled measure):** 9 fps (114.5 ms a frame, 4,283 draws) in the boat mission with this repository's code on an Intel Core Ultra 9 275HX laptop with a 12 GB GPU and 32 GB of RAM; the water shows dark rectangles there |
 | Memory | ⚠️ about 22-25 GB committed on a 16 GB PC. The CPU side of the copies that live on the GPU is now ordinary memory Windows can page out (it was 3-4.5 GB locked for the GPU): at the end of a 10-minute run the game still has about 5 GB in RAM instead of under 1 GB |
 | Stability | ⚠️ 22 minutes in a row without a crash, from a new game through the intro cutscene into the cell (26/11), with a few stalls of 4-12 s; a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
 

@@ -85,9 +85,9 @@ un, `%LOCALAPPDATA%\victory\data\7952987A\crashes.log`.
 
 ## Où en est le jeu
 
-### Avancement du portage : environ 62 %
+### Avancement du portage : environ 65 %
 
-`████████████░░░░░░░░` **environ 62 % : jouable** (on dirige l'héroïne dans le prologue)
+`█████████████░░░░░░░` **environ 65 % : jouable** (on dirige l'héroïne dans le prologue)
 
 Mesuré avec le barème de [PortWatch VI](https://portwatch-vi.xyz/#method) :
 jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, le
@@ -103,7 +103,7 @@ preuve (une vidéo).
 | Menu principal | 30 | ✅ |
 | Dans le monde (le prologue se charge et s'affiche) | 40 | ✅ |
 | Jouable (on dirige un personnage) | 50 | ✅ l'héroïne bouge dans le prologue |
-| Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
+| Histoire (17,5 points) | environ 3 | ⚠️ au-delà du prologue : une capture de la communauté (26/11) montre la mission du bateau (« Collect the package ») en jeu avec ce code ; pas encore confirmé plus loin |
 | Rendu (12,5 points) | environ 6,5 | ⚠️ éclairé, scènes de nuit éclairées par un plancher de lumière ambiante (26/11), mais la lumière et les ombres du ray tracing manquent : plans de nuit en voiture et en intérieur sombres, certains intérieurs au soleil voilés |
 | Vitesse (10 points : images/s ÷ 30) | environ 1,5 | ❌ 4,6 à 4,7 images/s dans la cellule, 1,4 à 3 dans les cinématiques (26/11) ; objectif 10, puis 15 |
 | Stabilité (10 points) | environ 4 | ⚠️ 16 et 22 minutes sans plantage depuis une nouvelle partie (26/11) ; quelques blocages de 4 à 12 s |
@@ -118,7 +118,7 @@ preuve (une vidéo).
 | Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Textures | ⚠️ le rattrapage n'a plus de limite de temps : les textures d'une nouvelle scène arrivent en quelques secondes (la plus vieille en attente 8 à 42 images, contre jusqu'à 1 115). Beaucoup sont encore jetées puis refaites quand le PC de 16 Go manque de RAM |
 | Lumière dans l'ombre | ⚠️ lumière de secours et plancher de lumière ambiante par défaut (`VICTORY_AMBIENT_STUB=0` coupe le plancher) : les scènes de nuit de l'intro montrent maintenant des visages éclairés ; les plans de nuit en voiture et en intérieur restent sombres et l'arrivée à la prison est voilée (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
-| Images par seconde dans le monde | ❌ 4,6 à 4,7 dans la cellule (215 à 220 ms par image : préparation 110, carte 87, recopie 65) sur RTX 3060 et 16 Go de RAM, vers 3,7 après 15-20 minutes quand la mémoire se tasse ; 30 dans les menus. Autres PC : une RTX 3070 Ti + i5-14400F + 16 Go a fait 4,8 au premier test et 3 dans une scène plus lourde, sa carte ne prenant que 60 ms par image : sur 16 Go, c'est notre préparation et la RAM qui limitent, pas la carte |
+| Images par seconde dans le monde | ❌ 4,6 à 4,7 dans la cellule (215 à 220 ms par image : préparation 110, carte 87, recopie 65) sur RTX 3060 et 16 Go de RAM, vers 3,7 après 15-20 minutes quand la mémoire se tasse ; 30 dans les menus. Autres PC : une RTX 3070 Ti + i5-14400F + 16 Go a fait 4,8 au premier test et 3 dans une scène plus lourde, sa carte ne prenant que 60 ms par image : sur 16 Go, c'est notre préparation et la RAM qui limitent, pas la carte. **Capture de la communauté (26/11, pas une mesure contrôlée) :** 9 images/s (114,5 ms par image, 4 283 dessins) dans la mission du bateau avec le code de ce dépôt, sur un PC portable Intel Core Ultra 9 275HX avec une carte de 12 Go et 32 Go de RAM ; l'eau y montre des rectangles sombres |
 | Mémoire | ⚠️ 22 à 25 Go réservés sur un PC de 16 Go. Le côté processeur des copies qui vivent sur la carte est maintenant de la mémoire ordinaire que Windows peut mettre sur le disque (avant : 3 à 4,5 Go bloqués pour la carte) : à la fin d'une partie de 10 minutes, le jeu garde environ 5 Go en RAM au lieu de moins de 1 Go |
 | Stabilité | ⚠️ 22 minutes d'affilée sans plantage, d'une nouvelle partie à la cellule en passant par la cinématique d'intro (26/11), avec quelques blocages de 4 à 12 s ; une partie complète de 10 minutes dans le monde sans arrêt (25/11 au soir), là où le jeu s'arrêtait net vers 9 minutes. `VICTORY_HOLD=71B6330:1` met en pause le chien de garde du jeu et `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` agrandit deux réserves d'objets qui se vidaient (idées de Tejvardhan-717) ; un fichier d'échange de 32 Go au moins aide encore. Un débordement de pile est rapporté au lieu de fermer la fenêtre en silence |
 
