@@ -140,10 +140,9 @@ if (!$Nosso) {
     # Perfil medido no ciclo da RTX 5070 Ti Laptop. -Seguro usa os limites de origem.
     if (!$Seguro) {
         # Limita a reserva de blocos livres. As texturas em uso conservam o seu espaco.
-        # Experiencia de VRAM (2026-11-26 18h): ~1 GB reservado em blocos de texturas mas vazio; menos
-        # blocos a frente (2) e menos buffers do jogo na placa (512 MB) para sobrar VRAM para texturas.
-        $more.VICTORY_RIPE_BLOCKS = '2'
-        $more.VICTORY_CARD_BUFFERS_MB = '512'
+        # (2 blocos a frente e 512 MB de buffers na placa deram 1,1 FPS, 2026-11-26 18:06: os buffers do
+        # jogo voltavam a ser lidos pelo barramento. Ficam 4 blocos e 1 GB.)
+        $more.VICTORY_RIPE_BLOCKS = '4'
         # Dica da comunidade: VICTORY_THIN=1 desfoca a imagem toda nas RTX 50 (Blackwell, como a 5070 Ti).
         $more.VICTORY_THIN = '0'
         # A runtime verifica o orcamento da placa antes de usar o Resizable BAR.
