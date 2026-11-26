@@ -72,6 +72,8 @@ if (!$SemEnter) { $more.VICTORY_KEYS = $enters }
 # No teste sozinho, uma captura do ecra (meio tamanho) a cada 20 s, para analise; o ciclo
 # guarda so as das ultimas 6 voltas.
 if ($Minutos -gt 0) {
+    # Como o launcher do cgbj (20 FPS na RTX 5090): Series S, que esta versao diz ter corrigido.
+    $SeriesS = $true
     $more.VICTORY_CAPTURE = Join-Path $PastaCorrida "capturas\$stamp"
     $more.VICTORY_CAPTURE_EVERY_MS = '20000'
     # (VICTORY_WAVE_WIDE=1 perdeu a placa aos 1,7 min, 2026-11-26 08:22: fica de fora; esta
