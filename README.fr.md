@@ -40,7 +40,13 @@ vues » de [Xeltax/VIcky](https://github.com/Xeltax/VIcky) (branche
 `fx-heapmap`).
 
 > [!NOTE]
-> **Nouveau le 25/11 au soir** : un [lanceur](#le-lanceur-lanceurexe) avec
+> **Nouveau le 26/11** : 4,6 à 4,7 images/s dans la cellule (une attente de
+> 85 ms par image supprimée), 22 minutes sans plantage depuis une nouvelle
+> partie jusqu'à la cellule en passant par la cinématique d'intro, reflets plus
+> nets et ombres corrigées, et [`Tester.cmd`](#tester-ton-pc-testercmd) pour
+> mesurer ton PC.
+>
+> **25/11 au soir** : un [lanceur](#le-lanceur-lanceurexe) avec
 > présence Discord et sauvegardes par endroit, deux [modes de test](#modes-de-test)
 > (sans textures, sans dessin), et la mesure de [ce que coûte le jeu
 > seul](#le-2511-au-soir--ce-que-coûte-le-jeu-seul-et-ce-que-coûte-notre-couche).
@@ -97,21 +103,21 @@ preuve (une vidéo).
 | Jouable (on dirige un personnage) | 50 | ✅ l'héroïne bouge dans le prologue |
 | Histoire (17,5 points) | 0 | ⏳ encore dans l'ouverture ; finir le prologue en rapporte environ 3 |
 | Rendu (12,5 points) | environ 6 | ⚠️ éclairé, mais de gros effets manquent (ombre, ray tracing) |
-| Vitesse (10 points : images/s ÷ 30) | environ 1,4 | ❌ 4,0 à 4,4 images/s (partie de 10 minutes, nuit du 25/11) ; objectif 15 |
-| Stabilité (10 points) | environ 2,5 | ⚠️ pas encore mesurée sur une longue partie |
+| Vitesse (10 points : images/s ÷ 30) | environ 1,5 | ❌ 4,6 à 4,7 images/s dans la cellule, 1,4 à 3 dans les cinématiques (26/11) ; objectif 10, puis 15 |
+| Stabilité (10 points) | environ 3,5 | ⚠️ 22 minutes sans plantage depuis une nouvelle partie (26/11) ; quelques blocages de 4 à 12 s |
 
 ### Détail
 
 | Étape | État |
 |-------|------|
 | Démarrage, menus, écran titre | ✅ fonctionne |
-| Cinématique d'intro | ✅ se joue en entier et s'affiche correctement (vérifié en jeu le 25/11) |
+| Cinématique d'intro | ✅ se joue en entier avec ses crédits depuis une nouvelle partie (26/11), à 1,4-3 images/s ; les plans de nuit sont beaucoup trop sombres et l'arrivée à la prison est voilée (pas d'éclairage indirect sans ray tracing) ; la tenue de l'héroïne garde un moment une mauvaise texture avant celle de détenue |
 | Sauvegardes | ✅ le jeu sauvegarde et recharge un point de passage |
 | Premier passage jouable (prologue) | ✅ on dirige l'héroïne ; s'affiche : personnages, textures, ciel, extérieur au soleil |
 | Lumière dans l'ombre | ⚠️ lumière de secours par défaut : intérieurs et visages éclairés, mais certaines cinématiques restent presque noires (le ray tracing du jeu ne tourne pas encore). Les essais 8 et 9 étaient plus sombres à cause d'un blocage des textures quand la mémoire était basse, retiré le 25/11 (commit `3b5bcb6`) |
-| Images par seconde dans le monde | ❌ 4,0 à 4,4 (230 à 250 ms par image : préparation 125, carte 85-100, recopie 55-70) sur RTX 3060 et 16 Go de RAM ; 30 dans les menus |
+| Images par seconde dans le monde | ❌ 4,6 à 4,7 dans la cellule (215 à 220 ms par image : préparation 110, carte 87, recopie 65) sur RTX 3060 et 16 Go de RAM, vers 3,7 après 15-20 minutes quand la mémoire se tasse ; 30 dans les menus. Autres PC : une RTX 3070 Ti + i5-14400F + 16 Go a fait 4,8 au premier test et 3 dans une scène plus lourde, sa carte ne prenant que 60 ms par image : sur 16 Go, c'est notre préparation et la RAM qui limitent, pas la carte |
 | Mémoire | ⚠️ 22 à 25 Go réservés sur un PC de 16 Go. Le côté processeur des copies qui vivent sur la carte est maintenant de la mémoire ordinaire que Windows peut mettre sur le disque (avant : 3 à 4,5 Go bloqués pour la carte) : à la fin d'une partie de 10 minutes, le jeu garde environ 5 Go en RAM au lieu de moins de 1 Go |
-| Stabilité | ⚠️ une partie complète de 10 minutes dans le monde sans arrêt (25/11 au soir), là où le jeu s'arrêtait net vers 9 minutes. `VICTORY_HOLD=71B6330:1` met en pause le chien de garde du jeu et `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` agrandit deux réserves d'objets qui se vidaient (idées de Tejvardhan-717) ; un fichier d'échange de 32 Go au moins aide encore. Un débordement de pile est rapporté au lieu de fermer la fenêtre en silence |
+| Stabilité | ⚠️ 22 minutes d'affilée sans plantage, d'une nouvelle partie à la cellule en passant par la cinématique d'intro (26/11), avec quelques blocages de 4 à 12 s ; une partie complète de 10 minutes dans le monde sans arrêt (25/11 au soir), là où le jeu s'arrêtait net vers 9 minutes. `VICTORY_HOLD=71B6330:1` met en pause le chien de garde du jeu et `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` agrandit deux réserves d'objets qui se vidaient (idées de Tejvardhan-717) ; un fichier d'échange de 32 Go au moins aide encore. Un débordement de pile est rapporté au lieu de fermer la fenêtre en silence |
 
 ```mermaid
 pie showData
@@ -190,7 +196,8 @@ et ce qui vient du PC. Double-cliquer `Tester.cmd` (lancer `Prechauffer.cmd`
 une fois avant, après chaque mise à jour) : il lance le jeu, appuie sur A à
 l'écran titre, mesure 5 minutes dans le monde (`Tester.ps1 -Minutes 10` pour
 plus long, `-Console series-x` pour l'autre profil), prend une capture toutes
-les 30 s, ferme le jeu et écrit `rapports	est-<date>apport.md` (ton PC,
+les 30 s, ferme le jeu et écrit `rapports	est-<date>
+apport.md` (ton PC,
 images/s, où va une image, mémoire, erreurs) et un zip avec le journal et les
 captures. Ton nom d'utilisateur Windows en est retiré ; rien n'est envoyé.
 Ouvrir une issue **Config test**, y coller `rapport.md` et joindre le zip.

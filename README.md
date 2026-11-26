@@ -45,7 +45,12 @@ from many other forks, named in each commit. *La même page en français :
 > by the game's developer or publisher.
 
 > [!NOTE]
-> **New on 25 November**: a [launcher](#the-launcher) with Discord presence and
+> **New on 26 November**: 4.6-4.7 fps in the cell (an 85 ms wait per frame
+> removed), a 22-minute run without a crash from a new game through the intro
+> cutscene, sharper reflections and fixed shadows, and
+> [`Tester.cmd`](#test-your-pc-testercmd) to measure your own PC.
+>
+> **25 November**: a [launcher](#the-launcher) with Discord presence and
 > saves by place, two [test modes](#test-modes) (no textures, no drawing), and
 > a measurement of [what the game costs on its own](#what-the-game-costs-alone-and-what-our-layer-costs).
 
@@ -70,19 +75,19 @@ them only with proof (a video).
 | Playable (you control a character) | 50 | ✅ the heroine moves in the prologue |
 | Story (17.5 points) | 0 | ⏳ still in the opening; finishing the prologue is worth about 3 |
 | Picture (12.5 points) | about 6 | ⚠️ lit, but big effects are missing (shadows, ray tracing) |
-| Speed (10 points: fps ÷ 30) | about 1.4 | ❌ 4.0-4.4 fps (10-minute run, 25/11 night); goal 15 |
-| Stability (10 points) | about 2.5 | ⚠️ not measured over a long session yet |
+| Speed (10 points: fps ÷ 30) | about 1.5 | ❌ 4.6-4.7 fps in the cell, 1.4-3 in cutscenes (26/11); goal 10, then 15 |
+| Stability (10 points) | about 3.5 | ⚠️ 22 minutes without a crash from a new game (26/11); a few stalls of 4-12 s |
 
 | Step | State |
 |---|---|
 | Boot, menus, title screen | ✅ works, 30 fps |
-| Intro cutscene | ✅ plays through and displays correctly |
+| Intro cutscene | ✅ plays through with its credits from a new game (26/11), at 1.4-3 fps; night shots are far too dark and the arrival at the prison is washed out (no indirect light without ray tracing); the heroine's outfit shows a wrong texture for a while before the inmate one |
 | Saves | ✅ the game saves and reloads a checkpoint |
 | Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
 | Light in the shade | ⚠️ fallback light by default: interiors and faces are lit, but some night cutscenes stay almost black (the game's ray tracing does not run yet) |
-| Frame rate in the world | ❌ 4.0-4.4 fps (230-250 ms a frame: preparing 125, GPU 85-100, copy-back 55-70) on an RTX 3060 with 16 GB of RAM; 30 in the menus |
+| Frame rate in the world | ❌ 4.6-4.7 fps in the cell (215-220 ms a frame: preparing 110, GPU 87, copy-back 65) on an RTX 3060 with 16 GB of RAM, dropping to about 3.7 after 15-20 minutes as memory settles; 30 in the menus. Other PCs: an RTX 3070 Ti + i5-14400F + 16 GB got 4.8 in its first test and 3 in a heavier scene, its GPU taking only 60 ms a frame: on 16 GB our preparing and the RAM limit, not the card |
 | Memory | ⚠️ about 22-25 GB committed on a 16 GB PC. The CPU side of the copies that live on the GPU is now ordinary memory Windows can page out (it was 3-4.5 GB locked for the GPU): at the end of a 10-minute run the game still has about 5 GB in RAM instead of under 1 GB |
-| Stability | ⚠️ a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
+| Stability | ⚠️ 22 minutes in a row without a crash, from a new game through the intro cutscene into the cell (26/11), with a few stalls of 4-12 s; a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
 
 ```mermaid
 pie showData
@@ -171,7 +176,8 @@ PC's. Double-click `Tester.cmd` (run `Prechauffer.cmd` once before, after
 every update): it starts the game, presses A on the title screen, measures
 5 minutes in the world (`Tester.ps1 -Minutes 10` for longer, `-Console
 series-x` for the other profile), takes a screenshot every 30 s, closes the
-game and writes `rapports	est-<date>apport.md` (your PC, fps, where a
+game and writes `rapports	est-<date>
+apport.md` (your PC, fps, where a
 frame goes, memory, errors) and a zip with the log and the screenshots.
 Your Windows user name is taken out of both; nothing is sent anywhere.
 Open a **Config test** issue, paste `rapport.md` and attach the zip.
