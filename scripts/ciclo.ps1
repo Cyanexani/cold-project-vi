@@ -29,6 +29,30 @@ $acordado = { [void][VIctory.Energia]::SetThreadExecutionState([uint32]214748365
 & $acordado
 
 $jogar = Join-Path $PSScriptRoot 'jogar.ps1'
+$logs = Join-Path $env:USERPROFILE '.codex/visualizations/2026/11/22/01a2020d-43d5-7ec3-a9e8-d56142dd6f82/victory-xtx-run/logs'
+
+# Estado ao vivo nesta janela (lido do log da sessao; nao usa o Claude): FPS, ms por frame,
+# desenhos, RAM livre e tempo da volta.
+function Show-Estado([datetime] $inicio) {
+    $log = Get-ChildItem -LiteralPath $logs -Filter 'jogo-*.log' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $linha = ''
+    if ($log) {
+        try {
+            $fs = [IO.File]::Open($log.FullName, 'Open', 'Read', 'ReadWrite')
+            $fs.Seek([Math]::Max(0, $fs.Length - 400000), 'Begin') | Out-Null
+            $texto = (New-Object IO.StreamReader($fs)).ReadToEnd(); $fs.Dispose()
+            $m = [regex]::Matches($texto, 'host: ([0-9.]+) fps, ([0-9.]+) ms/frame.*?; ([0-9.]+) on the GPU.*?(\d+) draws/frame')
+            if ($m.Count -gt 0) {
+                $u = $m[$m.Count - 1].Groups
+                $linha = "{0,5} FPS  {1,7} ms/frame  placa {2,6} ms  {3,5} desenhos" -f $u[1].Value, $u[2].Value, $u[3].Value, $u[4].Value
+            } else { $linha = 'a arrancar (menus / intro)' }
+            if ($texto -match 'device removed') { $linha += '  [PLACA PERDEU-SE]' }
+        } catch { $linha = '(log ocupado)' }
+    }
+    $livre = [int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1KB)
+    $min = [int]((Get-Date) - $inicio).TotalMinutes
+    Write-Host ("[{0:HH:mm:ss}] volta {1}, {2} min | {3} | RAM livre {4} MB" -f (Get-Date), $volta, $min, $linha, $livre)
+}
 $ps = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
 $volta = 0
 try {
@@ -55,9 +79,15 @@ try {
         Write-Host "`n=== Teste $volta ($(Get-Date -Format HH:mm)) ==="
         $filho = Start-Process -FilePath $ps -NoNewWindow -PassThru -ArgumentList @(
             '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', "`"$jogar`"", '-Minutos', "$Minutos")
+        $inicio = Get-Date
+        $proximo = (Get-Date).AddSeconds(30)
         while (!$filho.HasExited) {
             if (Test-Parar) { $parar = $true; break }
             Start-Sleep -Seconds 1
+            if ((Get-Date) -ge $proximo) {
+                $proximo = (Get-Date).AddSeconds(15)
+                Show-Estado $inicio
+            }
         }
         if ($parar) {
             Write-Host 'H: a fechar o jogo e a parar...'
