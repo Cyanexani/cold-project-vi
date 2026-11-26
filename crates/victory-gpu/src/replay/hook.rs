@@ -89,6 +89,17 @@ fn readable(at: usize, most: usize) -> usize {
     end.min(at + most) - at
 }
 
+/// Whether the word at `at` can be written.
+fn writable(at: usize) -> bool {
+    use windows_sys::Win32::System::Memory::*;
+    // SAFETY: a plain query.
+    let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
+    // SAFETY: as above.
+    let n = unsafe { VirtualQuery(at as *const c_void, &mut info, size_of::<MEMORY_BASIC_INFORMATION>()) };
+    const WRITE: u32 = PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+    n != 0 && info.State == MEM_COMMIT && info.Protect & WRITE != 0 && info.Protect & PAGE_GUARD == 0
+}
+
 /// Gives the object a table of its own, changed by `patch`. `state` is what
 /// [`state`] answers; it must live for good. False if the object has one
 /// already (then nothing changes).
@@ -105,6 +116,15 @@ pub(super) unsafe fn install(
     // SAFETY: a live COM object starts with its table's address.
     let at = unsafe { *this.cast::<usize>() };
     if made.contains(&at) {
+        return false;
+    }
+    // An object the runtime keeps in its own image (D3D12Core.dll of recent
+    // Windows builds has some in pages that are read and execute only): its
+    // table pointer cannot be changed, so it is not hooked. Writing it lost
+    // the process at the device's making (2026-11-26).
+    if !writable(this as usize) {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| tracing::warn!(object = this as usize, "frame recorder: an object in read-only memory is not hooked; its calls are not recorded"));
         return false;
     }
     let mut new = Box::new(Shim {
@@ -171,6 +191,9 @@ pub(super) unsafe fn again(
             .sub(std::mem::offset_of!(Shim, table))
             .cast::<Shim>();
         if (*shim).orig as usize == now {
+            if !writable(this as usize) {
+                return;
+            }
             this.cast::<usize>().write(before);
         } else {
             install(this, (*shim).state, patch);

@@ -9122,13 +9122,14 @@ impl Host {
                     pre.push(transition(&back, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
                     list.ResourceBarrier(&pre);
                     let compose_slot = slot.map_or(0, |i| i + 1);
-                    if let Err(err) = composer.record(
+                    if let Err(err) = composer.record_planes_fit(
                         self,
                         compose_slot,
                         list,
                         [(texture, base_fmt), (over, over_fmt)],
                         &back,
                         (width, height),
+                        p.out,
                     ) {
                         copy.close();
                         drop(back);

@@ -29,6 +29,9 @@ fn main() {
     let source = crates.join("victory-shader/src");
     println!("cargo:rerun-if-changed={}", source.display());
     files(&source, &mut all);
+    // Tests are no part of a translation: a new or changed test file must not
+    // make every cached translation stale.
+    all.retain(|p| !p.file_name().is_some_and(|n| n.to_string_lossy().ends_with("_tests.rs")));
     all.sort();
     let mut hash = blake3::Hasher::new();
     for path in &all {

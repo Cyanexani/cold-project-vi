@@ -135,6 +135,24 @@ impl Composer {
         back: &ID3D12Resource,
         (width, height): (u32, u32),
     ) -> windows::core::Result<()> {
+        self.record_at(host, slot, list, planes, back, (width, height), (width, height), false)
+    }
+
+    /// [`Self::record`] into the part of `back` (`out`) where a frame of `size`
+    /// fits with its shape kept, the rest cleared to black (`fit`), with the
+    /// composing pipeline or (one plane) the plain one.
+    #[allow(clippy::too_many_arguments)]
+    fn record_at(
+        &mut self,
+        host: &Host,
+        slot: usize,
+        list: &ID3D12GraphicsCommandList,
+        planes: [(&ID3D12Resource, DXGI_FORMAT); 2],
+        back: &ID3D12Resource,
+        size: (u32, u32),
+        (width, height): (u32, u32),
+        one_plane: bool,
+    ) -> windows::core::Result<()> {
         while self.views.len() <= slot {
             let heap = unsafe {
                 host.device
@@ -175,16 +193,23 @@ impl Composer {
             }
             let rtv = host.rtv(Some(back), None);
             list.OMSetRenderTargets(1, Some(&rtv), false, None);
+            if size != (width, height) {
+                list.ClearRenderTargetView(rtv, &[0.0, 0.0, 0.0, 1.0], None);
+            }
             list.SetDescriptorHeaps(&[Some(views.clone())]);
             list.SetGraphicsRootSignature(&self.root);
-            list.SetPipelineState(&self.pso);
+            list.SetPipelineState(if one_plane { &self.fit_pso } else { &self.pso });
             list.SetGraphicsRootDescriptorTable(0, gpu);
             list.IASetPrimitiveTopology(
                 windows::Win32::Graphics::Direct3D::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
             );
+            let scale = (width as f32 / size.0.max(1) as f32).min(height as f32 / size.1.max(1) as f32);
+            let (w, h) = ((size.0 as f32 * scale).round(), (size.1 as f32 * scale).round());
             list.RSSetViewports(&[D3D12_VIEWPORT {
-                Width: width as f32,
-                Height: height as f32,
+                TopLeftX: ((width as f32 - w) / 2.0).floor(),
+                TopLeftY: ((height as f32 - h) / 2.0).floor(),
+                Width: w,
+                Height: h,
                 MaxDepth: 1.0,
                 ..Default::default()
             }]);
@@ -215,27 +240,23 @@ impl Composer {
         size: (u32, u32),
         out: (u32, u32),
     ) -> windows::core::Result<()> {
-        // The views, root, pipeline and a viewport over all of `back`.
-        self.record(host, slot, list, [plane, plane], back, out)?;
-        let scale = (out.0 as f32 / size.0.max(1) as f32).min(out.1 as f32 / size.1.max(1) as f32);
-        let (w, h) = (size.0 as f32 * scale, size.1 as f32 * scale);
-        let (x, y) = ((out.0 as f32 - w) / 2.0, (out.1 as f32 - h) / 2.0);
-        // SAFETY: an open list with `back` bound as its target by `record`.
-        unsafe {
-            let rtv = host.rtv(Some(back), None);
-            list.ClearRenderTargetView(rtv, &[0.0, 0.0, 0.0, 1.0], None);
-            list.SetPipelineState(&self.fit_pso);
-            list.RSSetViewports(&[D3D12_VIEWPORT {
-                TopLeftX: x.floor(),
-                TopLeftY: y.floor(),
-                Width: w.round(),
-                Height: h.round(),
-                MaxDepth: 1.0,
-                ..Default::default()
-            }]);
-            list.DrawInstanced(3, 1, 0, 0);
-        }
-        Ok(())
+        self.record_at(host, slot, list, [plane, plane], back, size, out, true)
+    }
+
+    /// The two planes composed into `back` (`out`), the frame (`size`) kept
+    /// in its shape ([`Self::record_fit`]).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn record_planes_fit(
+        &mut self,
+        host: &Host,
+        slot: usize,
+        list: &ID3D12GraphicsCommandList,
+        planes: [(&ID3D12Resource, DXGI_FORMAT); 2],
+        back: &ID3D12Resource,
+        size: (u32, u32),
+        out: (u32, u32),
+    ) -> windows::core::Result<()> {
+        self.record_at(host, slot, list, planes, back, size, out, false)
     }
 }
 
