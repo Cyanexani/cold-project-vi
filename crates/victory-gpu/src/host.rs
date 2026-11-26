@@ -1750,6 +1750,8 @@ struct CardWork {
     fetch: Prelude,
     root: ID3D12RootSignature,
     pso: ID3D12PipelineState,
+    /// [`CARD_MASKED`]'s root signature and pipeline, if it compiled.
+    masked: Option<(ID3D12RootSignature, ID3D12PipelineState)>,
     /// One dword per piece compared: 0 = unchanged, 1 = differed (needs
     /// fallback fetch), >= 2 = differed and copied inline at ticket `d - 2`.
     /// PC memory, mapped (buffer, mapping, bytes).
@@ -1785,6 +1787,79 @@ static CARD_WORK: Mutex<Option<CardWork>> = Mutex::new(None);
 /// (`compare == 3` or `4`) cooperatively copy differing pieces directly into
 /// `inline_buf` (`u2`), storing `ticket + 2` in `differs` (`1` on ring
 /// overflow or when inline is off, `0` when unchanged).
+/// Puts changed title bytes into a copy in the card's memory by dwords
+/// (`Host::card_before`, [`masked_min`]): each entry is (dword index, the
+/// dword's bytes, a mask of the bytes that changed); the card's other bytes
+/// in that dword, which shaders may have written, are kept. Entries name
+/// distinct dwords.
+const CARD_MASKED: &str = r#"
+#define RS "RootConstants(num32BitConstants=1, b0), SRV(t0), UAV(u0)"
+cbuffer C : register(b0) { uint count; }
+ByteAddressBuffer entries : register(t0);
+RWByteAddressBuffer dst : register(u0);
+[RootSignature(RS)]
+[numthreads(64, 1, 1)]
+void main(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= count) return;
+    uint3 e = entries.Load3(id.x * 12);
+    uint old = dst.Load(e.x * 4);
+    dst.Store(e.x * 4, (old & ~e.z) | (e.y & e.z));
+}
+"#;
+
+/// From how many changed ranges of one copy in the card's memory a send
+/// puts them in with one pass of [`CARD_MASKED`] instead of a copy each
+/// (`VICTORY_MASKED_MIN`, 64; `0` never). With it a submission may put in
+/// far more of the title's changed runs under flights' writes than copies
+/// could ([`merge_runs`]): the title rewrites some 16,000 runs of 2-3 bytes
+/// a frame in pages shaders write, which settled the flights for ~85 ms.
+fn masked_min() -> usize {
+    static MIN: OnceLock<usize> = OnceLock::new();
+    *MIN.get_or_init(|| std::env::var("VICTORY_MASKED_MIN").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(64))
+}
+
+/// The dwords `ranges` (offsets in a copy, in order) touch, as
+/// [`CARD_MASKED`] entries: (dword index, the CPU side's dword, mask of
+/// the bytes in a range). `bytes(from, to)` reads the CPU side.
+fn masked_entries<'a>(ranges: &[(usize, usize)], bytes: impl Fn(usize, usize) -> &'a [u8]) -> Vec<[u32; 3]> {
+    let mut out: Vec<[u32; 3]> = Vec::new();
+    for &(a, b) in ranges {
+        for at in a..b {
+            let dw = (at / 4) as u32;
+            let bit = (at % 4) * 8;
+            match out.last_mut() {
+                Some(e) if e[0] == dw => e[2] |= 0xFF << bit,
+                _ => out.push([dw, 0, 0xFF << bit]),
+            }
+        }
+    }
+    for e in &mut out {
+        let from = e[0] as usize * 4;
+        let b = bytes(from, from + 4);
+        let mut w = [0u8; 4];
+        w[..b.len()].copy_from_slice(b);
+        e[1] = u32::from_le_bytes(w);
+    }
+    out
+}
+
+#[cfg(test)]
+mod masked_tests {
+    use super::masked_entries;
+
+    #[test]
+    fn masked_entries_cover_each_changed_byte_once() {
+        let side: Vec<u8> = (0..32u8).collect();
+        let ranges = [(1, 3), (3, 4), (9, 10), (12, 20)];
+        let e = masked_entries(&ranges, |a, b| &side[a.min(side.len())..b.min(side.len())]);
+        assert_eq!(e[0], [0, u32::from_le_bytes([0, 1, 2, 3]), 0xFFFF_FF00]);
+        assert_eq!(e[1], [2, u32::from_le_bytes([8, 9, 10, 11]), 0x0000_FF00]);
+        assert_eq!(e[2], [3, u32::from_le_bytes([12, 13, 14, 15]), 0xFFFF_FFFF]);
+        assert_eq!(e[3], [4, u32::from_le_bytes([16, 17, 18, 19]), 0xFFFF_FFFF]);
+        assert_eq!(e.len(), 4);
+    }
+}
+
 pub(crate) const CARD_COMPARE: &str = r#"
 #define RS "RootConstants(num32BitConstants=7, b0), SRV(t0), UAV(u0), UAV(u1), UAV(u2)"
 cbuffer Span : register(b0) {
@@ -2534,11 +2609,29 @@ fn stale_under_flights(runs: &[&HostList]) -> bool {
         // The title's bytes are put in beside the flights' writes; a
         // settle is still due where that could not be done. At most this
         // many changed runs go up to copies in the card's memory, each a
-        // copy of its own there.
-        let mut runs_left = 512;
+        // copy of its own there ([`merge_runs`]).
+        let mut runs_left = merge_runs();
         return spans.iter().any(|(shadow, from, to)| shadow.merge_under_writes(*from, *to - *from, &mut runs_left));
     }
     spans.iter().any(|(shadow, from, to)| shadow.stale_under_writes(*from, *to - *from))
+}
+
+/// Since the last frame-rate line: masked passes ([`CARD_MASKED`]) and
+/// the dwords they put in.
+static MASKED_PUT: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
+
+/// The most changed runs of title bytes a submission puts in under flights'
+/// writes to copies in the card's memory before it settles the flights
+/// instead (`VICTORY_MERGE_RUNS`): 512 when each is a copy of its own,
+/// a million with the masked pass ([`masked_min`] not 0), which puts them
+/// in by dwords in one dispatch (run "masque", 26/11: 106,000 runs a frame,
+/// the ~85 ms settle for them gone, 4.1-4.3 -> 4.6-4.7 fps).
+fn merge_runs() -> usize {
+    static MOST: OnceLock<usize> = OnceLock::new();
+    *MOST.get_or_init(|| {
+        let default = if masked_min() > 0 { 1 << 20 } else { 512 };
+        std::env::var("VICTORY_MERGE_RUNS").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(default)
+    })
 }
 
 /// A fence signal on a queue ([`late`]): goes behind the flights in the
@@ -2939,6 +3032,15 @@ fn late_line(frames: f64) {
             "title bytes put in under flights' shader writes per frame (VICTORY_LATE_WAIT=2): {pages:.0} pages looked at, \
              {runs:.0} changed runs, {:.2} MB",
             bytes / (1 << 20) as f64
+        );
+        let [passes, dwords] = [0, 1].map(|i| MASKED_PUT[i].swap(0, Ordering::Relaxed) as f64 / frames);
+        tracing::info!(
+            "changed bytes put into copies on the card by masked passes per frame (VICTORY_MASKED_MIN={}): {passes:.1} passes, {dwords:.0} dwords",
+            masked_min()
+        );
+        let [unwatched, unknown, many, no_snapshot] = crate::shadow::merge_refused_stats().map(|n| n as f64 / frames);
+        tracing::info!(
+            "settles asked by that merge per frame: memory not write-watched {unwatched:.1}, the watch could not say              {unknown:.1}, too many changed runs for a copy on the card {many:.1}, no snapshot {no_snapshot:.1}"
         );
     }
 }
@@ -3475,12 +3577,48 @@ impl Host {
                 },
                 ..Default::default()
             })?;
+            let masked = (|| -> Option<(ID3D12RootSignature, ID3D12PipelineState)> {
+                let mut code: Option<ID3DBlob> = None;
+                D3DCompile(
+                    CARD_MASKED.as_ptr().cast(),
+                    CARD_MASKED.len(),
+                    windows::core::s!("card masked"),
+                    None,
+                    None,
+                    windows::core::s!("main"),
+                    windows::core::s!("cs_5_1"),
+                    0,
+                    0,
+                    &mut code,
+                    None,
+                )
+                .ok()?;
+                let code = code?;
+                let bytes = std::slice::from_raw_parts(code.GetBufferPointer().cast::<u8>(), code.GetBufferSize());
+                let root: ID3D12RootSignature = self.device.CreateRootSignature(0, bytes).ok()?;
+                let pso: ID3D12PipelineState = self
+                    .device
+                    .CreateComputePipelineState(&D3D12_COMPUTE_PIPELINE_STATE_DESC {
+                        pRootSignature: std::mem::transmute_copy(&root),
+                        CS: D3D12_SHADER_BYTECODE {
+                            pShaderBytecode: bytes.as_ptr().cast(),
+                            BytecodeLength: bytes.len(),
+                        },
+                        ..Default::default()
+                    })
+                    .ok()?;
+                Some((root, pso))
+            })();
+            if masked.is_none() {
+                tracing::warn!("the masked put-in of changed bytes on the card did not compile: copies one by one");
+            }
             Ok(CardWork {
                 sync: vec![list()?],
                 check: vec![list()?],
                 fetch: list()?,
                 root,
                 pso,
+                masked,
                 differs: (differs, data as usize, RESULTS),
                 inline_buf,
                 inline_slots,
@@ -3577,18 +3715,65 @@ impl Host {
                     list.Reset(allocator, None)?;
                     // The bytes of copies whose CPU side is ordinary memory
                     // go up through this list's upload ring.
+                    // Copies with many changed ranges get them in by one
+                    // masked pass ([`CARD_MASKED`]), its entries through the ring.
+                    let masked_at = masked_min();
+                    let is_masked = |r: &Vec<(usize, usize)>| work.masked.is_some() && masked_at > 0 && r.len() >= masked_at;
+                    let masked: Vec<Option<Vec<[u32; 3]>>> = dirty
+                        .iter()
+                        .map(|(shadow, r)| is_masked(r).then(|| masked_entries(r, |a, b| shadow.card_cpu_bytes(a, b))))
+                        .collect();
                     let ring_bytes: u64 = dirty
                         .iter()
-                        .filter(|(s, _)| s.card_sides().is_some_and(|(staging, _, _)| staging.is_none()))
-                        .flat_map(|(_, r)| r.iter().map(|&(a, b)| (b - a) as u64))
+                        .zip(&masked)
+                        .map(|((s, r), m)| match m {
+                            Some(m) => (m.len() * 12) as u64 + 16,
+                            None if s.card_sides().is_some_and(|(staging, _, _)| staging.is_none()) => {
+                                r.iter().map(|&(a, b)| (b - a) as u64).sum()
+                            }
+                            None => 0,
+                        })
                         .sum();
                     let ring = if ring_bytes > 0 { self.card_upload_ring(list, ring_bytes) } else { None };
                     let mut ring_at = 0u64;
-                    for (shadow, ranges) in &dirty {
+                    for ((shadow, ranges), entries) in dirty.iter().zip(&masked) {
                         let Some((staging, before, size)) = shadow.card_sides() else {
                             continue;
                         };
-                        for &(a, b) in ranges {
+                        // The state the copy's buffer is in after its bytes went up.
+                        let mut put_in = D3D12_RESOURCE_STATE_COPY_DEST;
+                        if let (Some(entries), Some((ring, data)), Some((mroot, mpso))) = (entries, &ring, &work.masked) {
+                            ring_at = ring_at.next_multiple_of(16);
+                            std::ptr::copy_nonoverlapping(
+                                entries.as_ptr().cast::<u8>(),
+                                (*data + ring_at as usize) as *mut u8,
+                                entries.len() * 12,
+                            );
+                            list.ResourceBarrier(&[transition(
+                                &shadow.buffer,
+                                D3D12_RESOURCE_STATE_COMMON,
+                                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                            )]);
+                            list.SetComputeRootSignature(mroot);
+                            list.SetPipelineState(mpso);
+                            list.SetComputeRootUnorderedAccessView(2, shadow.buffer.GetGPUVirtualAddress());
+                            // At most 65,535 groups of 64 a dispatch.
+                            for chunk in entries.chunks(65_535 * 64) {
+                                let count = chunk.len() as u32;
+                                list.SetComputeRoot32BitConstants(0, 1, (&count as *const u32).cast(), 0);
+                                list.SetComputeRootShaderResourceView(1, ring.GetGPUVirtualAddress() + ring_at);
+                                list.Dispatch(count.div_ceil(64), 1, 1);
+                                ring_at += u64::from(count) * 12;
+                            }
+                            put_in = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                            MASKED_PUT[0].fetch_add(1, Ordering::Relaxed);
+                            MASKED_PUT[1].fetch_add(entries.len() as u64, Ordering::Relaxed);
+                            crate::shadow::CARD_STATS[0].fetch_add(
+                                ranges.iter().map(|&(a, b)| (b - a) as u64).sum(),
+                                Ordering::Relaxed,
+                            );
+                        }
+                        for &(a, b) in ranges.iter().filter(|_| put_in == D3D12_RESOURCE_STATE_COPY_DEST) {
                             match (staging, &ring) {
                                 (Some(staging), _) => {
                                     list.CopyBufferRegion(&shadow.buffer, a as u64, staging, a as u64, (b - a) as u64);
@@ -3622,7 +3807,7 @@ impl Host {
                         if !ranges.is_empty() {
                             list.ResourceBarrier(&[transition(
                                 &shadow.buffer,
-                                D3D12_RESOURCE_STATE_COPY_DEST,
+                                put_in,
                                 D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
                             )]);
                         }
