@@ -3,7 +3,12 @@
 Atualizado pelo Claude a cada volta do ciclo. Para ver o jogo ao vivo, olha para a janela do
 "VIctory teste em ciclo": de 15 em 15 s mostra FPS, ms por frame, desenhos e RAM livre (sem custo).
 
-## Agora (2026-11-26 08:30)
+## Agora (2026-11-26 08:55)
+
+- A jogar: atalho "VIctory cgbj (original)" = launcher do cgbj sem alteracoes + 1080p + buffers
+  na placa (agora 1 GB, para sobrar VRAM para texturas). Limite atual: VRAM e RAM cheias.
+
+## Antes (08:30)
 
 - Versao: ramo `codex/cgbj-nvidia` = reupload cgbj (pareto-residency, afinado numa RTX 5090 com
   32 GB) + as nossas ferramentas. Shaders pre-traduzidos: 25 756 (229 nao traduzem; 26 deles sao
@@ -19,6 +24,8 @@ Atualizado pelo Claude a cada volta do ciclo. Para ver o jogo ao vivo, olha para
 | 04:46 | xtx, Series X, 4K | ~2,3 | ~200 | 1 h sem crash; ~20 % das tabelas recusadas |
 | 06:24 | + 1080p, buffers na placa, 64 listas | 9,1 | 53 | sem crash; nevoa e objetos em falta |
 | 08:21 | + VICTORY_WAVE_WIDE=1, 32 listas | - | - | placa perdida aos 1,7 min: descartado |
+| 08:42 | cgbj, launcher dele tal e qual (4K) | ~1 | 400-1600 | 0 tabelas recusadas; demasiado pesado para 12 GB |
+| 08:47 | cgbj + 1080p + 1,5 GB de buffers na placa | 18-22 parado, 8-10 a andar | - | sem crash; VRAM cheia (9,46 de 9,6 GB): 19 453 texturas por carregar |
 
 ## O que ja se sabe
 
