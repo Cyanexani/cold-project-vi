@@ -1,0 +1,98 @@
+@echo off
+rem VIctory "cgbj + luz NVIDIA": o ramo cgbj (pareto-residency) com a luz do fork VIctory-NVIDIA,
+rem afinado para uma RTX 5070 Ti portatil (12 GB) com 32 GB de RAM. ~24 FPS no mundo aberto (2026-11-26).
+rem Guia completo: docs\LUZ-24FPS.md
+rem
+rem   set VICTORY_GAME_DIR=D:\Jogos\MeuDump          (pasta com game_scarlett_master.exe)
+rem   Jogar-Luz.cmd preparar                         (1.a vez e depois de cada recompilacao: traduz shaders)
+rem   Jogar-Luz.cmd                                  (jogar)
+rem   Jogar-Luz.cmd teste                            (so 1 dos 2 shaders de volumetria: teste da agua)
+setlocal
+if not defined VICTORY_GAME_DIR (
+  echo Define VICTORY_GAME_DIR com a pasta do teu dump ^(onde esta game_scarlett_master.exe^).
+  pause
+  exit /b 2
+)
+if not exist "%VICTORY_GAME_DIR%\game_scarlett_master.exe" (
+  echo Nao encontrei "%VICTORY_GAME_DIR%\game_scarlett_master.exe".
+  pause
+  exit /b 2
+)
+set "EXE=%~dp0target\diag\victory.exe"
+if not exist "%EXE%" (
+  echo Falta %EXE%. Compila primeiro: cargo build --locked --profile diag -p victory --features diagnostics
+  pause
+  exit /b 2
+)
+if not defined RUN set "RUN=%LOCALAPPDATA%\VIctory\luz"
+if not exist "%RUN%\logs" mkdir "%RUN%\logs"
+if not defined VICTORY_CACHE_DIR set "VICTORY_CACHE_DIR=%RUN%\cache"
+if not defined VICTORY_DATA_DIR set "VICTORY_DATA_DIR=%RUN%\data"
+if not defined VICTORY_LOG set "VICTORY_LOG=warn,victory_gpu::host=info,victory_gpu::copystat=info"
+rem --- Placa de 12 GB: 1080p (o jogo julga ter uma TV 4K), 1 GB de buffers do jogo na placa ---
+set "VICTORY_DISPLAY_MODE=1920x1080"
+set "VICTORY_CARD_BUFFERS_MB=1024"
+rem Regista os pipelines usados; ao fechar sao preparados para a proxima sessao.
+set "VICTORY_PIPELINE_BOOK=1"
+rem 4 blocos de texturas feitos a frente em vez de 12 (512 MB a mais para texturas).
+set "VICTORY_RIPE_BLOCKS=4"
+rem Texturas a velocidade normal enquanto houver 1 GB de RAM livre (o cgbj travava abaixo de 3 GB).
+set "VICTORY_PRESSURE_FREE_MB=1024"
+set "VICTORY_PRESSURE_CLEAR_MB=2048"
+set "VICTORY_TEXTURE_RAM_GUARD=0"
+rem A reserva para imagens do ecra era de 3 GB (medida a 4K); a 1080p elas ocupam ~1,4-1,6 GB.
+set "VICTORY_CARD_ROOM_FOR_TARGETS_MB=1792"
+set "VICTORY_AMBIENT=1.6"
+rem --- Luz do fork NVIDIA ---
+set "VICTORY_BVH_MISS=1"
+set "VICTORY_AMBIENT_AIR=1.5"
+set "VICTORY_AMBIENT_MOST=2"
+set "VICTORY_NAN_SCRUB=1"
+set "VICTORY_DYNAMIC_SLOTS=524288"
+set "VICTORY_SKIP_PIPELINES=@%~dp0scripts\rt_off_hashes.txt"
+rem --- Shaders de 64 threads que a NVIDIA recusa, traduzidos com ramos da onda inteira ---
+rem  24126c14... TransmissionVolumetrics_Tiled, 7099a57f... ..._LocalLights, f1f161e4... ...Submerged.
+rem  Nenhum: agua certa, ~1 FPS no mundo aberto. Os 3: manchas pretas na agua. Estes 2: 24 FPS, manchas ainda.
+set "VICTORY_WAVE_WIDE_DIGESTS=24126c14dc7619b082ef571296038890,7099a57fded142613b44f410463d6be6"
+if /i "%~1"=="teste" set "VICTORY_WAVE_WIDE_DIGESTS=24126c14dc7619b082ef571296038890"
+rem --- Definicoes do launcher do cgbj (Play-VIctory.cmd) ---
+set "VICTORY_TEXTURE_NO_WAIT=1"
+set "VICTORY_RELAY=2"
+set "VICTORY_WIDE_BACK=1"
+set "VICTORY_CARD_REHASH_RUNS=1"
+set "VICTORY_JOIN_COPIES=1"
+set "VICTORY_INDIRECT_WINDOW=1"
+set "VICTORY_RELAY_COPY=1"
+set "VICTORY_CARD_STEPS=2"
+set "VICTORY_INDIRECT_BATCH=2"
+set "VICTORY_MAP_THREADS=1"
+set "VICTORY_CARD_AWAKE=1"
+set "VICTORY_SHOW_AFTER=1"
+set "VICTORY_THIN=1"
+set "VICTORY_JOIN_PARTS=8"
+set "VICTORY_UPLOAD_AHEAD=1"
+set "VICTORY_LEVELS_ON_DEMAND=1"
+set "VICTORY_CARD_BUFFERS_MIN_KB=64"
+tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
+  echo Ja ha um VIctory a correr. Fecha-o primeiro.
+  pause
+  exit /b 1
+)
+if /i "%~1"=="preparar" goto :preparar
+if /i "%~2"=="preparar" goto :preparar
+for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "STAMP=%%t"
+set "LOG=%RUN%\logs\luz-%STAMP%.log"
+echo A jogar. Log: %LOG%
+"%EXE%" run "%VICTORY_GAME_DIR%\game_scarlett_master.exe" --console series-s --execute > "%LOG%" 2>&1
+echo Jogo fechado. A preparar os pipelines desta sessao para a proxima (pode levar uns minutos)...
+"%EXE%" warm --used >> "%LOG%" 2>&1
+echo Terminado. Log: %LOG%
+exit /b 0
+:preparar
+set "LOG=%RUN%\logs\preparar.log"
+echo A traduzir os shaders do jogo (uns 2 minutos)... Log: %LOG%
+"%EXE%" shaders "%VICTORY_GAME_DIR%" > "%LOG%" 2>&1
+echo A preparar os pipelines das sessoes anteriores...
+"%EXE%" warm --used >> "%LOG%" 2>&1
+echo Terminado. Log: %LOG%
+exit /b 0

@@ -1,0 +1,153 @@
+# VIctory "cgbj + luz NVIDIA" numa RTX 5070 Ti portátil (~24 FPS)
+
+Este ramo (`edupode`) junta três trabalhos e afina-os para um portátil com uma
+RTX 5070 Ti Laptop (12 GB) e 32 GB de RAM:
+
+- **cgbj** (`cputroll/cgbj-reupload`, perfil pareto-residency): a base, com a
+  gestão de memória, as tabelas de descritores e as texturas que funcionam
+  melhor nesta máquina;
+- **VIctory-NVIDIA** (`trustno1-coder/VIctory-NVIDIA`): a luz (salas sem
+  branco a mais, sem manchas de NaN, ray tracing desligado onde só estraga);
+- **afinações próprias**: VRAM, 3 shaders de 64 threads, teclado e rato.
+
+Não há aqui ficheiros do jogo. Precisas do teu próprio dump.
+
+## Resultado (2026-11-26)
+
+Medido no portátil acima, com Windows 11, 1080p e o perfil Series S.
+
+| Cena | FPS |
+|---|---|
+| Prisão, interiores (cutscenes) | 18-22 |
+| Mundo aberto, barco | ~24 |
+| Mundo aberto sem os 2 shaders de volumetria | ~1 (ver abaixo) |
+
+A luz e as texturas estão próximas do fork NVIDIA, e os FPS são os do cgbj ou
+melhores. As sessões de 30-40 minutos correram sem crashes.
+
+## Montar
+
+1. **Ferramentas:** o Rust da versão fixada em `rust-toolchain.toml` (o rustup
+   instala-a sozinho) e as Build Tools do Visual Studio (C++ e Windows SDK).
+2. **Compilar a build `diag`:**
+   ```powershell
+   git clone -b edupode https://github.com/edupode/cold-project-vi.git
+   cd cold-project-vi
+   cargo build --locked --profile diag -p victory --features diagnostics
+   ```
+   Tem de ser a `diag`: a lista de shaders de ray tracing que ficam de fora
+   (`VICTORY_SKIP_PIPELINES`) só funciona nas builds com diagnósticos.
+3. **Windows Defender:** a regra ASR de proteção contra ransomware pode bloquear
+   o `victory.exe` acabado de compilar, com o erro "Acesso negado". Numa
+   PowerShell de administrador:
+   ```powershell
+   Add-MpPreference -AttackSurfaceReductionOnlyExclusions "C:\caminho\cold-project-vi\target"
+   ```
+4. **Preparar a cache.** Faz isto uma vez e outra vez sempre que recompilares
+   o tradutor de shaders. Demora uns 2 minutos de shaders e mais uns minutos
+   de pipelines. Sem isto, a primeira sessão corre a ~1 FPS enquanto traduz.
+   ```powershell
+   $env:VICTORY_GAME_DIR = 'D:\Jogos\MeuDump'   # a pasta com game_scarlett_master.exe
+   .\Jogar-Luz.cmd preparar
+   ```
+5. **Jogar:**
+   ```powershell
+   .\Jogar-Luz.cmd
+   ```
+   A cache, os saves e os logs ficam em `%LOCALAPPDATA%\VIctory\luz`. Para
+   escolher outra pasta, define `RUN`. Quando fechas o jogo, o launcher prepara
+   os pipelines usados nessa sessão para a seguinte.
+
+**Antes de jogar,** fecha as aplicações que gastam placa e RAM, como emuladores
+Android, outros jogos, Wallpaper Engine e overlays. O VIctory usa cerca de
+24 GB de memória privada e enche os 12 GB da placa. Com outras aplicações
+abertas, o Windows passa memória para o disco e os FPS caem.
+
+## Teclado e rato
+
+| Tecla | Comando | A pé | Em veículos (Caps Lock ligado) |
+|---|---|---|---|
+| W/A/S/D | analógico esquerdo | mover | W acelera (RT), S trava ou faz marcha-atrás (LT), A/D vira |
+| rato | analógico direito | olhar (F1 solta ou prende o rato) | olhar |
+| botão esquerdo | RT / RB | atirar | atirar (RB) |
+| botão direito | LT | mirar ou interagir | |
+| Shift esq. | L3 | correr | buzina ou nitro |
+| F, E ou Y | Y | interagir, entrar no veículo | sair |
+| Espaço / Enter | A | saltar ou escalar | travão de mão |
+| Ctrl esq. / C / Backspace | B | agachar ou descansar | faróis |
+| R ou X | X | corpo a corpo | |
+| Q | RB | proteger-se | |
+| Tab | LB | inventário | sacar arma |
+| M | View | mapa | mapa |
+| V | R3 | olhar para trás | olhar para trás |
+| setas ou 1-4 | D-pad | telemóvel, rádio, navegação, parceiro | |
+| Esc | Menu | pausa | pausa |
+
+O jogo conduz com os gatilhos. Por isso, num carro, barco ou mota liga o
+**Caps Lock** para o W e o S passarem a acelerar e travar, e desliga-o quando
+saíres. A luz do Caps Lock mostra em que modo estás. Um comando Xbox ligado
+substitui o teclado.
+
+## O que mudou em relação ao cgbj
+
+Commits deste ramo, por cima do cgbj e das ferramentas de teste:
+
+- `Shader: VICTORY_BVH_MISS`, `fix(gpu): ambient depth`, `Loader: render scale`
+  e `Faces move, ray tracing mostly off…`: vêm do fork NVIDIA, juntos ao cgbj.
+  Nos conflitos ficaram as tabelas (TablePlan), a ordem das texturas e a gestão
+  de memória do cgbj. As vistas de 16 bits do fork NVIDIA marcam a tabela para
+  ser refeita dentro do TablePlan.
+- `VICTORY_SKIP_PIPELINES: @file form and a hash set`: a lista de 1 034
+  shaders de ray tracing passa a vir de um ficheiro (num `.cmd` não cabia) e
+  deixa de ser procurada um a um em cada desenho.
+- `VICTORY_WAVE_WIDE_DIGESTS`: liga a tradução "wave-wide" só para os shaders
+  de 64 threads escolhidos. Ligada para todos, a placa perdia-se com as
+  partículas.
+- `Input: keyboard and mouse…`: o teclado e o rato com o esquema da tabela acima.
+- No launcher: 1080p, 1 GB de buffers na placa, 4 blocos de texturas à
+  frente, menos aperto de RAM e a reserva para imagens do ecrã baixada de
+  3 GB para 1,8 GB.
+
+## O que ainda falta resolver
+
+1. **Manchas pretas na água.** Com os shaders `TransmissionVolumetrics_Tiled`
+   (`24126c14…`) e `…_LocalLights` (`7099a57f…`) traduzidos em modo
+   wave-wide, aparecem retângulos pretos na água. Sem eles a água fica certa,
+   mas o mundo aberto cai para ~1 FPS: a placa fica a 250-600 ms por frame,
+   provavelmente porque os passos seguintes leem listas por preencher. O
+   `Jogar-Luz.cmd teste` liga só o `_Tiled` para saber qual dos dois estraga
+   a água. A solução de fundo é traduzir estes programas de 64 threads
+   corretamente para ondas de 32 (`crates/victory-shader/src/emit/mod.rs`,
+   `widen`).
+2. **Dois shaders de 64 threads ainda sem tradução:** `DefragHeap`
+   (`02384a60…`, grupos de 128) e `CollectTriangles_Meshlets` (`6b82bc7d…`,
+   grupos de 1024). Têm várias ondas de 64 por grupo, e o tradutor ainda não
+   sabe emular isso com ondas de 32. A NVIDIA recusa programas com WaveSize 64.
+3. **VRAM.** A 1080p, os 12 GB da placa ficam acima do limite que o Windows
+   dá ao jogo (9-10 GB), e milhares de texturas esperam por espaço.
+   - Há sempre 1-2,5 GB vazios dentro dos blocos de texturas.
+   - Ideias: devolver blocos vazios quando a placa passa o limite, ou
+     carregar só os níveis menores das texturas grandes.
+4. **RAM.** O VIctory usa ~24 GB de memória privada. Com 32 GB e outras
+   aplicações abertas, o Windows tira ~11 GB para o disco e a placa fica à
+   espera.
+5. **Processador.** Cada frame gasta ~30 ms a preparar, sobretudo a copiar
+   ~80 MB de buffers do jogo, e mais ~10 ms a copiar dados de volta.
+6. **Modo de escala** (`VICTORY_RENDER_SCALE=0.75` + `VICTORY_OWN_UPSCALER=1`).
+   Neste ramo, o jogo fecha ~5 s depois de arrancar, sem erro no log. O fork
+   NVIDIA usava 0,5 com `VICTORY_COMPOSE=1`.
+7. **Ray tracing.** O construtor de estruturas (BVH) usa programas de 64
+   threads que a NVIDIA recusa. Os resolves de ray tracing ficam de fora, por
+   isso faltam os reflexos de ray tracing (na água, por exemplo) e algumas
+   salas ficam mais escuras.
+8. **Geração de frames.** O DLSS Frame Generation (Streamline) precisa de
+   vetores de movimento, profundidade e imagem sem HUD, que o VIctory não sabe
+   identificar entre os buffers do jogo. O NVIDIA Smooth Motion (no driver,
+   pela NVIDIA App, perfil para `victory.exe`) é a alternativa sem código.
+
+## Logs
+
+- Cada sessão: `%LOCALAPPDATA%\VIctory\luz\logs\luz-*.log`.
+- A linha `host: N fps, N ms/frame (…)` mostra o tempo do processador
+  (`preparing`), da placa (`on the GPU`) e das cópias de volta.
+- A linha `video memory as the system counts it` mostra a VRAM usada e o limite.
