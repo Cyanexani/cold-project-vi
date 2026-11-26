@@ -10,6 +10,7 @@
 #   Jogar.cmd -Com1c8          pipelines substitutos (vazios) no metodo 0x1c8: so para medir; deixa a imagem preta
 #   Jogar.cmd -SlotsDinamicos 393216   descritores dinamicos na NVIDIA (padrao 262144; o resto fica para o jogo)
 #   Jogar.cmd -Minutos 5       teste sozinho: Enter automatico e o jogo fecha-se ao fim de 5 min
+#   Jogar.cmd -Minutos 6 -TeclasTeste '150-153:W,165-167:D'   movimento so dentro do jogo
 #   Jogar.cmd -Nosso           as nossas definicoes (1080p, buffers na placa...) em vez das do cgbj
 #   Jogar.cmd -SeriesS         simula a Series S (menos memoria e mais FPS; intro preta e graficos piores: usa o 0x1c8)
 #   Jogar.cmd -MemoriaNormal   sem o perfil de pouca memoria (feito para 64 GB / 24 GB de VRAM)
@@ -17,8 +18,9 @@ param([switch] $Seguro, [switch] $RayTracing, [switch] $SemEnter, [switch] $Memo
       [string] $PastaJogo = (Join-Path $env:USERPROFILE 'Downloads\dump private build'),
       [string] $PastaCorrida = (Join-Path $env:USERPROFILE '.codex\visualizations\2026\11\22\01a2020d-43d5-7ec3-a9e8-d56142dd6f82\victory-xtx-run'),
       # Abaixo disto (MiB livres) em 3 amostras seguidas, o jogo e fechado para o PC nao bloquear.
-      [int] $RamMinimaMiB = 700)
+      [int] $RamMinimaMiB = 700, [string] $TeclasTeste)
 $ErrorActionPreference = 'Stop'
+if ($TeclasTeste -and ($Minutos -le 0 -or $Maximo)) { throw '-TeclasTeste requer um teste temporizado com a build de diagnostico.' }
 # Uma sessao de cada vez: um segundo Jogar.cmd (ou o ciclo) nao abre outra janela do jogo.
 $criado = $false
 $sessao = New-Object System.Threading.Mutex($true, 'Local\VIctoryJogar', [ref]$criado)
@@ -73,6 +75,7 @@ if ($Nosso -and !$MemoriaNormal) {
 # No teste sozinho, Enter a cada 8 s ate ao fim (a intro so avanca com Enter).
 $enters = if ($Minutos -gt 0) { (20..($Minutos * 60 - 30) | Where-Object { ($_ - 20) % 8 -eq 0 } | ForEach-Object { "${_}:Enter" }) -join ',' } else { '30:Enter,45:Enter,60:Enter,90:Enter' }
 if (!$SemEnter) { $more.VICTORY_KEYS = $enters }
+if ($TeclasTeste) { $more.VICTORY_KEYS = (@($more.VICTORY_KEYS, $TeclasTeste) | Where-Object { $_ }) -join ',' }
 # No teste sozinho, uma captura do ecra (meio tamanho) a cada 20 s, para analise; o ciclo
 # guarda so as das ultimas 6 voltas.
 if ($Minutos -gt 0) {
