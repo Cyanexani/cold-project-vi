@@ -78,9 +78,9 @@ rem  720p: o mundo a 1280x720 (escala 2/3) e o upscaler temporal do proprio jogo
 rem  540p: escala 0.5, mais rapido e mais suave. (0.75 e 1.0 com o upscaler forcado param ao arrancar.)
 rem  qualidade: menos geometria esticada (relay 1, sem passos na placa), ~7 FPS a menos.
 for %%m in ("%~1" "%~2") do (
-  if /i %%m=="720p" set "VICTORY_RENDER_SCALE=0.6666667" & set "VICTORY_OWN_UPSCALER=1"
-  if /i %%m=="540p" set "VICTORY_RENDER_SCALE=0.5" & set "VICTORY_OWN_UPSCALER=1"
-  if /i %%m=="qualidade" set "VICTORY_RELAY=1" & set "VICTORY_CARD_STEPS=0"
+  if /i %%m=="720p" (set "VICTORY_RENDER_SCALE=0.6666667" & set "VICTORY_OWN_UPSCALER=1")
+  if /i %%m=="540p" (set "VICTORY_RENDER_SCALE=0.5" & set "VICTORY_OWN_UPSCALER=1")
+  if /i %%m=="qualidade" (set "VICTORY_RELAY=1" & set "VICTORY_CARD_STEPS=0")
 )
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
   echo Ja ha um VIctory a correr. Fecha-o primeiro.
