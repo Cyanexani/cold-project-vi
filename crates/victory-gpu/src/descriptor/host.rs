@@ -798,6 +798,45 @@ pub(crate) fn device_removed() -> Option<String> {
 pub(crate) static PLACED_TEXTURE_SLOTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 pub(crate) static OBJECT_TEXTURE_SLOTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+/// What else the table of strides says of a typed buffer view of an integer
+/// format (`victory_shader::emit::VIEW_INTEGER`, after VIctory 4243a96a as
+/// avatarmanz/VIctory-7900XTX and cool_fox carry it): 16-bit typed accesses
+/// through it pass bits (the face network keeps its halves in UINT views;
+/// read as halves they were noise: distorted faces). 0 for any other view.
+fn view_kind(view: &View) -> u32 {
+    use victory_shader::emit::{VIEW_INTEGER, VIEW_SIGNED};
+    const BUFFER: u32 = 1;
+    let (words, unordered): (&[u32; 10], bool) = match view {
+        View::Shader(_, Some(d)) if d[1] == BUFFER => (d, false),
+        View::Unordered(_, _, Some(d)) if d[1] == BUFFER => (d, true),
+        View::Placed(unordered, resource, d) if resource[0] == BUFFER => match d[..10].try_into() {
+            Ok(w) => (w, *unordered),
+            Err(_) => return 0,
+        },
+        _ => return 0,
+    };
+    // SAFETY: buffer views' union members.
+    let (stride, raw, format) = unsafe {
+        if unordered {
+            let d = uav_desc(words);
+            let b = d.Anonymous.Buffer;
+            (b.StructureByteStride, b.Flags.0 & D3D12_BUFFER_UAV_FLAG_RAW.0 != 0, d.Format.0)
+        } else {
+            let d = srv_desc(words);
+            let b = d.Anonymous.Buffer;
+            (b.StructureByteStride, b.Flags.0 & D3D12_BUFFER_SRV_FLAG_RAW.0 != 0, d.Format.0)
+        }
+    };
+    if stride != 0 || raw {
+        return 0;
+    }
+    match format {
+        3 | 7 | 12 | 17 | 25 | 30 | 36 | 42 | 50 | 57 | 62 => VIEW_INTEGER,
+        4 | 8 | 14 | 18 | 32 | 38 | 43 | 52 | 59 | 64 => VIEW_INTEGER | VIEW_SIGNED,
+        _ => 0,
+    }
+}
+
 /// Bytes per element of a buffer view, as the console's descriptor holds
 /// them for indexed reads (structured: the stride; raw: 1, the index is the
 /// byte; typed: the format's); `None` if `view` is not a buffer view.
@@ -1972,12 +2011,13 @@ impl HostHeap {
             }
         }
         let stride = view.and_then(view_stride);
+        let kind = view.map_or(0, view_kind);
         if let Some((_, _, data)) = &self.strides
             && index < victory_shader::emit::SLOT_STRIDES_COUNT
         {
             // SAFETY: inside the mapping; shaders read it while we write (a
             // dword, either value is one the slot had).
-            unsafe { (*data as *mut u32).add(index as usize).write_volatile(stride.unwrap_or(0)) };
+            unsafe { (*data as *mut u32).add(index as usize).write_volatile(stride.unwrap_or(0) | kind) };
             // The title address of the buffer view, after the strides
             // (`victory_shader::emit::SLOT_ADDRESSES`): low dword, then high.
             let address = view.and_then(buffer_range).map_or(0, |range| range.0);

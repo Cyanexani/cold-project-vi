@@ -2150,6 +2150,146 @@ pub(crate) fn late() -> bool {
     late_stage() > 0
 }
 
+/// Submissions prepared by a thread of ours (`VICTORY_ASYNC_SUBMIT=1`, off
+/// by default; with [`late`] only), after the idea of
+/// avatarmanz/VIctory-7900XTX's `VICTORY_ASYNC_SUBMIT`: the title's
+/// `ExecuteCommandLists` detaches its lists (as it did) and returns; the
+/// preparing of the submission (refreshes of copies, descriptor records,
+/// the card's sends: ~110 ms a frame on the title's submitting thread at the
+/// cell) runs on [`behind_thread`] in the order the title made the calls, so
+/// the title records the next lists meanwhile. What must stay in that order
+/// goes the same way or waits for the line to be empty: fence signals
+/// ([`late_signal`]), our synchronous submissions ([`Host::execute`]),
+/// settles ([`settle_now`]) and presents (`crate::queue`).
+pub(crate) fn async_submit() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| {
+        let on = late() && std::env::var_os("VICTORY_ASYNC_SUBMIT").is_some_and(|v| v == "1");
+        if on {
+            tracing::info!("submissions prepared by a thread of ours (VICTORY_ASYNC_SUBMIT=1)");
+        }
+        on
+    })
+}
+
+type BehindJob = Box<dyn FnOnce() + Send>;
+
+/// The line of jobs for [`behind_thread`], and whether it runs one now.
+static BEHIND: Mutex<(std::collections::VecDeque<BehindJob>, bool)> =
+    Mutex::new((std::collections::VecDeque::new(), false));
+/// Told when a job joins [`BEHIND`] (the thread) and when the line empties
+/// (who waits for it).
+static BEHIND_MOVED: std::sync::Condvar = std::sync::Condvar::new();
+static BEHIND_EMPTY: std::sync::Condvar = std::sync::Condvar::new();
+/// Since the last frame-rate line: jobs run behind, and microseconds the
+/// title's threads waited for the line ([`behind_flush`]).
+static BEHIND_STATS: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
+
+thread_local! {
+    static ON_BEHIND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn behind_lock() -> std::sync::MutexGuard<'static, (std::collections::VecDeque<BehindJob>, bool)> {
+    BEHIND.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The thread that runs [`BEHIND`]'s jobs in order.
+fn behind_thread() {
+    static STARTED: OnceLock<()> = OnceLock::new();
+    STARTED.get_or_init(|| {
+        let _ = std::thread::Builder::new().name("victory-behind".into()).spawn(|| {
+            ON_BEHIND.set(true);
+            loop {
+                let job = {
+                    let mut line = behind_lock();
+                    loop {
+                        if let Some(job) = line.0.pop_front() {
+                            line.1 = true;
+                            break job;
+                        }
+                        line.1 = false;
+                        BEHIND_EMPTY.notify_all();
+                        line = BEHIND_MOVED.wait(line).unwrap_or_else(|e| e.into_inner());
+                    }
+                };
+                job();
+                BEHIND_STATS[0].fetch_add(1, Ordering::Relaxed);
+            }
+        });
+    });
+}
+
+/// Runs `job` behind what the line holds ([`async_submit`]), or now (off, or
+/// on that thread already). Whether it was queued.
+pub(crate) fn behind(job: impl FnOnce() + Send + 'static) -> bool {
+    if !async_submit() || ON_BEHIND.get() {
+        job();
+        return false;
+    }
+    behind_thread();
+    behind_lock().0.push_back(Box::new(job));
+    BEHIND_MOVED.notify_one();
+    true
+}
+
+/// Presents given to [`behind_thread`] and not run yet ([`behind_present`]).
+static PRESENTS_BEHIND: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Told when a present given behind has run.
+static PRESENT_DONE: std::sync::Condvar = std::sync::Condvar::new();
+
+/// A present given to [`behind_thread`] ([`async_submit`]): the title goes on
+/// with the next frame while this one is prepared and shown, one frame
+/// ahead at most (it waits here for the frame before to be shown).
+pub(crate) fn behind_present(job: impl FnOnce() + Send + 'static) {
+    let began = now_us();
+    {
+        let mut line = behind_lock();
+        while PRESENTS_BEHIND.load(Ordering::Acquire) > 0 {
+            line = PRESENT_DONE.wait(line).unwrap_or_else(|e| e.into_inner());
+        }
+    }
+    BEHIND_STATS[1].fetch_add(now_us().saturating_sub(began), Ordering::Relaxed);
+    PRESENTS_BEHIND.fetch_add(1, Ordering::AcqRel);
+    behind(move || {
+        job();
+        let _line = behind_lock();
+        PRESENTS_BEHIND.fetch_sub(1, Ordering::AcqRel);
+        PRESENT_DONE.notify_all();
+    });
+}
+
+/// A host object handed to [`behind_thread`].
+pub(crate) struct SendCom<T>(pub(crate) T);
+// SAFETY: D3D12 objects are free-threaded.
+unsafe impl<T> Send for SendCom<T> {}
+
+/// Whether the line holds or runs anything ([`behind`]).
+fn behind_busy() -> bool {
+    let line = behind_lock();
+    !line.0.is_empty() || line.1
+}
+
+/// Waits until the line has run everything given so far (not on its own
+/// thread): before what must see the submissions made (a synchronous
+/// submission of ours, a settle, a present).
+pub(crate) fn behind_flush() {
+    if !async_submit() || ON_BEHIND.get() {
+        return;
+    }
+    let began = now_us();
+    let mut line = behind_lock();
+    while !line.0.is_empty() || line.1 {
+        line = BEHIND_EMPTY.wait(line).unwrap_or_else(|e| e.into_inner());
+    }
+    BEHIND_STATS[1].fetch_add(now_us().saturating_sub(began), Ordering::Relaxed);
+}
+
+/// Detached host lists given to [`behind_thread`].
+struct SendLists(Vec<crate::list::Detached>, Vec<usize>);
+// SAFETY: host lists nothing records into any more (detached from the
+// title's), handed to one thread; as `Line` holds them.
+unsafe impl Send for SendLists {}
+
 /// `VICTORY_LATE_WAIT`: 0 (off), 1, or 2 ([`late_exact`]).
 fn late_stage() -> u8 {
     static STAGE: OnceLock<u8> = OnceLock::new();
@@ -2641,6 +2781,15 @@ pub(crate) fn late_signal(fence: usize, value: u64) -> bool {
     if !late() {
         return false;
     }
+    // Behind the submissions still being prepared: in their order.
+    if async_submit() && !ON_BEHIND.get() && behind_busy() {
+        behind(move || {
+            if !late_signal(fence, value) {
+                let _ = crate::fence::signal(fence as crate::object::This, value);
+            }
+        });
+        return true;
+    }
     let mut line = line();
     if line.line.is_empty() && !line.settling {
         return false;
@@ -2703,6 +2852,7 @@ pub(crate) fn settle_now(why: usize) {
     if !late() {
         return;
     }
+    behind_flush();
     let Some(host) = host() else {
         return;
     };
@@ -3033,6 +3183,13 @@ fn late_line(frames: f64) {
              {runs:.0} changed runs, {:.2} MB",
             bytes / (1 << 20) as f64
         );
+        if async_submit() {
+            let [jobs, waited] = [0, 1].map(|i| BEHIND_STATS[i].swap(0, Ordering::Relaxed) as f64 / frames);
+            tracing::info!(
+                "submissions prepared behind per frame (VICTORY_ASYNC_SUBMIT=1): {jobs:.1} jobs, {:.1} ms the title's threads waited for them",
+                waited / 1e3
+            );
+        }
         let [passes, dwords] = [0, 1].map(|i| MASKED_PUT[i].swap(0, Ordering::Relaxed) as f64 / frames);
         tracing::info!(
             "changed bytes put into copies on the card by masked passes per frame (VICTORY_MASKED_MIN={}): {passes:.1} passes, {dwords:.0} dwords",
@@ -4607,6 +4764,7 @@ impl Host {
     /// Runs closed lists and waits for them, and with [`late`] for
     /// everything sent to the card before them, which is settled first.
     pub(crate) fn execute(&self, runs: &[&HostList]) {
+        behind_flush();
         let _ = self.submit(runs, false);
     }
 
@@ -4617,6 +4775,19 @@ impl Host {
     /// ([`late`] lists those points); their host lists are reset and kept
     /// for reuse then, as a queue does for the lists it ran.
     pub(crate) fn execute_late(&self, lists: Vec<crate::list::Detached>, order: Vec<usize>) {
+        if async_submit() && !ON_BEHIND.get() && !order.is_empty() {
+            let job = SendLists(lists, order);
+            behind(move || {
+                // The whole wrapper is moved here (not its fields: they are
+                // not `Send` on their own).
+                let job = job;
+                let SendLists(lists, order) = job;
+                if let Some(host) = host() {
+                    host.execute_late(lists, order);
+                }
+            });
+            return;
+        }
         if order.is_empty() {
             crate::list::recycle(lists, &order);
             return;

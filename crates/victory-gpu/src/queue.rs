@@ -792,6 +792,23 @@ extern "system" fn present(
     plane_parameters: *const Plane,
     _parameters: *const u8,
 ) -> HRESULT {
+    // What is still being prepared behind (`crate::host::async_submit`) is
+    // part of this frame: the present goes into the line behind it (one
+    // frame ahead at most, `behind_present`) where it can be sent ahead,
+    // else it waits for the line.
+    #[cfg(windows)]
+    let ahead = crate::host::async_submit() && crate::host::late_free_present() && {
+        // `VICTORY_ASYNC_PRESENT=0`: the present waits for the line (the
+        // title then goes on only within a frame).
+        static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *ON.get_or_init(|| std::env::var_os("VICTORY_ASYNC_PRESENT").is_none_or(|v| v != "0"))
+    };
+    #[cfg(not(windows))]
+    let ahead = false;
+    #[cfg(windows)]
+    if !ahead {
+        crate::host::behind_flush();
+    }
     #[cfg(all(windows, feature = "diagnostics"))]
     crate::copystat::present_begins();
     // Submissions sent to the card and not waited for are settled first,
@@ -801,7 +818,7 @@ extern "system" fn present(
         crate::host::settle_for_present();
         release_held(false);
         crate::host::settle_for_present();
-    } else if crate::host::late() {
+    } else if crate::host::late() && !ahead {
         // The present is sent ahead too: what waits for a value a flight
         // will write runs behind that flight, and nothing is settled here.
         release_held(false);
@@ -809,7 +826,9 @@ extern "system" fn present(
     // shortcut: what a queue still holds at a present runs now, whatever
     // its fence: a wait is not kept across frames.
     #[cfg(windows)]
-    release_held(forces());
+    if !ahead {
+        release_held(forces());
+    }
     let frame = FRAMES.fetch_add(1, Ordering::Relaxed) + 1;
     if frame.is_power_of_two() {
         let (draws, dispatches) = crate::list::take_counts();
@@ -907,6 +926,27 @@ extern "system" fn present(
                     .map_or(PIXEL_SHADER_RESOURCE, |(_, before)| before);
                 (t, r, s)
             });
+        if ahead {
+            // The states as recorded so far are those the planes have when
+            // the frame's lists have run: the copy goes to the card behind
+            // them, in the line. The tracking is left as it was at once.
+            crate::resource::host_transition(resource, state);
+            if let Some((_, r, s)) = overlay {
+                crate::resource::host_transition(r, s);
+            }
+            let texture = crate::host::SendCom(texture.clone());
+            let overlay = overlay.map(|(t, _, s)| crate::host::SendCom((t.clone(), s)));
+            crate::host::behind_present(move || {
+                let (texture, overlay) = (texture, overlay);
+                release_held(false);
+                release_held(forces());
+                if let Some(host) = crate::host::host() {
+                    let over = overlay.as_ref().map(|o| (&o.0.0, o.0.1));
+                    let _ = host.present(&texture.0, state, frame, over);
+                }
+            });
+            return S_OK;
+        }
         let shown = host.present(texture, state, frame, overlay.map(|(t, _, s)| (t, s)));
         crate::resource::host_transition(resource, state);
         if let Some((_, r, s)) = overlay {
@@ -916,6 +956,15 @@ extern "system" fn present(
         blinks(frame, resource, state, shown);
         #[cfg(not(feature = "diagnostics"))]
         let _ = shown;
+    }
+    // Sent ahead with nothing to show: what queues hold still runs in the
+    // line, as above.
+    #[cfg(windows)]
+    if ahead {
+        crate::host::behind(|| {
+            release_held(false);
+            release_held(forces());
+        });
     }
     #[cfg(not(windows))]
     let _ = (planes, plane_parameters);
@@ -991,6 +1040,9 @@ extern "system" fn copy_page_mappings(
     pool_pages: u32,
     _flags: u32,
 ) -> HRESULT {
+    // In the queue's order behind the submissions still being prepared.
+    #[cfg(windows)]
+    crate::host::behind_flush();
     let Some(map) = crate::resource::page_mapper() else {
         return E_INVALIDARG;
     };
