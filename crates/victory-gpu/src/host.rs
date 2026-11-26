@@ -2027,8 +2027,10 @@ enum Step {
     /// A copy into title memory (destination, source, bytes): the title's
     /// buffer copies, which later refreshes must see.
     Copy(usize, usize, usize),
-    /// A copy of title memory into the list's own upload memory.
-    Fill(usize, usize, usize),
+    /// A copy of title memory into the list's own upload memory; with the
+    /// descriptor slot that alone shows it (host heap, index), if any, so
+    /// that the card can bring the bytes instead ([`card_steps`]).
+    Fill(usize, usize, usize, Option<(usize, u32)>),
     /// Brings a range (address, bytes) of a buffer's host copy up to date:
     /// once per submission, whichever lists ask, until a `Copy` or `Run`
     /// intervenes.
@@ -2653,26 +2655,203 @@ fn flying() -> bool {
     line.settling || line.line.iter().any(|l| matches!(l, Late::Run(_)))
 }
 
+/// Steps of a submission that read title memory flights in the air may
+/// still write, done on the card behind the flights instead of on the CPU
+/// after a wait for them (`VICTORY_CARD_STEPS`; off by default): `1` the
+/// constant buffers of descriptor tables (fills with a slot of their own),
+/// `2` the title's buffer copies too. After avatarmanz/VIctory-7900XTX's
+/// `host/card_steps.rs` (its idea and argument; written anew for this tree).
+///
+/// Why: after the masked put-in (`CARD_MASKED`) every frame still had one
+/// wait of 77-92 ms for the card, by a fill of upload memory or a title
+/// buffer copy reading the title's 174 MB constants heap, which the skinning
+/// passes declare written whole (runs "masque", "tablecb", "relay2-masque").
+///
+/// Why the card's bytes are those the CPU would have read after the wait:
+/// every flight in the air that may write them writes them through one and
+/// the same host copy in the card's memory ([`card_source`] refuses
+/// otherwise, and a bottom-of-pipe write there), all those flights are ahead
+/// of our list on the queue, and the title's own bytes reach that copy by
+/// the sends of `card_before`, which go to the queue before our list. A
+/// fill's slot is the fill's alone (a dynamic slot of the list, which has
+/// not gone to the card): it is pointed at a buffer of ours the card copies
+/// into. A copy's destination is declared written by this submission's
+/// shaders, exactly the bytes copied: the relay compares and lands them in
+/// title memory as any shader write; a copy is refused where another step
+/// of the submission reads or writes its destination or source, or where
+/// source and destination overlap.
+pub(crate) fn card_steps() -> u32 {
+    static STAGE: OnceLock<u32> = OnceLock::new();
+    *STAGE.get_or_init(|| {
+        let stage = if !relay() || !crate::shadow::cards() {
+            0
+        } else {
+            std::env::var("VICTORY_CARD_STEPS").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0)
+        };
+        if stage > 0 {
+            tracing::info!(stage, "steps under flights' writes done on the card (VICTORY_CARD_STEPS)");
+        }
+        stage
+    })
+}
+
+/// Since the last frame-rate line: fills and copies done on the card.
+static CARD_STEPS_DONE: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
+/// Since the last frame-rate line, why copies under flights were not done
+/// on the card: overlap, source not held by one copy on the card, source
+/// not in such a copy, destination likewise (two), another step touches
+/// them.
+static CARD_COPY_REFUSED: [std::sync::atomic::AtomicU64; 6] = [const { std::sync::atomic::AtomicU64::new(0) }; 6];
+
+fn card_copy_refused(why: usize) -> Option<(std::sync::Arc<crate::shadow::Shadow>, std::sync::Arc<crate::shadow::Shadow>)> {
+    CARD_COPY_REFUSED[why].fetch_add(1, Ordering::Relaxed);
+    None
+}
+
+/// What a submission's card steps are ([`card_steps`]).
+#[derive(Default)]
+struct CardSteps {
+    /// (source copy, source address, bytes, host heap, slot).
+    fills: Vec<(std::sync::Arc<crate::shadow::Shadow>, usize, usize, usize, u32)>,
+    /// (source copy, source address, destination copy, destination address, bytes).
+    copies: Vec<(
+        std::sync::Arc<crate::shadow::Shadow>,
+        usize,
+        std::sync::Arc<crate::shadow::Shadow>,
+        usize,
+        usize,
+    )>,
+    /// Destinations of `copies`: declared written by the submission.
+    declared: Vec<(std::sync::Arc<crate::shadow::Shadow>, usize, usize)>,
+}
+
+/// The host copy in the card's memory that holds what the flights in
+/// `line` may write of `[at, at + len)`, if every one of them writes it
+/// through that copy and it holds the range whole; `None` if that cannot
+/// be said (then the step waits as before).
+fn card_source(line: &Line, at: usize, len: usize) -> Option<std::sync::Arc<crate::shadow::Shadow>> {
+    let to = at + len;
+    let mut found: Option<std::sync::Arc<crate::shadow::Shadow>> = None;
+    for item in &line.line {
+        match item {
+            Late::Run(flight) => {
+                for (shadow, ranges) in &flight.back {
+                    if !ranges.iter().any(|&(a, b)| a < to && b > at) {
+                        continue;
+                    }
+                    match &found {
+                        Some(f) if !std::sync::Arc::ptr_eq(f, shadow) => return None,
+                        Some(_) => {}
+                        None => found = Some(shadow.clone()),
+                    }
+                }
+            }
+            Late::Write(w, _, n) if *w < to && at < *w + *n => return None,
+            _ => {}
+        }
+    }
+    // What is being landed now (out of the line): its writes are not known
+    // by copy any more.
+    if line.in_hand.iter().any(|(w, _, n)| *w < to && at < *w + *n) {
+        return None;
+    }
+    let shadow = found?;
+    let (start, bytes) = shadow.span();
+    (shadow.carded() && at as u64 >= start && to as u64 <= start + bytes).then_some(shadow)
+}
+
+/// For a title buffer copy of `len` bytes from `src` to `dst` under flights'
+/// writes: the host copies in the card's memory the card copies between
+/// (source, destination), if [`card_steps`] may do it. `runs`: the
+/// submission's lists, none of whose other steps may read or write the
+/// destination or the source.
+fn card_copy(
+    line: &Line,
+    runs: &[&HostList],
+    dst: usize,
+    src: usize,
+    len: usize,
+) -> Option<(std::sync::Arc<crate::shadow::Shadow>, std::sync::Arc<crate::shadow::Shadow>)> {
+    if len == 0 || (src < dst + len && dst < src + len) {
+        return card_copy_refused(0);
+    }
+    let held = |at: usize| -> Option<std::sync::Arc<crate::shadow::Shadow>> {
+        let shadow = crate::shadow::find(at as u64, len as u64)?;
+        let (start, bytes) = shadow.span();
+        (shadow.carded() && at as u64 >= start && (at + len) as u64 <= start + bytes).then_some(shadow)
+    };
+    let from = if touches(&line.written, src, src + len) {
+        match card_source(line, src, len) {
+            Some(s) => s,
+            None => return card_copy_refused(1),
+        }
+    } else {
+        match held(src) {
+            Some(s) => s,
+            None => return card_copy_refused(2),
+        }
+    };
+    let to = if touches(&line.written, dst, dst + len) {
+        match card_source(line, dst, len) {
+            Some(s) => s,
+            None => return card_copy_refused(3),
+        }
+    } else {
+        match held(dst) {
+            Some(s) => s,
+            None => return card_copy_refused(4),
+        }
+    };
+    // No other step of the submission reads or writes either range on the
+    // CPU (it would find the bytes before the card has copied them).
+    let mut seen = 0;
+    for list in runs {
+        for step in &list.deferred().copies {
+            let hit = |a: usize, n: usize| (a < dst + len && dst < a + n) || (a < src + len && src < a + n);
+            match step {
+                &Step::Copy(d, s2, n) => {
+                    if (d, s2, n) == (dst, src, len) {
+                        seen += 1;
+                        if seen > 1 {
+                            return card_copy_refused(5);
+                        }
+                    } else if hit(d, n) || hit(s2, n) {
+                        return card_copy_refused(5);
+                    }
+                }
+                &Step::Fill(_, s2, n, _) if hit(s2, n) => return card_copy_refused(5),
+                Step::Texture(staging) => {
+                    let (a, n) = staging.memory();
+                    if hit(a, n) {
+                        return card_copy_refused(5);
+                    }
+                }
+                &Step::Run(_, Some((d, s2, n))) if hit(d, n) || hit(s2, n) => return card_copy_refused(5),
+                Step::Run(..) => return card_copy_refused(5),
+                _ => {}
+            }
+        }
+    }
+    Some((from, to))
+}
+
 /// With flights in the air ([`late`]): why `runs` cannot be prepared
 /// before they are settled, if so. Preparing reads title memory on the
 /// CPU (the title's buffer copies, fills of upload memory, textures) and
 /// runs steps of ours that may read or write it anywhere; what the
 /// flights' shaders write is not there yet.
 fn late_blocked(runs: &[&HostList]) -> Option<usize> {
-    let written = {
-        let line = line();
-        if line.written.is_empty() {
-            return None;
-        }
-        line.written.clone()
-    };
-    blocked_by(&written, runs, true)
+    let line = line();
+    if line.written.is_empty() {
+        return None;
+    }
+    blocked_by(&line.written, runs, true, Some(&line))
 }
 
 /// [`late_blocked`] against `written`, the title memory flights' shaders
 /// may write (in order, joined); `count` whether the kind of read is
 /// counted for the frame line.
-fn blocked_by(written: &[(usize, usize)], runs: &[&HostList], count: bool) -> Option<usize> {
+fn blocked_by(written: &[(usize, usize)], runs: &[&HostList], count: bool, line: Option<&Line>) -> Option<usize> {
     if written.is_empty() {
         return None;
     }
@@ -2680,15 +2859,19 @@ fn blocked_by(written: &[(usize, usize)], runs: &[&HostList], count: bool) -> Op
         for step in &list.deferred().copies {
             match step {
                 &Step::Copy(dst, src, len) => {
-                    if touches(written, src, src + len) || touches(written, dst, dst + len) {
+                    if (touches(written, src, src + len) || touches(written, dst, dst + len))
+                        && !(card_steps() >= 2 && line.is_some_and(|l| card_copy(l, runs, dst, src, len).is_some()))
+                    {
                         if count {
                             LATE_STATS[15].fetch_add(1, Ordering::Relaxed);
                         }
                         return Some(WHY_READ);
                     }
                 }
-                &Step::Fill(_, src, len) => {
-                    if touches(written, src, src + len) {
+                &Step::Fill(_, src, len, slot) => {
+                    if touches(written, src, src + len)
+                        && !(slot.is_some() && card_steps() >= 1 && line.is_some_and(|l| card_source(l, src, len).is_some()))
+                    {
                         if count {
                             LATE_STATS[16].fetch_add(1, Ordering::Relaxed);
                         }
@@ -3183,6 +3366,18 @@ fn late_line(frames: f64) {
              {runs:.0} changed runs, {:.2} MB",
             bytes / (1 << 20) as f64
         );
+        if card_steps() > 0 {
+            let [fills, copies] = [0, 1].map(|i| CARD_STEPS_DONE[i].swap(0, Ordering::Relaxed) as f64 / frames);
+            tracing::info!(
+                "steps under flights' writes done on the card per frame (VICTORY_CARD_STEPS={}): {fills:.1} constant buffers, {copies:.1} buffer copies",
+                card_steps()
+            );
+            let r: [f64; 6] = std::array::from_fn(|i| CARD_COPY_REFUSED[i].swap(0, Ordering::Relaxed) as f64 / frames);
+            tracing::info!(
+                "buffer copies under flights left to a wait per frame: overlap {:.1}, source not held by one copy on the card {:.1}, source not in one {:.1}, destination not held by one {:.1}, destination not in one {:.1}, another step touches them {:.1}",
+                r[0], r[1], r[2], r[3], r[4], r[5]
+            );
+        }
         if async_submit() {
             let [jobs, waited] = [0, 1].map(|i| BEHIND_STATS[i].swap(0, Ordering::Relaxed) as f64 / frames);
             tracing::info!(
@@ -3798,7 +3993,12 @@ impl Host {
     /// relay()`, the compare updates stored hashes and captures changed pieces
     /// inline into the shared readback ring; single synchronous submissions
     /// (`!late`) also capture inline without updating stored hashes.
-    fn card_before(&self, runs: &[&HostList], late: bool) -> Option<CardPlan> {
+    fn card_before(
+        &self,
+        runs: &[&HostList],
+        late: bool,
+        extra: &[(std::sync::Arc<crate::shadow::Shadow>, usize, usize)],
+    ) -> Option<CardPlan> {
         use std::sync::Arc;
         if !crate::shadow::cards() {
             return None;
@@ -3824,6 +4024,19 @@ impl Host {
                         declared[*idx].1.push(range);
                     }
                 }
+            }
+        }
+        // Destinations of copies the card does ([`card_steps`]): written by
+        // this submission as a shader's write is.
+        for (shadow, from, to) in extra {
+            let key = Arc::as_ptr(shadow) as usize;
+            let (idx, seen) = declared_idx.entry(key).or_insert_with(|| {
+                let idx = declared.len();
+                declared.push((shadow.clone(), Vec::new()));
+                (idx, std::collections::HashSet::new())
+            });
+            if seen.insert((*from, *to)) {
+                declared[*idx].1.push((*from, *to));
             }
         }
         // With the relay: the order of the queue is held from here until
@@ -4107,6 +4320,109 @@ impl Host {
     /// With [`relay`]: whether the compare's result area is half taken by
     /// plans in the air. It starts from the beginning only when no plan is
     /// out, so the caller lets the flights land first.
+    /// The steps [`card_steps`] does on the card for this submission: a
+    /// list of ours, sent after `card_before`'s and ahead of the title's.
+    /// What is read goes into a buffer of ours first (every read, then every
+    /// write: a copy within one host copy reads and writes the same buffer);
+    /// fills' slots show that buffer.
+    fn run_card_steps(&self, steps: &CardSteps) {
+        if steps.fills.is_empty() && steps.copies.is_empty() {
+            return;
+        }
+        let align = |n: usize| (n as u64).next_multiple_of(256).max(256);
+        let total: u64 = steps.fills.iter().map(|f| align(f.2)).sum::<u64>()
+            + steps.copies.iter().map(|c| align(c.4)).sum::<u64>();
+        // A list, its allocator and a buffer of a submission that has run,
+        // if one is big enough: made anew they cost milliseconds each (the
+        // run that made them every time prepared 60 ms a frame more).
+        static SPARE: Mutex<Vec<(u64, Prelude, ID3D12Resource, u64)>> = Mutex::new(Vec::new());
+        let finished = FINISHED.load(Ordering::Acquire);
+        let reused = {
+            let mut spare = SPARE.lock().unwrap_or_else(|e| e.into_inner());
+            spare.iter().position(|s| s.0 <= finished && s.3 >= total).map(|i| spare.swap_remove(i))
+        };
+        let (allocator, list, between, size) = match reused {
+            Some((_, (allocator, list), between, size)) => (allocator, list, between, size),
+            None => {
+                let size = total.next_multiple_of(64 << 10);
+                let Some(between) = self.uav_buffer(size) else {
+                    fail(format_args!("no buffer of {size} bytes for steps done on the card"));
+                };
+                name(&between, || "steps done on the card: bytes read".into());
+                let Some((allocator, list)) = self.make_prelude() else {
+                    fail(format_args!("no host list for steps done on the card"));
+                };
+                (allocator, list, between, size)
+            }
+        };
+        // SAFETY: a new list and buffer of ours; live host copies; the
+        // ranges lie in them (`card_source`, `card_copy`); the slots are
+        // the fills' own, in lists not sent yet.
+        let made = unsafe {
+            (|| -> windows::core::Result<()> {
+                allocator.Reset()?;
+                list.Reset(&allocator, None)?;
+                let base = between.GetGPUVirtualAddress();
+                let mut at = 0u64;
+                for (from, src, len, heap, index) in &steps.fills {
+                    let (start, _) = from.span();
+                    list.CopyBufferRegion(&between, at, &from.buffer, *src as u64 - start, *len as u64);
+                    // SAFETY: a host heap the list keeps (the draw named it).
+                    let heap = &*(*heap as *const crate::descriptor::host::HostHeap);
+                    heap.constant_at(*index, base + at, *len as u32);
+                    at += align(*len);
+                }
+                let firsts = at;
+                for (from, src, _, _, len) in &steps.copies {
+                    let (start, _) = from.span();
+                    list.CopyBufferRegion(&between, at, &from.buffer, *src as u64 - start, *len as u64);
+                    at += align(*len);
+                }
+                if !steps.copies.is_empty() {
+                    list.ResourceBarrier(&[transition(
+                        &between,
+                        D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_STATE_COPY_SOURCE,
+                    )]);
+                    // Copies read in this list are copy sources now; a
+                    // destination among them goes to copy destination.
+                    let mut moved: Vec<usize> = Vec::new();
+                    for (_, _, to, _, _) in &steps.copies {
+                        let key = std::sync::Arc::as_ptr(to) as usize;
+                        let read = steps.fills.iter().any(|f| std::sync::Arc::ptr_eq(&f.0, to))
+                            || steps.copies.iter().any(|c| std::sync::Arc::ptr_eq(&c.0, to));
+                        if read && !moved.contains(&key) {
+                            moved.push(key);
+                            list.ResourceBarrier(&[transition(
+                                &to.buffer,
+                                D3D12_RESOURCE_STATE_COPY_SOURCE,
+                                D3D12_RESOURCE_STATE_COPY_DEST,
+                            )]);
+                        }
+                    }
+                    let mut at = firsts;
+                    for (_, _, to, dst, len) in &steps.copies {
+                        let (start, _) = to.span();
+                        list.CopyBufferRegion(&to.buffer, *dst as u64 - start, &between, at, *len as u64);
+                        at += align(*len);
+                    }
+                }
+                list.Close()?;
+                self.queue.ExecuteCommandLists(&[Some(list.cast()?)]);
+                Ok(())
+            })()
+        };
+        if let Err(e) = made {
+            fail(format_args!("steps done on the card could not be sent ({e})"));
+        }
+        // Free again once the submission behind them (started next) has run.
+        let behind = STARTED.load(Ordering::Acquire);
+        let mut spare = SPARE.lock().unwrap_or_else(|e| e.into_inner());
+        if spare.len() < 16 {
+            spare.push((behind, (allocator, list), between, size));
+        }
+    }
+
     fn card_results_low(&self) -> bool {
         CARD_WORK
             .lock()
@@ -5050,7 +5366,7 @@ impl Host {
             if relay_exact() && why == WHY_READ {
                 // Only until the flights that may write what is read have
                 // landed: their copy-back's end, not the card's other work.
-                relay_wait(why, |line| blocked_by(&line.written, runs, false).is_none());
+                relay_wait(why, |line| blocked_by(&line.written, runs, false, Some(line)).is_none());
             } else {
                 self.settle(&mut submitted, why);
             }
@@ -5091,6 +5407,9 @@ impl Host {
         // Where each run's lists start in `lists`.
         let mut firsts = Vec::with_capacity(runs.len());
         let mut batch = Batch::default();
+        if late && card_steps() > 0 {
+            batch.under = line().written.clone();
+        }
         // The time a settle of flights takes inside this preparing: the
         // wait for the card and the copy-back have their own places on the
         // frame line (run 92 showed them twice, "preparing" 250 ms for 135).
@@ -5161,7 +5480,9 @@ impl Host {
             self.settle(&mut submitted, WHY_MOST);
             settled += settling.elapsed();
         }
-        let card = self.card_before(runs, late);
+        let card_steps = std::mem::take(&mut batch.card);
+        let card = self.card_before(runs, late, &card_steps.declared);
+        self.run_card_steps(&card_steps);
         if let Some(check) = card.as_ref().and_then(|c| c.check.clone()) {
             lists.push(Some(check));
         }
@@ -5177,7 +5498,13 @@ impl Host {
             if let Err(e) = signalled {
                 fail(format_args!("a submission sent ahead could not be followed by a signal ({e})"));
             }
-            let back = declared_writes(runs);
+            let mut back = declared_writes(runs);
+            for (shadow, from, to) in &card_steps.declared {
+                match back.iter_mut().find(|(s, _)| std::sync::Arc::ptr_eq(s, shadow)) {
+                    Some((_, ranges)) => ranges.push((*from, *to)),
+                    None => back.push((shadow.clone(), vec![(*from, *to)])),
+                }
+            }
             let writes = runs.iter().flat_map(|l| l.deferred().writes.clone()).collect();
             SUBMISSION_US[0].fetch_add((prepared - started).saturating_sub(settled).as_micros() as u64, Ordering::Relaxed);
             submitting(0, 0);
@@ -6303,7 +6630,25 @@ impl HostList {
     pub(crate) fn defer_fill(&self, dst: *mut u8, src: *const u8, len: usize) {
         self.deferred()
             .copies
-            .push(Step::Fill(dst as usize, src as usize, len));
+            .push(Step::Fill(dst as usize, src as usize, len, None));
+    }
+
+    /// [`Self::defer_fill`] of a constant buffer that descriptor slot
+    /// `index` of `heap` alone shows ([`card_steps`]).
+    pub(crate) fn defer_fill_slot(
+        &self,
+        dst: *mut u8,
+        src: *const u8,
+        len: usize,
+        heap: &crate::descriptor::host::HostHeap,
+        index: u32,
+    ) {
+        self.deferred().copies.push(Step::Fill(
+            dst as usize,
+            src as usize,
+            len,
+            Some((std::ptr::from_ref(heap) as usize, index)),
+        ));
     }
 
     /// Brings `[address, address + len)` of a buffer's host copy up to date
@@ -6535,16 +6880,37 @@ impl HostList {
                         add(C::CopyBytes, len as u64);
                     }
                     batch.title_written();
+                    // Under flights' writes: the card copies, behind them
+                    // ([`card_steps`]; `blocked_by` let it through).
+                    if card_steps() >= 2 && (batch.under(src, len) || batch.under(dst, len))
+                        && let Some((from, to)) = card_copy(&line(), &[], dst, src, len)
+                    {
+                        batch.flush_for_write(&to);
+                        to.writing(dst, len);
+                        batch.card.copies.push((from, src, to.clone(), dst, len));
+                        batch.card.declared.push((to, dst, dst + len));
+                        CARD_STEPS_DONE[1].fetch_add(1, Ordering::Relaxed);
+                        continue;
+                    }
                     copy_mapped(dst as *mut u8, src as *const u8, len, true);
                     // With the submission's one asking: the journal learns it.
                     crate::watch::wrote(dst, len);
                     len
                 }
-                &Step::Fill(dst, src, len) => {
+                &Step::Fill(dst, src, len, slot) => {
                     #[cfg(feature = "diagnostics")]
                     {
                         add(C::Copies, 1);
                         add(C::CopyBytes, len as u64);
+                    }
+                    if let Some((heap, index)) = slot
+                        && card_steps() >= 1
+                        && batch.under(src, len)
+                        && let Some(from) = card_source(&line(), src, len)
+                    {
+                        batch.card.fills.push((from, src, len, heap, index));
+                        CARD_STEPS_DONE[0].fetch_add(1, Ordering::Relaxed);
+                        continue;
                     }
                     copy_mapped(dst as *mut u8, src as *const u8, len, false);
                     len
@@ -6677,9 +7043,19 @@ struct Batch {
     /// Texture refreshes running beside the submitting thread
     /// ([`crate::memcopy::texture_overlap`]).
     textures_beside: crate::memcopy::Group,
+    /// Title memory flights in the air may write, when the submission began
+    /// ([`card_steps`]).
+    under: Vec<(usize, usize)>,
+    /// Steps the card does instead ([`card_steps`]).
+    card: CardSteps,
 }
 
 impl Batch {
+    /// Whether `[at, at + len)` lies under flights' writes.
+    fn under(&self, at: usize, len: usize) -> bool {
+        touches(&self.under, at, at + len)
+    }
+
     fn add(&mut self, shadow: &std::sync::Arc<crate::shadow::Shadow>, address: usize, len: usize) {
         let end = address + len;
         let key = std::sync::Arc::as_ptr(shadow) as usize;

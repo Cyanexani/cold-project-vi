@@ -2916,7 +2916,7 @@ impl State {
                             host.make_null(index);
                             continue;
                         };
-                        list.defer_fill(to, address as *const u8, size as usize);
+                        list.defer_fill_slot(to, address as *const u8, size as usize, host, index);
                         host.constant_at(index, gpu, size);
                     }
                     Some(view) => {
