@@ -21,7 +21,8 @@ Medido no portátil acima, com Windows 11, 1080p e o perfil Series S.
 | Prisão, interiores (cutscenes) | 18-22 |
 | Mundo aberto, barco | 24-26 |
 | Cutscenes | ~26 (31-32 no modo rápido) |
-| Modo rápido (540p + upscaler do jogo), mundo aberto parado / a andar / de carro | 25-29 / ~15 / ~10 |
+| 720p + upscaler do jogo, mundo aberto | 23-26 |
+| 540p + upscaler do jogo, mundo aberto parado / a andar / de carro | 25-29 / ~15 / ~10 |
 
 A luz e as texturas estão próximas do fork NVIDIA, e os FPS são os do cgbj ou
 melhores. As sessões de 30-40 minutos correram sem crashes.
@@ -55,6 +56,12 @@ melhores. As sessões de 30-40 minutos correram sem crashes.
    ```powershell
    .\Jogar-Luz.cmd
    ```
+   Ou, com mais FPS: `.\Jogar-Luz.cmd 720p` (o mundo a 1280x720, esticado
+   para 1080p pelo upscaler temporal do próprio jogo: 23-26 FPS no mundo
+   aberto) ou `540p` (mais rápido e mais suave). `qualidade` como segundo
+   argumento reduz a geometria esticada, com ~7 FPS a menos. As escalas 0,75 e
+   1,0 com o upscaler forçado param ao arrancar.
+
    A cache, os saves e os logs ficam em `%LOCALAPPDATA%\VIctory\luz`. Para
    escolher outra pasta, define `RUN`. Quando fechas o jogo, o launcher prepara
    os pipelines usados nessa sessão para a seguinte.
@@ -149,9 +156,10 @@ Commits deste ramo, por cima do cgbj e das ferramentas de teste:
    espera.
 5. **Processador.** Cada frame gasta ~30 ms a preparar, sobretudo a copiar
    ~80 MB de buffers do jogo, e mais ~10 ms a copiar dados de volta.
-6. **Modo de escala** (`VICTORY_RENDER_SCALE=0.75` + `VICTORY_OWN_UPSCALER=1`).
-   Neste ramo, o jogo fecha ~5 s depois de arrancar, sem erro no log. O fork
-   NVIDIA usava 0,5 com `VICTORY_COMPOSE=1`.
+6. **Escalas de resolução.** 0,5 (540p) e 2/3 (720p) funcionam. 0,75 fecha
+   o jogo ~5 s depois de arrancar, e 1,0 com o upscaler forçado para num
+   breakpoint (nota do fork NVIDIA). Também há geometria esticada ao passar
+   por objetos e gaivotas como blocos deformados (o modo `qualidade` atenua).
 7. **Ray tracing.** O construtor de estruturas (BVH) usa programas de 64
    threads que a NVIDIA recusa. Os resolves de ray tracing ficam de fora, por
    isso faltam os reflexos de ray tracing (na água, por exemplo) e algumas
