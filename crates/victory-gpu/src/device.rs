@@ -374,7 +374,7 @@ extern "system" fn unknown_pipeline<const SLOT: usize>(
         // pointer is known to be mapped.
         #[cfg(windows)]
         let words = |at: usize| -> Option<Vec<u64>> {
-            let mut bytes = [0u8; 128];
+            let mut bytes = [0u8; 256];
             (at != 0 && crate::host::read_into(at as *const u8, &mut bytes)).then(|| {
                 bytes
                     .as_chunks::<8>().0.iter()
@@ -388,15 +388,56 @@ extern "system" fn unknown_pipeline<const SLOT: usize>(
         let first = description
             .as_ref()
             .and_then(|w| words(w[0] as usize));
+        // Each word followed by a small one may be a (blob, size) pair; the
+        // first bytes of each blob say what it is ("DXBC": a shader
+        // container, as the other creation methods are given), so that the
+        // description's layout can be read off a run (diagnostics only).
+        #[cfg(windows)]
+        let blobs: Vec<String> = description
+            .as_ref()
+            .map(|w| {
+                w.windows(2)
+                    .filter(|p| p[0] > 0x1_0000 && p[1] != 0 && p[1] < 0x10_0000)
+                    .map(|p| {
+                        let mut head = [0u8; 48];
+                        if crate::host::read_into(p[0] as usize as *const u8, &mut head) {
+                            let text: String = head[..4]
+                                .iter()
+                                .map(|&b| if b.is_ascii_graphic() { b as char } else { '.' })
+                                .collect();
+                            format!("{:#x}+{:#x} {text:?} {head:02x?}", p[0], p[1])
+                        } else {
+                            format!("{:#x}+{:#x} unreadable", p[0], p[1])
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        #[cfg(not(windows))]
+        let blobs: Vec<String> = Vec::new();
+        #[cfg(windows)]
+        save_description::<SLOT>(calls, desc as usize, description.as_deref());
         tracing::warn!(
             slot = format_args!("{:#x}", SLOT),
             calls,
             description = format_args!("{description:x?}"),
             first_points_at = format_args!("{first:x?}"),
+            blobs = format_args!("{blobs:#?}"),
             "a pipeline creation method that is not implemented: the title goes without this pipeline"
         );
     }
+    // `VICTORY_1C8=stand-in`: 0x1c8 hands out a pipeline without shaders
+    // ([`crate::pipeline::stand_in`]), to measure how much the title draws
+    // with these pipelines (docs/device-0x1c8.md).
+    if SLOT == 0x1c8 && stand_ins() && !out.is_null() {
+        return crate::pipeline::stand_in(_iid, out);
+    }
     E_NOTIMPL
+}
+
+fn stand_ins() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("VICTORY_1C8").is_ok_and(|v| v == "stand-in"))
 }
 
 /// The host device's state: the console's device is removed when the host's is
@@ -411,6 +452,55 @@ extern "system" fn removed_reason(_: This) -> HRESULT {
     }
     S_OK
 }
+
+/// The logged calls' descriptions whole, so that 0x1c8 and 0x218 can be
+/// written from one run: the 256 description bytes, 512 bytes at its first
+/// word, and each (pointer, size) pair's bytes (sizes under 1 MiB, up to
+/// 4 KiB each), as hex in the log, since the run's controller forwards no
+/// output folder (diagnostics builds only). `VICTORY_PIPELINE_SAVE=<dir>`
+/// also writes them whole as `<slot>-<call>[-object|-w<i>].bin`.
+#[cfg(all(windows, feature = "diagnostics"))]
+fn save_description<const SLOT: usize>(calls: u32, desc: usize, words: Option<&[u64]>) {
+    use std::fmt::Write as _;
+    let read = |at: usize, len: usize| -> Option<Vec<u8>> {
+        let mut bytes = vec![0u8; len];
+        (at != 0 && crate::host::read_into(at as *const u8, &mut bytes)).then_some(bytes)
+    };
+    let mut parts: Vec<(String, Vec<u8>)> = Vec::new();
+    parts.extend(read(desc, 256).map(|b| ("desc".to_owned(), b)));
+    if let Some(words) = words {
+        parts.extend(words.first().and_then(|&w| read(w as usize, 512)).map(|b| ("object".to_owned(), b)));
+        for (i, pair) in words.windows(2).enumerate() {
+            let (at, len) = (pair[0] as usize, pair[1] as usize);
+            if at > 0x1_0000 && len != 0 && len < 0x10_0000 {
+                parts.extend(read(at, len).map(|b| (format!("w{i:02}"), b)));
+            }
+        }
+    }
+    let dir = std::env::var_os("VICTORY_PIPELINE_SAVE").map(std::path::PathBuf::from);
+    let dir = dir.filter(|d| std::fs::create_dir_all(d).is_ok());
+    for (name, bytes) in &parts {
+        if let Some(dir) = &dir {
+            let _ = std::fs::write(dir.join(format!("{SLOT:#x}-{calls:05}-{name}.bin")), bytes);
+        }
+        let shown = &bytes[..bytes.len().min(4096)];
+        let mut hex = String::with_capacity(shown.len() * 2);
+        for b in shown {
+            let _ = write!(hex, "{b:02x}");
+        }
+        tracing::warn!(
+            slot = format_args!("{SLOT:#x}"),
+            calls,
+            part = %name,
+            len = bytes.len(),
+            hex = %hex,
+            "pipeline description bytes"
+        );
+    }
+}
+
+#[cfg(all(windows, not(feature = "diagnostics")))]
+fn save_description<const SLOT: usize>(_: u32, _: usize, _: Option<&[u64]>) {}
 
 /// IUnknown 3, object methods 4, device methods 76 (0x18-0x290), then the
 /// methods `ID3D12Device1` to `ID3D12Device8` add, in order: 3, 1, 3, 6, 9,

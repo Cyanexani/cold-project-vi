@@ -152,7 +152,33 @@ pub(crate) fn wanted(n: u64) -> bool {
     // run, so single frames cannot be compared between runs).
     let first = WORLD.load(std::sync::atomic::Ordering::Relaxed);
     let in_world = world_on() && first != u64::MAX && n > first && (n - first).is_multiple_of(8);
-    folder().is_some() && (n.is_power_of_two() || listed(n) || before_world || in_world)
+    folder().is_some() && (n.is_power_of_two() || listed(n) || before_world || in_world || every(n))
+}
+
+/// `VICTORY_CAPTURE_EVERY_MS=<ms>`: also a frame each time that long has
+/// passed since the last one so saved (a picture every 20 s of an unattended
+/// run, whatever its frame rate).
+fn every(n: u64) -> bool {
+    use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+    static EVERY: std::sync::OnceLock<Option<u64>> = std::sync::OnceLock::new();
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    static LAST_FRAME: AtomicU64 = AtomicU64::new(u64::MAX);
+    let Some(every) = *EVERY.get_or_init(|| {
+        std::env::var("VICTORY_CAPTURE_EVERY_MS").ok().and_then(|v| v.trim().parse().ok()).filter(|&ms| ms > 0)
+    }) else {
+        return false;
+    };
+    // (Asked more than once for the same frame: the same answer.)
+    if LAST_FRAME.load(Relaxed) == n {
+        return true;
+    }
+    let now = crate::host::now_ms();
+    let last = LAST.load(Relaxed);
+    if now.saturating_sub(last) >= every && LAST.compare_exchange(last, now, Relaxed, Relaxed).is_ok() {
+        LAST_FRAME.store(n, Relaxed);
+        return true;
+    }
+    false
 }
 
 /// Saves 8-bit RGBA or BGRA rows (`pitch` bytes apart) as frame `n`.
@@ -179,6 +205,8 @@ fn save_as(name: &str, width: u32, height: u32, pitch: usize, bgra: bool, rows: 
         }
     }
     let png = encode(w, h, &raw);
+    // (The folder of a run is made by its first picture.)
+    let _ = std::fs::create_dir_all(folder);
     let path = folder.join(format!("{name}.png"));
     match std::fs::write(&path, png) {
         Ok(()) => tracing::info!(path = %path.display(), "frame saved"),

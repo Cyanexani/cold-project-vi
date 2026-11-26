@@ -1415,6 +1415,11 @@ pub(crate) fn probe_view_limit() {
 /// table past them is made afresh in these slots like any other.
 pub(crate) const DYNAMIC: u32 = 1 << 18;
 
+/// The dynamic slots of the last view heap made, and the most of them in use
+/// at once since the last memory line (diagnostics).
+pub(crate) static DYNAMIC_SIZE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+pub(crate) static DYNAMIC_PEAK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 /// [`DYNAMIC`] for a heap of `count` title slots whose null slot is `null`
 /// (0: none): up to four times as many where the host heap has the room (a
 /// host that takes more than [`PORTABLE_VIEWS`]; `VICTORY_DYNAMIC_SLOTS`
@@ -1422,6 +1427,7 @@ pub(crate) const DYNAMIC: u32 = 1 << 18;
 /// play-1125-0127: 27,000 to 35,000 tables a frame, up to 3,285 of them
 /// refused, with 2,639 indirect draws and dispatches).
 fn dynamic_slots(count: u32, null: u32) -> u32 {
+    static CAPPED: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
     static MOST: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
     let most = *MOST.get_or_init(|| {
         std::env::var("VICTORY_DYNAMIC_SLOTS")
@@ -1430,7 +1436,16 @@ fn dynamic_slots(count: u32, null: u32) -> u32 {
             .unwrap_or(DYNAMIC << 2)
     });
     if null < PORTABLE_VIEWS {
-        return DYNAMIC;
+        // A host capped at 1,000,000 views (NVIDIA): the dynamic slots come
+        // out of the title's, and every table of the title's past them is
+        // made afresh in them (`draw::State::tables`), so neither side has
+        // enough. `VICTORY_DYNAMIC_SLOTS` moves the line here too.
+        let set = *CAPPED.get_or_init(|| {
+            std::env::var("VICTORY_DYNAMIC_SLOTS").ok().and_then(|v| v.trim().parse::<u32>().ok())
+        });
+        let size = set.map_or(DYNAMIC, |n| n.clamp(DYNAMIC / 4, null / 2));
+        DYNAMIC_SIZE.store(size, std::sync::atomic::Ordering::Relaxed);
+        return size;
     }
     null.saturating_sub(count).min(most).max(DYNAMIC)
 }
@@ -1700,7 +1715,8 @@ impl HostHeap {
         #[cfg(feature = "diagnostics")]
         crate::copystat::add(crate::copystat::C::DynamicNs, started.elapsed().as_nanos() as u64);
         taken[first..first + n].fill(true);
-        self.free.fetch_sub(n as u32, std::sync::atomic::Ordering::Relaxed);
+        let free = self.free.fetch_sub(n as u32, std::sync::atomic::Ordering::Relaxed) - n as u32;
+        DYNAMIC_PEAK.fetch_max(self.dynamic - free, std::sync::atomic::Ordering::Relaxed);
         *next = ((first + n) % end) as u32;
         Some(self.count + first as u32)
     }

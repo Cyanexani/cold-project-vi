@@ -436,6 +436,15 @@ pub(crate) fn bound(this: This) {
         return;
     }
     let p = pipeline(this);
+    if p.shaders.is_empty() {
+        // A stand-in for a pipeline the title made from native code (device
+        // method 0x1c8, [`stand_in`]): how often lists bind one says how much
+        // drawing goes without them.
+        let n = STAND_IN_BINDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        if n.is_power_of_two() {
+            tracing::info!(binds = n, frame = crate::frame::current(), "binds of stand-in pipelines (device method 0x1c8; their draws are dropped)");
+        }
+    }
     if p.bound.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return;
     }
@@ -526,6 +535,22 @@ pub(crate) fn note_drop(this: This) {
     }
 }
 
+/// Why `this` has no host pipeline, without counting it (diagnostics):
+/// `None` when it has one.
+#[cfg(all(windows, feature = "diagnostics"))]
+pub(crate) fn drop_reason(this: This) -> Option<String> {
+    if this.is_null() {
+        return Some("no pipeline set".to_owned());
+    }
+    let p = pipeline(this);
+    if p.shaders.is_empty() {
+        return Some("a stand-in without shaders".to_owned());
+    }
+    skipped_shader(p)
+        .map(|hash| format!("skipped shader {hash}"))
+        .or_else(|| make::missing(&p.host))
+}
+
 /// Counts a draw or dispatch dropped for `why` (diagnostics).
 #[cfg(all(windows, feature = "diagnostics"))]
 pub(crate) fn note_why(why: String) {
@@ -589,6 +614,23 @@ fn hand_out(
         bound: std::sync::atomic::AtomicBool::new(false),
     });
     object::hand_out(PIPELINE, pipeline, iid, &PIPELINE_IIDS, out)
+}
+
+/// Binds of stand-in pipelines ([`stand_in`]) since the start.
+pub(crate) static STAND_IN_BINDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A pipeline without shaders, handed out for one the title made from
+/// native code (device method 0x1c8, not translated yet): the title then
+/// binds it and draws, and those draws are dropped as any without a host
+/// pipeline, where before it went without the pipeline and its draws.
+pub(crate) fn stand_in(iid: *const Iid, out: *mut This) -> HRESULT {
+    hand_out(
+        Vec::new(),
+        #[cfg(windows)]
+        None,
+        iid,
+        out,
+    )
 }
 
 /// Device method.
