@@ -181,6 +181,20 @@ la santé du joueur).
 | `VICTORY_NO_TEXTURES=1` | les textures du jeu ne sont ni envoyées à la carte ni montrées : chaque vue lit une petite texture grise de la même forme (2D, tableau, cube, 3D). Les cibles de rendu, la profondeur et ce que la carte écrit restent |
 | `VICTORY_NO_DRAWS=1` | ni pipelines ni shaders : chaque dessin du jeu est jeté, l'écran reste noir (le compteur s'affiche). Le jeu tourne quand même : sert à mesurer ce que coûte le jeu seul |
 
+### Tester ton PC (`Tester.cmd`)
+
+On n'a mesuré que sur un seul PC (RTX 3060 12 Go, Ryzen 7 5700G, 16 Go :
+4,5 images/s stables, 5 au mieux). Des rapports d'autres PC, surtout avec
+32-64 Go de RAM ou une carte plus forte, disent ce qui vient de notre couche
+et ce qui vient du PC. Double-cliquer `Tester.cmd` (lancer `Prechauffer.cmd`
+une fois avant, après chaque mise à jour) : il lance le jeu, appuie sur A à
+l'écran titre, mesure 5 minutes dans le monde (`Tester.ps1 -Minutes 10` pour
+plus long, `-Console series-x` pour l'autre profil), prend une capture toutes
+les 30 s, ferme le jeu et écrit `rapports	est-<date>apport.md` (ton PC,
+images/s, où va une image, mémoire, erreurs) et un zip avec le journal et les
+captures. Ton nom d'utilisateur Windows en est retiré ; rien n'est envoyé.
+Ouvrir une issue **Config test**, y coller `rapport.md` et joindre le zip.
+
 ### Réglages conseillés (PC de 16 Go)
 
 - **Mode Series S** : ajouter `--console series-s` à la commande. Le jeu se

@@ -162,6 +162,20 @@ player's position and health found in game memory, without symbols).
 | `VICTORY_NO_TEXTURES=1` | the game's textures are neither sent to the GPU nor shown: every view reads a small grey texture of the same shape (2D, array, cube, 3D). Render targets, depth and what the GPU writes stay |
 | `VICTORY_NO_DRAWS=1` | no pipelines, no shaders: every draw is dropped and the screen stays black (the counter shows). The game still runs, to measure the game on its own |
 
+### Test your PC (`Tester.cmd`)
+
+We have measured on one PC only (RTX 3060 12 GB, Ryzen 7 5700G, 16 GB:
+4.5 fps steady, 5 at best). Reports from other PCs, above all with 32-64 GB
+of RAM or a stronger card, tell us what is our layer's cost and what is the
+PC's. Double-click `Tester.cmd` (run `Prechauffer.cmd` once before, after
+every update): it starts the game, presses A on the title screen, measures
+5 minutes in the world (`Tester.ps1 -Minutes 10` for longer, `-Console
+series-x` for the other profile), takes a screenshot every 30 s, closes the
+game and writes `rapports	est-<date>apport.md` (your PC, fps, where a
+frame goes, memory, errors) and a zip with the log and the screenshots.
+Your Windows user name is taken out of both; nothing is sent anywhere.
+Open a **Config test** issue, paste `rapport.md` and attach the zip.
+
 ## Speed
 
 Frame time in the world (the cell scene, RTX 3060, 16 GB, Series S profile):

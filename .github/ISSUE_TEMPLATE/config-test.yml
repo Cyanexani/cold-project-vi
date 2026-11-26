@@ -1,0 +1,24 @@
+name: Config test / Rapport de test
+description: Results of Tester.cmd on your PC / Résultats de Tester.cmd sur ton PC
+title: "Config test: <GPU> + <RAM>"
+labels: ["config test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run `Tester.cmd` (after `Prechauffer.cmd`), then paste `rapports\test-<date>\rapport.md` below and attach the zip next to it.
+        Lance `Tester.cmd` (après `Prechauffer.cmd`), colle `rapports\test-<date>\rapport.md` ci-dessous et joins le zip à côté.
+        Never attach game files / Ne joins jamais de fichiers du jeu.
+  - type: textarea
+    id: report
+    attributes:
+      label: rapport.md
+      description: Paste the whole file / Colle tout le fichier
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What you saw / Ce que tu as vu
+      description: Picture problems, stutters, where it closed... (drag the zip and screenshots here) / Problèmes d'image, saccades, où ça s'est fermé... (glisse le zip et les captures ici)

@@ -81,3 +81,6 @@ Thumbs.db
 /logs/
 /sauvegarde-avant-fork/
 /apps/lanceur/target/
+
+# Config test reports (Tester.cmd)
+/rapports/
