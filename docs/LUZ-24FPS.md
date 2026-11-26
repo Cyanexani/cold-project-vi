@@ -65,14 +65,15 @@ abertas, o Windows passa memória para o disco e os FPS caem.
 
 ## Teclado e rato
 
-| Tecla | Comando | A pé | Em veículos (Caps Lock ligado) |
+| Tecla | Comando | A pé | Em veículos |
 |---|---|---|---|
 | W/A/S/D | analógico esquerdo | mover | W acelera (RT), S trava ou faz marcha-atrás (LT), A/D vira |
-| rato | analógico direito | olhar (F1 solta ou prende o rato) | olhar |
+| rato | analógico direito | olhar | olhar |
 | botão esquerdo | RT / RB | atirar | atirar (RB) |
 | botão direito | LT | mirar ou interagir | |
 | Shift esq. | L3 | correr | buzina ou nitro |
-| F, E ou Y | Y | interagir, entrar no veículo | sair |
+| F | Y + modo veículo | entrar no veículo | sair do veículo |
+| E ou Y | Y | interagir, falar | |
 | Espaço / Enter | A | saltar ou escalar | travão de mão |
 | Ctrl esq. / C / Backspace | B | agachar ou descansar | faróis |
 | R ou X | X | corpo a corpo | |
@@ -83,10 +84,15 @@ abertas, o Windows passa memória para o disco e os FPS caem.
 | setas ou 1-4 | D-pad | telemóvel, rádio, navegação, parceiro | |
 | Esc | Menu | pausa | pausa |
 
-O jogo conduz com os gatilhos. Por isso, num carro, barco ou mota liga o
-**Caps Lock** para o W e o S passarem a acelerar e travar, e desliga-o quando
-saíres. A luz do Caps Lock mostra em que modo estás. Um comando Xbox ligado
-substitui o teclado.
+- **Rato:** um clique na janela do jogo prende o rato para servir de câmara.
+  **Alt** ou **F1** soltam-no, e mudar para outra janela também o solta. O F1
+  volta a prendê-lo.
+- **Veículos:** o jogo conduz com os gatilhos. O **F** (entrar ou sair) liga e
+  desliga sozinho o modo veículo, em que o W e o S passam a acelerar e travar.
+  Basta segurar o W. Se o modo ficar trocado (por exemplo, se o F não te pôs
+  no carro), carrega no **Caps Lock** para o corrigir. Para falar com pessoas
+  sem mudar de modo, usa o **E**.
+- Um comando Xbox ligado substitui o teclado e o rato.
 
 ## O que mudou em relação ao cgbj
 

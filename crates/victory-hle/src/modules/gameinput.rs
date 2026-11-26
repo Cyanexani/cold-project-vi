@@ -67,8 +67,9 @@ const POLL: Duration = Duration::from_millis(8);
 /// R hits (X), Q takes cover (RB), Tab is the inventory (LB), M the map
 /// (View), V looks back (R3), arrows the D-pad. Sticks: W/A/S/D left, the
 /// mouse ([`MOUSE_LOOK`]) or I/J/K/L right; the right mouse button aims (LT),
-/// the left one shoots (RT). Caps Lock on is the vehicle scheme ([`VEHICLE`]):
-/// W/S accelerate and brake (RT/LT), the left button shoots (RB).
+/// the left one shoots (RT). F (enter, leave) and Caps Lock switch to and from
+/// the vehicle scheme ([`VEHICLE`]): W/S accelerate and brake (RT/LT), the
+/// left button shoots (RB).
 const FALLBACK_BUTTONS: [(u8, u32); 24] = [
     (0x1B, MENU), // Esc
     (b'M', VIEW),
@@ -96,7 +97,8 @@ const FALLBACK_BUTTONS: [(u8, u32); 24] = [
     (b'V', RIGHT_STICK),
 ];
 
-/// Caps Lock's light: the vehicle scheme of the stand-in pad ([`fallback`]).
+/// The vehicle scheme of the stand-in pad ([`fallback`]): switched by F and
+/// Caps Lock (the host's poll).
 static VEHICLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The mouse's movement as the right stick, x and y as `f32` bits (up
@@ -1168,7 +1170,7 @@ mod host {
     use windows_sys::Win32::System::Threading::GetCurrentProcessId;
     use windows_sys::Win32::Foundation::{POINT, RECT};
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-        GetAsyncKeyState, GetKeyState, MAPVK_VK_TO_VSC_EX, MapVirtualKeyW,
+        GetAsyncKeyState, MAPVK_VK_TO_VSC_EX, MapVirtualKeyW,
     };
     use windows_sys::Win32::UI::Input::XboxController::{
         XINPUT_GAMEPAD, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_BACK,
@@ -1265,10 +1267,8 @@ mod host {
                 0
             };
             super::MOUSE_BUTTONS.store(mouse, std::sync::atomic::Ordering::Relaxed);
-            // SAFETY: plain query; the low bit is the key's light.
-            let caps = unsafe { GetKeyState(0x14) } & 1 != 0;
-            super::VEHICLE.store(caps, std::sync::atomic::Ordering::Relaxed);
-            mouse_look(self, focused());
+            vehicle_mode(focused());
+            mouse_look(mouse, focused());
             if focused() {
                 // Left/right modifier keys only, as devices report them; no
                 // mouse buttons (below 0x08).
@@ -1348,13 +1348,37 @@ mod host {
     /// cursor put back there. F1 lets the mouse go (and takes it again);
     /// `VICTORY_MOUSE_LOOK=0` never takes it, `VICTORY_MOUSE_SENS` (0.02)
     /// is the stick per pixel.
-    fn mouse_look<T>(_: &T, focused: bool) {
+    /// The vehicle scheme ([`super::VEHICLE`]): F (entering or leaving a
+    /// vehicle) and Caps Lock each switch it, on their press. F also talks to
+    /// people (Y); E does that without switching, and Caps Lock puts it right.
+    fn vehicle_mode(focused: bool) {
+        use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+        static HELD: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
+        for (held, vk) in HELD.iter().zip([i32::from(b'F'), 0x14]) {
+            // SAFETY: plain query.
+            let down = focused && unsafe { GetAsyncKeyState(vk) } < 0;
+            if down && !held.swap(true, Relaxed) {
+                super::VEHICLE.fetch_xor(true, Relaxed);
+            } else if !down {
+                held.store(false, Relaxed);
+            }
+        }
+    }
+
+    /// The right stick from the mouse while it is taken: each poll the
+    /// cursor's distance from the middle of the foreground window, smoothed
+    /// over about 40 ms, and the cursor put back there. A left click in the
+    /// window takes the mouse; Alt or F1, or another window in front, lets
+    /// it go (F1 takes it again). `VICTORY_MOUSE_LOOK=0` never takes it,
+    /// `VICTORY_MOUSE_SENS` (0.02) is the stick per pixel.
+    fn mouse_look(buttons: u32, focused: bool) {
         use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
         use std::sync::OnceLock;
         static ON: OnceLock<bool> = OnceLock::new();
         static SENS: OnceLock<f32> = OnceLock::new();
-        static FREE: AtomicBool = AtomicBool::new(false);
+        static TAKEN: AtomicBool = AtomicBool::new(false);
         static F1_HELD: AtomicBool = AtomicBool::new(false);
+        static CLICK_HELD: AtomicBool = AtomicBool::new(false);
         static SMOOTH: AtomicU64 = AtomicU64::new(0);
         let on = *ON.get_or_init(|| std::env::var_os("VICTORY_MOUSE_LOOK").is_none_or(|v| v != "0"));
         let sens = *SENS.get_or_init(|| {
@@ -1365,19 +1389,33 @@ mod host {
         // SAFETY: plain query.
         let f1 = focused && unsafe { GetAsyncKeyState(0x70) } < 0;
         if f1 && !F1_HELD.swap(true, Relaxed) {
-            FREE.fetch_xor(true, Relaxed);
+            TAKEN.fetch_xor(true, Relaxed);
         } else if !f1 {
             F1_HELD.store(false, Relaxed);
+        }
+        // SAFETY: plain query (Alt).
+        if !focused || unsafe { GetAsyncKeyState(0x12) } < 0 {
+            TAKEN.store(false, Relaxed);
+        }
+        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut at = POINT { x: 0, y: 0 };
+        // SAFETY: plain queries into locals.
+        let placed = focused
+            && unsafe { GetWindowRect(GetForegroundWindow(), &mut rect) } != 0
+            && unsafe { GetCursorPos(&mut at) } != 0;
+        let click = buttons & 1 != 0;
+        if click && !CLICK_HELD.swap(true, Relaxed) {
+            let inside = placed && at.x >= rect.left && at.x < rect.right && at.y >= rect.top + 32 && at.y < rect.bottom;
+            if inside {
+                TAKEN.store(true, Relaxed);
+            }
+        } else if !click {
+            CLICK_HELD.store(false, Relaxed);
         }
         let (mut x, mut y) = unpack(SMOOTH.load(Relaxed));
         x *= 0.8;
         y *= 0.8;
-        if on && focused && !FREE.load(Relaxed) {
-            let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-            let mut at = POINT { x: 0, y: 0 };
-            // SAFETY: plain queries into locals.
-            if unsafe { GetWindowRect(GetForegroundWindow(), &mut rect) } != 0
-                && unsafe { GetCursorPos(&mut at) } != 0
+        if on && placed && TAKEN.load(Relaxed) {
             {
                 let (cx, cy) = ((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2);
                 // (A jump of more than a quarter of the window is the cursor
