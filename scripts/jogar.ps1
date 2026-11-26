@@ -144,6 +144,8 @@ if (!$Nosso) {
         # blocos a frente (2) e menos buffers do jogo na placa (512 MB) para sobrar VRAM para texturas.
         $more.VICTORY_RIPE_BLOCKS = '2'
         $more.VICTORY_CARD_BUFFERS_MB = '512'
+        # Dica da comunidade: VICTORY_THIN=1 desfoca a imagem toda nas RTX 50 (Blackwell, como a 5070 Ti).
+        $more.VICTORY_THIN = '0'
         # A runtime verifica o orcamento da placa antes de usar o Resizable BAR.
         $more.VICTORY_WINDOWS_BAR_MB = '1024'
         $more.VICTORY_PRESSURE_FREE_MB = '1024'
