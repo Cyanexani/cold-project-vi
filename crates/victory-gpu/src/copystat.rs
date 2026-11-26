@@ -803,7 +803,8 @@ fn log_memory() {
     );
     {
         let [textures, staging] = crate::pool::memory();
-        tracing::info!("memory in blocks (VICTORY_TEXTURE_POOL=0 turns them off): {textures} MB of textures, {staging} MB of their staging buffers");
+        let [free, empty, sparse] = crate::pool::texture_holes();
+        tracing::info!("memory in blocks (VICTORY_TEXTURE_POOL=0 turns them off): {textures} MB of textures, {staging} MB of their staging buffers; {free} MB of the textures' free ({empty} blocks empty, {sparse} under a quarter full; VICTORY_POOL_FULLEST)");
     }
     let targets = crate::resource::targets_census();
     tracing::info!(

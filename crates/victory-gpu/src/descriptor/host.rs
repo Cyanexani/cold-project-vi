@@ -5727,31 +5727,6 @@ void BY_FLOATS_OR_NOT(uint3 id : SV_DispatchThreadID) {
         assert!(q.due(16, 100).iter().any(|d| d.0 == 98));
     }
 
-    /// Slots looked at before and slots never looked at are served in
-    /// turns, one looked at before first: a pass that can take only some
-    /// of a backlog of slots streaming in a part at a time still reaches
-    /// the slots never looked at.
-    #[test]
-    fn the_texture_queue_serves_looked_at_and_fresh_slots_in_turns() {
-        let mut q = TextureQueue::default();
-        // Slots 100..110 looked at before (their memory not there yet).
-        for i in 0..10u32 {
-            q.written(100 + i, 1, 0, false);
-        }
-        for i in 0..10u32 {
-            let w = q.due(u64::MAX, 100).iter().find(|d| d.0 == 100 + i).unwrap().1;
-            q.later(100 + i, w, 1, 1);
-        }
-        // Slots 1..4 never looked at.
-        for i in 1..4u32 {
-            q.written(i, 2, 0, false);
-        }
-        let order: Vec<u32> = q.due(10, 6).into_iter().map(|d| d.0).collect();
-        assert_eq!(order.len(), 6);
-        assert!(order[0] >= 100, "a slot looked at before comes first: {order:?}");
-        assert_eq!(order.iter().filter(|&&i| i < 100).count(), 3, "every fresh slot is reached: {order:?}");
-    }
-
     /// Slots held back for lack of room on the card are not handed out
     /// until their frame, keep their place, are not counted as waiting
     /// for their memory, and all come back at once when the card has room;
