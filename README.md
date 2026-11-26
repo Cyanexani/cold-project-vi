@@ -1,3 +1,12 @@
+It runs 24-26 fps, all controls have been mapped,currently using -locallights
+On the Open world i get about 10-15fps
+Everything seems to be loading
+I need help to fix volumetric shaders _Tiled
+It's running on 12gb vram and 32gb ddr5
+Currently it uses about 10-11gb on vram and 27gb ddr5
+I got a laptop with a rtx 5070 ti capped at 145w and a Intel i9 ultra 275hx
+Hope this helps anyone, missions are already possible and doesn't crash even after long sessions
+on menus it goes from 30-32/33fps
 # VIctory on an RX 7900 XTX
 
 > **Ramo `edupode`:** cgbj + luz do fork VIctory-NVIDIA, afinado para uma RTX 5070 Ti portátil (12 GB):
