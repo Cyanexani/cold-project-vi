@@ -15,6 +15,9 @@ rem 1080p em vez da TV 4K que o jogo julga ter, e ate 1 GB de buffers do jogo na
 rem Medido aqui: de ~3 para ~9 FPS. O launcher dele so poe as suas definicoes quando nao existem.
 set "VICTORY_DISPLAY_MODE=1920x1080"
 set "VICTORY_CARD_BUFFERS_MB=1024"
+rem Regista os pipelines que o jogo cria; ao fechar, sao preparados para a proxima sessao
+rem (sem isto, caras e objetos de cenas novas ficam por desenhar enquanto o driver os compila).
+set "VICTORY_PIPELINE_BOOK=1"
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
   echo Ja ha um VIctory a correr. Fecha-o primeiro ^(ou carrega em H no ciclo^).
   pause
@@ -25,5 +28,7 @@ for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss
 set "LOG=%RUN%\logs\cgbj-%STAMP%.log"
 echo A jogar com o launcher do cgbj. Log: %LOG%
 call "%~dp0Play-VIctory.cmd" pareto-residency > "%LOG%" 2>&1
+echo Jogo fechado. A preparar os pipelines desta sessao para a proxima (pode levar uns minutos)...
+"%~dp0victory-3d-rtx-pareto-residency.exe" warm --used >> "%LOG%" 2>&1
 echo Terminado. Log: %LOG%
 exit /b %errorlevel%
