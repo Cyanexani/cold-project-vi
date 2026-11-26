@@ -2633,6 +2633,25 @@ impl State {
         // drains; `VICTORY_TEXTURE_CATCHUP=0` keeps the plain budget.
         static CATCHUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
         let catchup = *CATCHUP.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_CATCHUP").is_none_or(|v| v != "0"));
+        // System RAM decides too, for PCs with 32 GB (this fork measured 40-46 GB
+        // private on 64): staged textures are host memory first. Below 8 GiB
+        // available no catch-up; below 4 GiB a quarter of the budget, so the queue
+        // still drains. `VICTORY_TEXTURE_RAM_GUARD=0` turns it off.
+        static RAM_GUARD: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        let (per_frame, span, catchup) =
+            if *RAM_GUARD.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_RAM_GUARD").is_none_or(|v| v != "0")) {
+                let avail = crate::host::available_physical_ram().unwrap_or(u64::MAX);
+                if avail < 4 << 30 {
+                    once!("textures picked by index: little system RAM left; staging a quarter of the budget");
+                    (per_frame / 4, span / 2, false)
+                } else if avail < 8 << 30 {
+                    (per_frame, span, false)
+                } else {
+                    (per_frame, span, catchup)
+                }
+            } else {
+                (per_frame, span, catchup)
+            };
         let (per_frame, span) = if catchup && on_time >= 1024 { (per_frame * 3, span * 3) } else { (per_frame, span) };
         // A run made early (`State::early_textures`) has a budget of its
         // own: its bytes on top of what the frame has spent so far.
@@ -3592,6 +3611,54 @@ impl State {
         }
     }
 
+    /// Whether the table at root `slot` can be read from the title's own
+    /// slots although it holds constant buffers (`VICTORY_CBV_IN_PLACE=1`):
+    /// every constant buffer of it lies in a host copy at a 256-byte aligned
+    /// address (as the host takes them; the title's slot is then made from
+    /// it, `make_twinned`) and the table lies within the host heap. Such
+    /// tables then take no dynamic slots, which a host heap capped at
+    /// 1,000,000 views (NVIDIA) ran out of: 20 % of tables refused, their
+    /// draws dropped. Their constants are read from the host copy, brought
+    /// up to date for the list as other views' memory is (the fresh tables'
+    /// constants are copied at submission too).
+    fn constants_in_place(&self, used: &[UsedResource], slot: u8, compute: bool) -> bool {
+        static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if !*ON.get_or_init(|| std::env::var_os("VICTORY_CBV_IN_PLACE").is_some_and(|v| v == "1")) {
+            return false;
+        }
+        let Some(&Root::Table(table)) = self.roots_ref(compute).get(usize::from(slot)) else {
+            return false;
+        };
+        let Some(heap) = self.heap_of(table) else {
+            return false;
+        };
+        let Some(host) = heap.host() else {
+            return false;
+        };
+        let mut any = false;
+        for u in used.iter().filter(|u| u.root == RootType::Table && u.slot == slot) {
+            let handle = table + u64::from(u.table_offset_dwords) * 4;
+            match heap.index(handle) {
+                Some(index) if index < host.count() => {}
+                _ => return false,
+            }
+            if u.kind != ResourceType::Cbv {
+                continue;
+            }
+            let Some(crate::descriptor::View::Constant(address, size)) = crate::descriptor::view(handle) else {
+                return false;
+            };
+            let Some(shadow) = crate::shadow::find(address, u64::from(size)) else {
+                return false;
+            };
+            if shadow.gpu(address) % 256 != 0 {
+                return false;
+            }
+            any = true;
+        }
+        any
+    }
+
     fn table_entry(&self, list: &HostList, u: &UsedResource, compute: bool) {
         let Some(Root::Table(table)) = self.roots_ref(compute).get(usize::from(u.slot)) else {
             return;
@@ -3768,6 +3835,11 @@ impl State {
                 made.push((slot, u32::MAX));
                 continue;
             };
+            #[cfg(feature = "diagnostics")]
+            {
+                crate::copystat::add(crate::copystat::C::FreshOther, 1);
+                crate::copystat::add(crate::copystat::C::FreshOtherSlots, u64::from(n));
+            }
             self.fresh_tables.insert(key, FreshTable { first, epoch: 0, ready: Vec::new() });
             self.dynamic
                 .push((std::ptr::from_ref(heap) as usize, first, n));
@@ -4348,6 +4420,24 @@ impl State {
             _ => false,
         };
         if !ran {
+            // Which part: the pipeline (refused, a shader that does not
+            // translate, being made) or, with one, its kind, its binding or
+            // an index buffer outside title buffers.
+            #[cfg(feature = "diagnostics")]
+            {
+                let host = crate::pipeline::host_pipeline(self.pipeline as This);
+                let detail = match (crate::pipeline::drop_reason(self.pipeline as This), host) {
+                    (Some(missing), _) => missing,
+                    (None, Some(h)) if h.compute != (kind == DISPATCH) || h.mesh != (kind == MESH) => format!(
+                        "a pipeline of another kind (compute {}, mesh {})",
+                        h.compute, h.mesh
+                    ),
+                    (None, Some(_)) if kind == INDEXED => "binding or index buffer".to_owned(),
+                    (None, _) => "binding".to_owned(),
+                };
+                why(&format!("prepare failed: {detail}"));
+            }
+            #[cfg(not(feature = "diagnostics"))]
             why("prepare failed");
             return false;
         }

@@ -51,6 +51,19 @@ pub(crate) enum C {
     /// and the nanoseconds of the searches.
     DynamicAsked,
     DynamicRefused,
+    /// Fresh tables made because they reach past a capped host heap, and their slots.
+    FreshPast,
+    FreshPastSlots,
+    /// Other fresh tables (constant buffers copied per draw), and their slots.
+    FreshOther,
+    FreshOtherSlots,
+    /// Refused tables that reached past a capped host heap.
+    RefusedPast,
+    /// Constant buffer views in fresh tables, those 256-byte aligned (as the host wants),
+    /// and fresh tables whose constant buffers all are.
+    CbvSeen,
+    CbvAligned,
+    CbvTablesAligned,
     DynamicNs,
     /// Marker texts for device-removed data (`HostList::note`).
     NoteNs,
@@ -1203,6 +1216,19 @@ pub(crate) fn log(frames: f64) {
         ms(c[C::PaceUs as usize]),
         c[C::GpuWritesLeftOut as usize],
         mb(c[C::GpuWritesLeftOutBytes as usize]),
+    );
+    tracing::info!(
+        "fresh descriptor tables per frame: {:.0} past the capped host heap ({:.0} slots), {:.0} others ({:.0} slots); refused {:.0} of the first kind; dynamic slots in use at most {} of {}; constant buffer views in them {:.0}, {:.0} of them 256-byte aligned, {:.0} tables with all of theirs aligned",
+        c[C::FreshPast as usize],
+        c[C::FreshPastSlots as usize],
+        c[C::FreshOther as usize],
+        c[C::FreshOtherSlots as usize],
+        c[C::RefusedPast as usize],
+        crate::descriptor::host::DYNAMIC_PEAK.swap(0, std::sync::atomic::Ordering::Relaxed),
+        crate::descriptor::host::DYNAMIC_SIZE.load(std::sync::atomic::Ordering::Relaxed),
+        c[C::CbvSeen as usize],
+        c[C::CbvAligned as usize],
+        c[C::CbvTablesAligned as usize],
     );
     let [together, written, mapped] =
         [0, 1, 2].map(|n| crate::watch::ALIASES[n].load(std::sync::atomic::Ordering::Relaxed));
