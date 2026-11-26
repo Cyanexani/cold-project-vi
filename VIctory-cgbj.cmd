@@ -25,6 +25,9 @@ rem Texturas a velocidade normal enquanto houver 1 GB de RAM livre (o cgbj trava
 rem e so as soltava aos 5 GB: com 32 GB o jogo ficava sempre travado, a ~2 GB livres).
 set "VICTORY_PRESSURE_FREE_MB=1024"
 set "VICTORY_PRESSURE_CLEAR_MB=2048"
+rem A protecao de RAM antiga deste ramo (texturas a 1/4 abaixo de 4 GB livres) somava-se a do cgbj e
+rem travava as texturas (log 2026-11-26 09:44): desligada, fica so a do cgbj (acima).
+set "VICTORY_TEXTURE_RAM_GUARD=0"
 rem Salas menos escuras: sem ray tracing, a luz indireta e uma estimativa feita da luz no ecra
 rem (VICTORY_AMBIENT: parte dela que se usa). O cgbj usa 0.8; aqui 1.6. So visual.
 set "VICTORY_AMBIENT=1.6"
