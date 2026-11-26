@@ -36,9 +36,10 @@ if (Get-Process -Name victory -ErrorAction SilentlyContinue) {
     Write-Host 'Ainda ha uma sessao ou a preparacao de pipelines a correr; espero que acabe...'
     while (Get-Process -Name victory -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 5 }
 }
+$build = if ($Maximo -or (!$Nosso -and $Minutos -eq 0)) { 'release' } else { 'diag' }
 Push-Location -LiteralPath $repo
 try {
-    if ($Maximo -or (!$Nosso -and $Minutos -eq 0)) { & cargo build --locked --release -p victory }
+    if ($build -eq 'release') { & cargo build --locked --release -p victory }
     else { & cargo build --locked --profile diag -p victory --features diagnostics }
     if ($LASTEXITCODE -ne 0) { throw 'A compilacao falhou.' }
 } finally { Pop-Location }
@@ -125,7 +126,7 @@ if ($Minutos -gt 0) {
 # a jogar a serio, a build release. O teste em ciclo fica na build de diagnostico (Enter
 # automatico e capturas so existem nela), com o log das linhas de FPS.
 if (!$Nosso) { $SeriesS = $true }
-$opcoes = @{ Exe = $exe; More = $more; Console = $(if ($SeriesS) { 'series-s' } else { 'series-x' }) }
+$opcoes = @{ Exe = $exe; More = $more; Build = $build; Console = $(if ($SeriesS) { 'series-s' } else { 'series-x' }) }
 if (!$Nosso) {
     $opcoes.Cgbj = $true
     # Como o atalho "VIctory cgbj (original)" (VIctory-cgbj.cmd): 1080p e 1 GB de buffers na placa.
@@ -133,23 +134,20 @@ if (!$Nosso) {
     $more.VICTORY_CARD_BUFFERS_MB = '1024'
     $more.VICTORY_AMBIENT = '1.6'
     $more.VICTORY_TEXTURE_RAM_GUARD = '0'
-    if ($Minutos -gt 0) {
-        $more.VICTORY_LOG = 'warn,victory_gpu::host=info,victory_gpu::copystat=info'
-        # Experiencia: 4 blocos de texturas feitos a frente em vez de 12 (768 MB de VRAM vazia
-        # numa placa de 12 GB cheia), para caberem mais texturas.
+    # Perfil medido no ciclo da RTX 5070 Ti Laptop. -Seguro usa os limites de origem.
+    if (!$Seguro) {
+        # Limita a reserva de blocos livres. As texturas em uso conservam o seu espaco.
         $more.VICTORY_RIPE_BLOCKS = '4'
-        # Experiencia: buffers de vertices/constantes ("janelas") direto na VRAM pelo Resizable BAR
-        # (activo neste portatil: 16 GB de BAR), sem a copia do lado do PC.
+        # A runtime verifica o orcamento da placa antes de usar o Resizable BAR.
         $more.VICTORY_WINDOWS_BAR_MB = '1024'
         $more.VICTORY_PRESSURE_FREE_MB = '1024'
         $more.VICTORY_PRESSURE_CLEAR_MB = '2048'
     }
-    else { $opcoes.Build = 'release' }
+    if ($Minutos -gt 0) { $more.VICTORY_LOG = 'warn,victory_gpu::host=info,victory_gpu::copystat=info' }
 }
 # Maximo: sem os contadores de diagnostico e sem as milhares de linhas de log por segundo
 # (fica so a linha de FPS); o Enter automatico so existe na build de diagnostico.
 if ($Maximo) {
-    $opcoes.Build = 'release'
     $more.VICTORY_LOG = 'warn,victory_gpu::host=info'
 }
 if ($Seguro) { $opcoes.Safe = $true }
@@ -161,7 +159,7 @@ if ($relogio) { Stop-Job $relogio -ErrorAction SilentlyContinue; Remove-Job $rel
 
 # Pipelines feitos antes da proxima corrida (driver), a partir do livro desta.
 Write-Host "`nA preparar os pipelines para a proxima corrida (victory warm --used)..."
-& (Join-Path $repo 'target\diag\victory.exe') warm --used *>&1 | Select-Object -Last 3 | ForEach-Object { $_.ToString() }
+& (Join-Path $repo "target\$build\victory.exe") warm --used *>&1 | Select-Object -Last 3 | ForEach-Object { $_.ToString() }
 
 # Resumo
 $esc = [char]27

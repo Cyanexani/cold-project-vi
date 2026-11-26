@@ -974,38 +974,37 @@ impl TextureQueue {
         self.slots.remove(&index);
     }
 
-    /// Up to `max` slots due at `frame`, each with its write number, in
-    /// the order to serve them:
-    /// - first the ones looked at before (their memory was not mapped, or
-    ///   only part of it): the look is a query, and memory that has
-    ///   arrived since is what the title streamed in last;
-    /// - then the others, the newest write first and the oldest next, in
-    ///   turns: slot order served the low slots of a backlog of
-    ///   25,000-40,000 while the textures of the shot on screen waited
-    ///   (run 52: 98% of the drawn pixels had no colour texture in the
-    ///   first 3D frames).
+    /// Up to `max` due slots with their write numbers. Share the start of the
+    /// pass between first uploads and revisits, alternating newest and oldest
+    /// in each. The caller may exhaust its time or byte budget after one slot.
     fn due(&self, frame: u64, max: usize) -> Vec<(u32, u64)> {
-        let mut again: Vec<(u64, u32, u64)> = Vec::new();
-        let mut fresh: Vec<(u64, u32, u64)> = Vec::new();
+        if max == 0 {
+            return Vec::new();
+        }
+        let mut again = Vec::new();
+        let mut fresh = Vec::new();
         for (&index, w) in self.slots.iter().filter(|(_, w)| w.due <= frame) {
             let class = if w.looks > 0 || w.mapped > 0 { &mut again } else { &mut fresh };
-            class.push((w.written, index, w.write));
+            class.push((index, w.write));
         }
-        // By the number of the write, counted over the run.
-        let newest_first = |a: &(u64, u32, u64), b: &(u64, u32, u64)| b.2.cmp(&a.2);
-        again.sort_unstable_by(newest_first);
-        fresh.sort_unstable_by(newest_first);
-        let mut order: Vec<(u32, u64)> = again.iter().map(|&(_, index, write)| (index, write)).collect();
-        let (mut new, mut old) = (0, fresh.len());
-        while new < old && order.len() < max {
-            order.push((fresh[new].1, fresh[new].2));
-            new += 1;
-            if new < old && order.len() < max {
-                old -= 1;
-                order.push((fresh[old].1, fresh[old].2));
+        let count = max.min(again.len() + fresh.len());
+        let mut order = Vec::with_capacity(count);
+        let mut turn = frame % 4;
+        again.sort_unstable_by_key(|&(_, write)| write);
+        fresh.sort_unstable_by_key(|&(_, write)| write);
+        let (mut again, mut fresh) = (again.into_iter(), fresh.into_iter());
+        while order.len() < count {
+            let entry = match turn {
+                0 => again.next_back(),
+                1 => fresh.next_back(),
+                2 => again.next(),
+                _ => fresh.next(),
+            };
+            if let Some(entry) = entry {
+                order.push(entry);
             }
+            turn = (turn + 1) % 4;
         }
-        order.truncate(max);
         order
     }
 
@@ -1022,9 +1021,12 @@ impl TextureQueue {
     }
 
     /// Nothing to upload at slot `index` now: looked at again after 1, 2,
-    /// 4, ... frames, at most `most`.
-    fn later(&mut self, index: u32, write: u64, frame: u64, most: u64) {
+    /// 4, ... frames, at most `most`. Only pages still mapped can count
+    /// toward the next upload. The host copy can be discarded on unmap.
+    fn later(&mut self, index: u32, write: u64, frame: u64, most: u64, mapped_now: u64) {
         if let Some(w) = self.same(index, write) {
+            w.mapped = w.mapped.min(mapped_now);
+            w.checked = Default::default();
             w.due = frame + (1u64 << w.looks.min(16)).min(most.max(1));
             w.looks = w.looks.saturating_add(1);
         }
@@ -1066,6 +1068,7 @@ impl TextureQueue {
     fn partly(&mut self, index: u32, write: u64, due: u64, mapped: u64) {
         if let Some(w) = self.same(index, write) {
             (w.due, w.looks, w.mapped) = (due, 0, mapped.max(1));
+            w.checked = Default::default();
         }
     }
 
@@ -1105,13 +1108,15 @@ impl TextureQueue {
     }
 
     /// For the frame line: slots in the queue; of them due at `frame`;
-    /// waiting for their memory (looked at, never uploaded); uploaded in
-    /// part; and the frames the oldest due one has waited since its write.
-    fn census(&self, frame: u64) -> [u64; 5] {
-        let mut c = [self.slots.len() as u64, 0, 0, 0, 0];
+    /// waiting for memory; partial uploads; age of the oldest due write;
+    /// and whole uploads scheduled for a fingerprint check.
+    fn census(&self, frame: u64) -> [u64; 6] {
+        let mut c = [self.slots.len() as u64, 0, 0, 0, 0, 0];
         for w in self.slots.values() {
             if w.mapped > 0 {
                 c[3] += 1;
+            } else if w.checked.2 != 0 {
+                c[5] += 1;
             } else if w.looks > 0 {
                 c[2] += 1;
             }
@@ -1811,9 +1816,9 @@ impl HostHeap {
     /// with its write number, in the order to serve them
     /// ([`TextureQueue::due`]), and the queue's counts
     /// ([`TextureQueue::census`]).
-    pub(crate) fn texture_slots_due(&self, frame: u64, max: usize) -> (Vec<(u32, u64)>, [u64; 5]) {
+    pub(crate) fn texture_slots_due(&self, frame: u64, max: usize) -> (Vec<(u32, u64)>, [u64; 6]) {
         let textures = self.textures.lock().unwrap_or_else(|e| e.into_inner());
-        (if max == 0 { Vec::new() } else { textures.due(frame, max) }, textures.census(frame))
+        (textures.due(frame, max), textures.census(frame))
     }
 
     /// A number that changes when a slot is written or made due anew, and
@@ -1874,9 +1879,9 @@ impl HostHeap {
     /// Nothing to upload at title slot `index` now (its memory is not
     /// mapped, or no more of it than before): looked at again after 1, 2,
     /// 4, ... frames, at most `most`.
-    pub(crate) fn texture_slot_later(&self, index: u32, write: u64, frame: u64, most: u64) {
+    pub(crate) fn texture_slot_later(&self, index: u32, write: u64, frame: u64, most: u64, mapped_now: u64) {
         let mut textures = self.textures.lock().unwrap_or_else(|e| e.into_inner());
-        textures.later(index, write, frame, most);
+        textures.later(index, write, frame, most, mapped_now);
     }
 
     /// See [`TextureQueue::hold`].
@@ -5308,11 +5313,53 @@ mod tests {
         }
     }
 
-    /// The queue of textures picked by index serves the slots looked at
-    /// before first, then the newest write and the oldest in turns; a
-    /// slot whose memory is not there is looked at again after
-    /// 1, 2, 4 frames up to the limit; and what the pass reports about a
-    /// slot written again meanwhile is dropped.
+    /// A short frame budget must leave time for first uploads as well as
+    /// revisits when many textures are being streamed.
+    #[test]
+    fn short_texture_passes_reach_new_views_among_rechecks() {
+        let mut q = TextureQueue::default();
+        // A busy scene keeps feeding the queue partial uploads and revisits.
+        // Two views have never had their first upload.
+        for index in 0..66 {
+            q.written(index, 1, 1, false);
+        }
+        let pending = q.due(1, 66);
+        for (index, write) in pending {
+            match index {
+                0 | 65 => {}
+                1..=32 => q.partly(index, write, 2, 4096),
+                _ => q.recheck(index, write, 2, (1, 4096), 42, 0, 1),
+            }
+        }
+        // Simulate the caller running out of time after the first entry.
+        let first: std::collections::BTreeSet<_> = (4..8).map(|frame| q.due(frame, 1)[0].0).collect();
+        assert!(first.contains(&0) && first.contains(&65), "unserved views: {first:?}");
+        assert!(first.contains(&1) && first.contains(&64), "unserved revisits: {first:?}");
+        assert_eq!(q.census(4), [66, 66, 0, 32, 3, 32]);
+        assert!(q.due(4, 0).is_empty());
+        assert_eq!(q.due(4, 100).into_iter().collect::<std::collections::BTreeSet<_>>().len(), 66);
+    }
+
+    #[test]
+    fn returning_texture_pages_are_uploadable_after_an_unmap() {
+        let mut q = TextureQueue::default();
+        q.written(7, 1, 1, false);
+        let write = q.due(1, 1)[0].1;
+        q.partly(7, write, 2, 4096);
+        // The pass can discard the host copy after the slot's pages disappear.
+        q.later(7, write, 2, 16, 0);
+        assert_eq!(q.mapped(7), 0, "the same 4096 bytes must be eligible on return");
+        q.recheck(7, write, 4, (12288, 8192), 42, 0, 3);
+        q.partly(7, write, 5, 4096);
+        assert_eq!(q.checked(7), None, "a partial copy cannot pass an older whole-copy check");
+        q.recheck(7, write, 6, (12288, 8192), 42, 0, 5);
+        q.later(7, write, 6, 16, 0);
+        assert_eq!(q.checked(7), None);
+        q.partly(7, write, 7, 4096);
+        q.later(7, write, 7, 16, 4096);
+        assert_eq!(q.mapped(7), 4096, "unchanged mapped pages keep their progress");
+    }
+
     #[test]
     fn the_texture_queue_serves_the_newest_writes_first() {
         let mut q = TextureQueue::default();
@@ -5325,17 +5372,16 @@ mod tests {
         // newest, oldest, newest, oldest, and so on
         assert_eq!(order, [5, 10, 17, 11, 16, 12, 15, 13, 14]);
         assert_eq!(q.due(9, 2).len(), 2);
-        assert_eq!(q.census(9), [9, 9, 0, 0, 8]);
+        assert_eq!(q.census(9), [9, 9, 0, 0, 8, 0]);
         // Slot 17's memory is not mapped: again next frame, then in 2, 4, 4.
         let write = |q: &TextureQueue, index: u32| q.due(u64::MAX, 100).iter().find(|d| d.0 == index).unwrap().1;
         let w17 = write(&q, 17);
         let mut frame = 9;
         for wait in [1, 2, 4, 4] {
-            q.later(17, w17, frame, 4);
+            q.later(17, w17, frame, 4, 0);
             assert!(!q.due(frame + wait - 1, 100).iter().any(|d| d.0 == 17));
             frame += wait;
-            // Due again, and ahead of every slot never looked at.
-            assert_eq!(q.due(frame, 100)[0].0, 17);
+            assert!(q.due(frame, 2).iter().any(|d| d.0 == 17));
         }
         assert_eq!(q.census(9)[2], 1);
         q.done(17, w17);
@@ -5344,12 +5390,12 @@ mod tests {
         let w16 = write(&q, 16);
         q.partly(16, w16, 12, 4096);
         assert_eq!(q.mapped(16), 4096);
-        assert_eq!(q.due(12, 100)[0].0, 16);
+        assert!(q.due(12, 2).iter().any(|d| d.0 == 16));
         // The title writes slot 16 again while the pass works on it: what
         // the pass then says about the old write changes nothing.
         q.written(16, 13, 0, false);
         q.done(16, w16);
-        q.later(16, w16, 13, 4);
+        q.later(16, w16, 13, 4, 0);
         assert_eq!(q.mapped(16), 0);
         assert_eq!(q.due(13, 100)[0].0, 16);
         // A draw that makes the host slot (`seen`) keeps what the queue knows,

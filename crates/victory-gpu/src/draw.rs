@@ -800,8 +800,9 @@ pub(crate) static HEAP_TEXTURES_AWAY: AtomicU64 = AtomicU64::new(0);
 pub(crate) static HEAP_TEXTURES_TABLED: AtomicU64 = AtomicU64::new(0);
 /// The queue of textures picked by index at the last pass
 /// (`TextureQueue::census`): slots in it, due, waiting for their memory,
-/// uploaded in part, and the frames the oldest due one has waited.
-pub(crate) static HEAP_TEXTURES_QUEUE: [AtomicU64; 5] = [const { AtomicU64::new(0) }; 5];
+/// uploaded in part, age of the oldest due write in frames, and whole
+/// uploads scheduled for another fingerprint check.
+pub(crate) static HEAP_TEXTURES_QUEUE: [AtomicU64; 6] = [const { AtomicU64::new(0) }; 6];
 /// Since the start: looks at a slot uploaded in part that found no more of
 /// its memory mapped; uploads of textures not all mapped; and of those,
 /// the ones whose first page was not there (asked by the first page alone,
@@ -2494,7 +2495,7 @@ impl State {
     /// something reads them) and uploaded, as a table read would do, for
     /// shaders that pick them by a computed index. Within a budget of bytes
     /// per frame and in all; the rest waits for later lists and frames.
-    /// The most recently written slots first (`TextureQueue::due`); slots
+    /// New and old writes share the pass with revisits (`TextureQueue::due`); slots
     /// draws read through tables are not in the queue.
     /// shortcut: uploaded once, and again only when the title rewrites the
     /// slot. A placed texture not all mapped yet is uploaded with what is
@@ -2758,7 +2759,7 @@ impl State {
                     HEAP_TEXTURES_AWAY.fetch_add(1, Ordering::Relaxed);
                     // Streamed out: what the slot showed is let go.
                     host.texture_slot_gone(index);
-                    host.texture_slot_later(index, write, frame, most);
+                    host.texture_slot_later(index, write, frame, most, 0);
                     continue;
                 }
                 host.texture_slot_here(index);
@@ -2766,7 +2767,7 @@ impl State {
                 if mapped < len {
                     if mapped <= host.texture_slot_mapped(index) {
                         HEAP_TEXTURES_PARTLY[0].fetch_add(1, Ordering::Relaxed);
-                        host.texture_slot_later(index, write, frame, most);
+                        host.texture_slot_later(index, write, frame, most, mapped);
                         continue;
                     }
                     if !crate::texture::committed(address as *const u8, 1) {

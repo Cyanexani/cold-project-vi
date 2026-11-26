@@ -3,10 +3,22 @@
 Atualizado pelo Claude a cada volta do ciclo. Para ver o jogo ao vivo, olha para a janela do
 "VIctory teste em ciclo": de 15 em 15 s mostra FPS, ms por frame, desenhos e RAM livre (sem custo).
 
-## Agora (2026-11-26 09:50)
+## Como jogar e comparar as texturas na RTX 5070 Ti Laptop
 
-- Atalho de jogar = cgbj + 1080p + 1 GB de buffers + 4 blocos a frente + aperto de RAM so abaixo de
-  1 GB + luz ambiente 1,6 + registo/preparacao de pipelines + rato (LT/RT) e Espaco (A).
+Abre **Jogar VIctory** no ambiente de trabalho ou executa `.\Jogar.cmd` na raiz deste projeto. Carrega em **Enter** no seletor. A versão normal usa `target\release\victory.exe`. Os atalhos **VIctory teste automático** e **VIctory teste em ciclo** usam `target\diag\victory.exe`. O ciclo recompila a cada volta e termina com **H** na sua janela. Os três usam a instalação em `%USERPROFILE%\Downloads\dump private build` e a pasta `victory-xtx-run` indicada em `scripts\jogar.ps1`.
+
+A referência de 26 de novembro é `0875feec976f5244bdc8aad3a1b1764da208437a` no ramo `codex/cgbj-nvidia`. Na sessão das 11h34, o utilizador chegou ao corredor e ao gabinete. Os fotogramas do corredor marcaram 15 e 17 FPS. Há materiais pretos, manchas roxas e relatos de oscilações nas superfícies e na luminosidade de todo o ecrã com a câmara parada. O executável dessa sessão tem SHA-256 `4AD437B8647A1613976E2AD4E84897FD02C66116B44FB7CD72021AE9AD126573`. A cópia encontra-se em `checkpoints\victory-cgbj-0875fee-20261126\release-4ad437b8-victory.exe`, junto à pasta de corrida.
+
+A fila de texturas agora alterna entre primeiras cargas e novas tentativas. Quando páginas de uma textura saem da memória, a fila volta a aceitar essas páginas mesmo que regressem com o mesmo número de bytes. O log distingue cópias parciais de cópias completas à espera de verificação. O total de entradas inclui ambas e pode incluir vários descritores da mesma textura.
+
+O perfil padrão de jogo passou a usar os quatro blocos de reserva, o limite de 1 GiB para buffers via BAR e os limiares de memória de 1 e 2 GiB já usados no ciclo. `.\Jogar.cmd -Seguro` usa os valores de origem para estas quatro opções. Depois de fechar, o próprio executável que correu prepara os pipelines registados com `warm --used`. As páginas das texturas continuam a chegar do jogo durante a cena.
+
+Para registar o piscar, corre `.\scripts\gravar-piscar.ps1` com o jogo aberto e volta ao jogo. A gravação começa cinco segundos depois e guarda oito segundos da janela em **Vídeos\VIctory**. Usa o FFmpeg com o filtro `gfxcapture`. Para comparar duas builds, entra no corredor, para junto à porta marcada B36 e mantém a câmara no mesmo ângulo. Regista se mudam as paredes, o chão, a personagem ou o ecrã inteiro. A validação visual destas alterações no corredor continua em aberto.
+
+## Registo das 09h50 de 26 de novembro
+
+- O ciclo usava cgbj, 1080p, 1 GB de buffers, 4 blocos a frente, aperto de RAM abaixo de
+  1 GB e luz ambiente 1,6. Naquele momento o atalho manual ainda usava os limites de reserva e de RAM do fork.
 - Escuridao e olhos a brilhar: sem ray tracing (1-12 FPS aqui) a luz indireta e uma estimativa.
 - Proximo: confirmar a luz 1,6 nas capturas; memoria das listas de comandos (4-7 GB).
 
