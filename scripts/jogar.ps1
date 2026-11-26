@@ -131,6 +131,7 @@ if (!$Nosso) {
     # Como o atalho "VIctory cgbj (original)" (VIctory-cgbj.cmd): 1080p e 1 GB de buffers na placa.
     $more.VICTORY_DISPLAY_MODE = '1920x1080'
     $more.VICTORY_CARD_BUFFERS_MB = '1024'
+    $more.VICTORY_AMBIENT = '1.6'
     if ($Minutos -gt 0) {
         $more.VICTORY_LOG = 'warn,victory_gpu::host=info,victory_gpu::copystat=info'
         # Experiencia: 4 blocos de texturas feitos a frente em vez de 12 (768 MB de VRAM vazia
