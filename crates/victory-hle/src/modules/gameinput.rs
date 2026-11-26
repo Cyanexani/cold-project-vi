@@ -61,26 +61,52 @@ const DEVICES: usize = PADS + 2;
 const HISTORY: usize = 256;
 const POLL: Duration = Duration::from_millis(8);
 
-/// The keyboard's stand-in gamepad (virtual key, button); README lists it.
-/// Sticks: W/A/S/D left, I/J/K/L right; triggers Z and C, or the right
-/// (LT, aim) and left (RT, shoot) mouse buttons ([`MOUSE_BUTTONS`]).
-const FALLBACK_BUTTONS: [(u8, u32); 15] = [
+/// The keyboard's stand-in gamepad (virtual key, button), laid out like the
+/// title's own default scheme ("Padrao"): on foot Shift runs (L3), F enters
+/// vehicles and interacts (Y), Space jumps (A), Ctrl/C crouches or rests (B),
+/// R hits (X), Q takes cover (RB), Tab is the inventory (LB), M the map
+/// (View), V looks back (R3), arrows the D-pad. Sticks: W/A/S/D left, the
+/// mouse ([`MOUSE_LOOK`]) or I/J/K/L right; the right mouse button aims (LT),
+/// the left one shoots (RT). Caps Lock on is the vehicle scheme ([`VEHICLE`]):
+/// W/S accelerate and brake (RT/LT), the left button shoots (RB).
+const FALLBACK_BUTTONS: [(u8, u32); 24] = [
     (0x1B, MENU), // Esc
-    (0x09, VIEW), // Tab
-    (0x0D, A),    // Enter
-    (0x20, A),    // Space
-    (0x08, B),    // Backspace
+    (b'M', VIEW),
+    (0x0D, A), // Enter
+    (0x20, A), // Space
+    (0x08, B), // Backspace
+    (b'C', B),
+    (0xA2, B), // left Ctrl
     (b'X', X),
+    (b'R', X),
     (b'Y', Y),
+    (b'F', Y),
+    (b'E', Y),
     (0x26, UP), // arrows
     (0x28, DOWN),
     (0x25, LEFT),
     (0x27, RIGHT),
-    (b'Q', LEFT_SHOULDER),
-    (b'E', RIGHT_SHOULDER),
-    (b'F', LEFT_STICK),
-    (b'H', RIGHT_STICK),
+    (b'1', UP), // also 1-4, beside W/A/S/D
+    (b'2', LEFT),
+    (b'3', RIGHT),
+    (b'4', DOWN),
+    (0x09, LEFT_SHOULDER), // Tab
+    (b'Q', RIGHT_SHOULDER),
+    (0xA0, LEFT_STICK), // left Shift
+    (b'V', RIGHT_STICK),
 ];
+
+/// Caps Lock's light: the vehicle scheme of the stand-in pad ([`fallback`]).
+static VEHICLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The mouse's movement as the right stick, x and y as `f32` bits (up
+/// positive), set by the host's poll while one of our windows has the focus.
+static MOUSE_LOOK: AtomicU64 = AtomicU64::new(0);
+
+fn mouse_look() -> (f32, f32) {
+    let bits = MOUSE_LOOK.load(Ordering::Relaxed);
+    (f32::from_bits(bits as u32), f32::from_bits((bits >> 32) as u32))
+}
 
 /// A gamepad reading: triggers 0 to 1, sticks -1 to 1 (up positive).
 #[repr(C)]
@@ -131,17 +157,29 @@ fn fallback(keys: &[KeyState]) -> PadState {
             0.0
         }
     };
+    let mut buttons = FALLBACK_BUTTONS
+        .iter()
+        .filter(|(vk, _)| on(*vk) != 0.0)
+        .fold(0, |all, (_, bit)| all | bit);
+    let (look_x, look_y) = mouse_look();
+    let further = |x: f32, y: f32| if y.abs() > x.abs() { y } else { x };
+    let (left_trigger, right_trigger) = if VEHICLE.load(Ordering::Relaxed) {
+        // Vehicles: the triggers brake and accelerate, RB shoots.
+        if mouse & 1 != 0 {
+            buttons |= RIGHT_SHOULDER;
+        }
+        (f32::max(on(b'S'), on(b'Z')), f32::max(on(b'W'), on(b'C')))
+    } else {
+        (f32::max(on(b'Z'), button(2)), button(1))
+    };
     PadState {
-        buttons: FALLBACK_BUTTONS
-            .iter()
-            .filter(|(vk, _)| on(*vk) != 0.0)
-            .fold(0, |all, (_, bit)| all | bit),
-        left_trigger: f32::max(on(b'Z'), button(2)),
-        right_trigger: f32::max(on(b'C'), button(1)),
+        buttons,
+        left_trigger,
+        right_trigger,
         left_x: on(b'D') - on(b'A'),
         left_y: on(b'W') - on(b'S'),
-        right_x: on(b'L') - on(b'J'),
-        right_y: on(b'I') - on(b'K'),
+        right_x: further(on(b'L') - on(b'J'), look_x),
+        right_y: further(on(b'I') - on(b'K'), look_y),
     }
 }
 
@@ -1128,8 +1166,9 @@ mod host {
     use std::time::{Duration, Instant};
 
     use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+    use windows_sys::Win32::Foundation::{POINT, RECT};
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-        GetAsyncKeyState, MAPVK_VK_TO_VSC_EX, MapVirtualKeyW,
+        GetAsyncKeyState, GetKeyState, MAPVK_VK_TO_VSC_EX, MapVirtualKeyW,
     };
     use windows_sys::Win32::UI::Input::XboxController::{
         XINPUT_GAMEPAD, XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_BACK,
@@ -1140,7 +1179,7 @@ mod host {
         XInputSetState,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowThreadProcessId,
+        GetCursorPos, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, SetCursorPos,
     };
 
     use super::*;
@@ -1226,6 +1265,10 @@ mod host {
                 0
             };
             super::MOUSE_BUTTONS.store(mouse, std::sync::atomic::Ordering::Relaxed);
+            // SAFETY: plain query; the low bit is the key's light.
+            let caps = unsafe { GetKeyState(0x14) } & 1 != 0;
+            super::VEHICLE.store(caps, std::sync::atomic::Ordering::Relaxed);
+            mouse_look(self, focused());
             if focused() {
                 // Left/right modifier keys only, as devices report them; no
                 // mouse buttons (below 0x08).
@@ -1300,6 +1343,64 @@ mod host {
     }
 
     /// The foreground window is one of ours (the title's or our fallback).
+    /// The right stick from the mouse: each poll the cursor's distance from
+    /// the middle of the foreground window, smoothed over about 40 ms, and the
+    /// cursor put back there. F1 lets the mouse go (and takes it again);
+    /// `VICTORY_MOUSE_LOOK=0` never takes it, `VICTORY_MOUSE_SENS` (0.02)
+    /// is the stick per pixel.
+    fn mouse_look<T>(_: &T, focused: bool) {
+        use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+        use std::sync::OnceLock;
+        static ON: OnceLock<bool> = OnceLock::new();
+        static SENS: OnceLock<f32> = OnceLock::new();
+        static FREE: AtomicBool = AtomicBool::new(false);
+        static F1_HELD: AtomicBool = AtomicBool::new(false);
+        static SMOOTH: AtomicU64 = AtomicU64::new(0);
+        let on = *ON.get_or_init(|| std::env::var_os("VICTORY_MOUSE_LOOK").is_none_or(|v| v != "0"));
+        let sens = *SENS.get_or_init(|| {
+            std::env::var("VICTORY_MOUSE_SENS").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0.02)
+        });
+        let unpack = |b: u64| (f32::from_bits(b as u32), f32::from_bits((b >> 32) as u32));
+        let pack = |x: f32, y: f32| u64::from(x.to_bits()) | (u64::from(y.to_bits()) << 32);
+        // SAFETY: plain query.
+        let f1 = focused && unsafe { GetAsyncKeyState(0x70) } < 0;
+        if f1 && !F1_HELD.swap(true, Relaxed) {
+            FREE.fetch_xor(true, Relaxed);
+        } else if !f1 {
+            F1_HELD.store(false, Relaxed);
+        }
+        let (mut x, mut y) = unpack(SMOOTH.load(Relaxed));
+        x *= 0.8;
+        y *= 0.8;
+        if on && focused && !FREE.load(Relaxed) {
+            let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            let mut at = POINT { x: 0, y: 0 };
+            // SAFETY: plain queries into locals.
+            if unsafe { GetWindowRect(GetForegroundWindow(), &mut rect) } != 0
+                && unsafe { GetCursorPos(&mut at) } != 0
+            {
+                let (cx, cy) = ((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2);
+                // (A jump of more than a quarter of the window is the cursor
+                // coming back from elsewhere, not a turn.)
+                let (dx, dy) = (at.x - cx, at.y - cy);
+                if dx.abs() < (rect.right - rect.left) / 4 && dy.abs() < (rect.bottom - rect.top) / 4 {
+                    x += dx as f32 * sens;
+                    y -= dy as f32 * sens;
+                }
+                // SAFETY: plain call.
+                unsafe { SetCursorPos(cx, cy) };
+            }
+        }
+        if x.abs() < 0.01 {
+            x = 0.0;
+        }
+        if y.abs() < 0.01 {
+            y = 0.0;
+        }
+        SMOOTH.store(pack(x, y), Relaxed);
+        super::MOUSE_LOOK.store(pack(x.clamp(-1.0, 1.0), y.clamp(-1.0, 1.0)), Relaxed);
+    }
+
     fn focused() -> bool {
         let mut process = 0;
         // SAFETY: plain queries; a null window gives process 0.
@@ -1560,7 +1661,7 @@ mod tests {
         register(hub, KEYBOARD_KIND, 2, &log);
         assert_eq!(*log.lock().unwrap(), [(KEYBOARD, STATUS_CONNECTED, 0)]);
 
-        let keys = vec![key(b'W'), key(0x0D), key(b'L'), key(b'C')];
+        let keys = vec![key(b'W'), key(0x0D), key(b'L'), key(b'F')];
         host.lock().unwrap().keys = keys.clone();
         hub.poll();
         let r = current(hub, KEYBOARD_KIND, KEYBOARD).unwrap();
@@ -1577,10 +1678,9 @@ mod tests {
         assert_eq!(
             pad(r),
             PadState {
-                buttons: A,
+                buttons: A | Y,
                 left_y: 1.0,
                 right_x: 1.0,
-                right_trigger: 1.0,
                 ..Default::default()
             }
         );
