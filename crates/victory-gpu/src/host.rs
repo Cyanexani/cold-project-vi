@@ -841,9 +841,26 @@ mod tests {
     }
 }
 
+/// How many resets of a host list its command allocator serves before it is
+/// made anew (`VICTORY_ALLOCATOR_RENEW`, 0: never, as before). An allocator
+/// keeps the memory of the largest recording it ever held: with ~760 host
+/// lists the region shared with the card held ~8.5 GB beyond every buffer
+/// counted (run "anneaux").
+fn allocator_renew() -> u32 {
+    static N: OnceLock<u32> = OnceLock::new();
+    *N.get_or_init(|| std::env::var("VICTORY_ALLOCATOR_RENEW").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0))
+}
+
+/// Allocators made anew since the start ([`allocator_renew`]).
+static ALLOCATORS_RENEWED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// A host command list and its allocator, always used together.
 pub(crate) struct HostList {
-    allocator: ID3D12CommandAllocator,
+    /// Made anew every [`allocator_renew`] resets: an allocator keeps the
+    /// memory of the largest recording it ever held.
+    allocator: Mutex<ID3D12CommandAllocator>,
+    /// Resets since the allocator was made.
+    resets: std::sync::atomic::AtomicU32,
     pub(crate) list: ID3D12GraphicsCommandList,
     /// Work for submission time, in recorded order.
     deferred: Mutex<Deferred>,
@@ -3786,7 +3803,8 @@ impl Host {
                 let _ = prelude.set(self.make_prelude());
             }
             Ok(HostList {
-                allocator,
+                allocator: Mutex::new(allocator),
+                resets: std::sync::atomic::AtomicU32::new(0),
                 list,
                 deferred: Mutex::default(),
                 scratch: Mutex::default(),
@@ -6194,12 +6212,22 @@ impl HostList {
                 give_chunks(std::mem::take(&mut scratch.chunks));
             }
         }
+        let mut allocator = self.allocator.lock().unwrap_or_else(|e| e.into_inner());
+        let renew = allocator_renew();
+        if renew > 0 && self.resets.fetch_add(1, Ordering::Relaxed) + 1 >= renew
+            && let Some(host) = host()
+            // SAFETY: plain creation.
+            && let Ok(made) = unsafe { host.device.CreateCommandAllocator::<ID3D12CommandAllocator>(D3D12_COMMAND_LIST_TYPE_DIRECT) }
+        {
+            // The old one goes with its memory: nothing of it runs (a reset
+            // comes after every submission of the list has run).
+            *allocator = made;
+            self.resets.store(0, Ordering::Relaxed);
+            ALLOCATORS_RENEWED.fetch_add(1, Ordering::Relaxed);
+        }
         // SAFETY: the list is not executing.
-        let reset = unsafe {
-            self.allocator
-                .Reset()
-                .and_then(|()| self.list.Reset(&self.allocator, None))
-        };
+        let reset = unsafe { allocator.Reset().and_then(|()| self.list.Reset(&*allocator, None)) };
+        drop(allocator);
         if let Err(e) = reset {
             fail(format_args!("a host command list did not reset ({e})"));
         }
@@ -7765,7 +7793,12 @@ impl Meter {
                 slow[1] as f64 / 1e3 / frames,
                 slow[2] as f64 / 1e3
             );
-            tracing::info!("{}", crate::census::line());
+            tracing::info!(
+                "{}; command allocators made anew so far (VICTORY_ALLOCATOR_RENEW={}): {}",
+                crate::census::line(),
+                allocator_renew(),
+                ALLOCATORS_RENEWED.load(Ordering::Relaxed)
+            );
             if crate::shadow::cards() {
                 let per_frame = |i: usize| card[i] as f64 / frames;
                 tracing::info!(
