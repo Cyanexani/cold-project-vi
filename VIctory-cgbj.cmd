@@ -10,6 +10,11 @@ set "VICTORY_GAME_DIR=%USERPROFILE%\Downloads\dump private build"
 set "VICTORY_CACHE_DIR=%RUN%\cache"
 set "VICTORY_DATA_DIR=%RUN%\data"
 set "VICTORY_LOG=warn,victory_gpu::host=info,victory_gpu::copystat=info"
+rem Para esta placa (RTX 5070 Ti portatil, 12 GB; o launcher dele assume uma RTX 5090 com 32 GB):
+rem 1080p em vez da TV 4K que o jogo julga ter, e ate 1,5 GB de buffers do jogo na placa.
+rem Medido aqui: de ~3 para ~9 FPS. O launcher dele so poe as suas definicoes quando nao existem.
+set "VICTORY_DISPLAY_MODE=1920x1080"
+set "VICTORY_CARD_BUFFERS_MB=1536"
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
   echo Ja ha um VIctory a correr. Fecha-o primeiro ^(ou carrega em H no ciclo^).
   pause
