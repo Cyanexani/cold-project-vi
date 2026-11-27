@@ -5,6 +5,7 @@
 <p>
   <a href="#come%C3%A7ar-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-come%C3%A7a%20aqui-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Read%20in-English-C8102E?style=for-the-badge" alt="English"/></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Lire%20en-Fran%C3%A7ais-0055A4?style=for-the-badge" alt="Francais"/></a>
   <a href="docs/LUZ-24FPS.md"><img src="https://img.shields.io/badge/Notas-Portugu%C3%AAs-006600?style=for-the-badge" alt="Notas"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/por-%40edupode-222?style=for-the-badge&logo=github" alt="por edupode"/></a>
 </p>
@@ -47,6 +48,21 @@ O motor com que todas as placas jogam por defeito. Medido no portátil do autor 
 | Multidões e lutas | 10-15 FPS | **14-17 FPS** |
 | Cutscenes / menus | ~26 / 30-33 FPS | **35-38 / 60 FPS** |
 | Sessões longas | | **missões sem crashes** |
+
+## Progresso na escala do PortWatch VI
+
+**Cerca de 77 % ou mais** (medido no portátil do autor, RTX 5070 Ti, 27/11/2026). A escala do PortWatch: até 50 %,
+cada passo precisa do anterior; depois disso, história, imagem, velocidade e estabilidade dividem os últimos 50
+pontos. Os pontos acima de 50 são a nossa estimativa (o PortWatch só os conta com prova, um vídeo).
+
+| Marco | % | Estado |
+|---|---|---|
+| Base, executável, primeira imagem, menu, no mundo | 0-40 | ✅ |
+| Jogável (controlas uma personagem) | 50 | ✅ missões jogáveis |
+| História (17,5 pontos) | 3 ou mais | ✅ prólogo feito, missões jogadas; mais à medida que a história avança |
+| Imagem (12,5 pontos) | cerca de 8 | ✅ iluminação NVIDIA, água certa, cenas noturnas iluminadas; ⏳ ray tracing e a volumetria `_Tiled` ainda desligados |
+| Velocidade (10 pontos: fps ÷ 30) | cerca de 8 | ✅ 22-26 fps no mundo aberto, 35-38 nas cutscenes, 60 nos menus |
+| Estabilidade (10 pontos) | cerca de 8 | ✅ sessões longas e missões sem crashes |
 
 ## Download
 

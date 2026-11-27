@@ -310,7 +310,7 @@ namespace VIctoryLauncher
                 nav.Add(b);
                 side.Controls.Add(b);
             }
-            var report = new Pill { Text = L("Send errors to Discord", "Enviar erros no Discord"), Size = new Size(184, 34), Location = new Point(16, 0), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            var report = new Pill { Text = L("Send errors (GitHub / Discord)", "Enviar erros (GitHub / Discord)"), Size = new Size(184, 34), Location = new Point(16, 0), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
             report.Click += (s, e) => ReportErrors();
             side.Controls.Add(report);
             var en = new Pill { Text = "EN", Size = new Size(90, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = !Pt };
@@ -477,7 +477,7 @@ namespace VIctoryLauncher
             facesBox = T(L("Rainbow-face fix", "Correcao das caras arco-iris"), L("Textures finish uploading first; costs FPS", "Texturas acabam de subir primeiro; custa FPS"), 1, 2, false);
             loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), L("Shorter loading pauses; untested", "Pausas de carregamento mais curtas; nao testado"), 1, 3, false);
             warmBox = T(L("Load pipelines before the game", "Carregar pipelines antes do jogo"), L("No stutter the first time you see a place", "Sem engasgos a primeira vez que ves um sitio"), 1, 4, true);
-            cpuBox = T(L("More CPU cores (test)", "Mais nucleos do processador (teste)"), L("Half the cores copy the game's memory", "Metade dos nucleos copia a memoria do jogo"), 0, 5, false);
+            cpuBox = T(L("★ More CPU cores", "★ Mais nucleos do processador"), L("Half the cores copy the game's memory (+1 FPS)", "Metade dos nucleos copia a memoria do jogo (+1 FPS)"), 0, 5, true);
             y += 6 * 66 + 2;
             explain = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Cyan, BackColor = Theme.Back, Font = Theme.Ui(9f),
                 Text = L("Point at an option to see what it does. ★ marks what was tested on edupode's PC (RTX 5070 Ti laptop).", "Passa o rato por uma opcao para ver o que faz. ★ marca o que foi testado no PC do edupode (portatil RTX 5070 Ti).") };
@@ -524,8 +524,8 @@ namespace VIctoryLauncher
                               "Espera por todas as copias dos buffers do jogo antes de desenhar: menos corpos esticados ('esparguete'), mas varios FPS mais lento.");
             d[facesBox] = L("Waits for textures to finish uploading before use: fixes rainbow faces, costs FPS.",
                             "Espera que as texturas acabem de subir antes de as usar: corrige as caras arco-iris, custa FPS.");
-            d[cpuBox] = L("Test: the CPU is the limit (the card waits ~0 ms a frame). By default 6 helper threads refresh the game's buffers and textures (~18 ms of a 44 ms frame); this gives them half your cores (up to 12) and asks Windows which pages changed on a thread of its own. Play 5 minutes with it on and 5 off and compare AVG 1M on F3; tell us on Discord which wins.",
-                          "Teste: o limite e o processador (a placa espera ~0 ms por frame). Por defeito, 6 ajudantes refrescam os buffers e as texturas do jogo (~18 ms de um frame de 44 ms); isto da-lhes metade dos teus nucleos (ate 12) e pergunta ao Windows que paginas mudaram numa thread a parte. Joga 5 minutos com e 5 sem e compara o AVG 1M no F3; conta no Discord qual ganha.");
+            d[cpuBox] = L("★ Tested on edupode's PC: +1 FPS in the open world (21.6 vs 20.5) and 2.3 ms less preparing each frame. The CPU is the limit (the card waits ~0 ms a frame): 6 helper threads used to refresh the game's buffers and textures (~18 ms of a 44 ms frame); this gives them half your cores (up to 12) and asks Windows which pages changed on a thread of its own.",
+                          "★ Testado no PC do edupode: +1 FPS no mundo aberto (21,6 contra 20,5) e menos 2,3 ms a preparar cada frame. O limite e o processador (a placa espera ~0 ms por frame): 6 ajudantes refrescavam os buffers e as texturas do jogo (~18 ms de um frame de 44 ms); isto da-lhes metade dos teus nucleos (ate 12) e pergunta ao Windows que paginas mudaram numa thread a parte.");
             d[warmBox] = L("New: before the game starts, a loading bar makes every pipeline earlier sessions drew with, in separate processes, so the driver has them ready: no stutter the first time you see a place. Takes seconds once the cache is ready; after a VIctory or driver update it takes longer, once.",
                            "Novo: antes de o jogo arrancar, uma barra de carregamento prepara todas as pipelines usadas nas sessoes anteriores, em processos a parte, para o driver ja as ter: sem engasgos a primeira vez que ves um sitio. Demora segundos com a cache pronta; depois de atualizar o VIctory ou o driver demora mais, uma vez.");
             d[loadingBox] = L("Experimental: textures the game builds on the CPU no longer wait for the game's memory to settle. Shorter loading pauses; untested.",
@@ -540,7 +540,7 @@ namespace VIctoryLauncher
             SelectMode(0);
             panelBox.Checked = true; borderlessBox.Checked = true; fps60Box.Checked = true; reserveBox.Checked = true;
             smoothBox.Checked = rtxFrameGen;
-            fightsBox.Checked = vramGb == 0 || vramGb >= 11; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
+            fightsBox.Checked = vramGb == 0 || vramGb >= 11; cpuBox.Checked = true; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
             Log(L("Recommended setup (= the TUDO + lutas shortcut): Recommended 720p, overlay, borderless, 60 FPS clock, 2 GB of buffers for crowds, video memory reserve" + (rtxFrameGen ? ", Smooth Motion." : "."),
                   "Configuracao recomendada (= atalho TUDO + lutas): Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, 2 GB de buffers para multidoes, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
         }
@@ -867,7 +867,7 @@ namespace VIctoryLauncher
             int y = 18;
             page.Controls.Add(new Heading(L("Help: everything the launcher does", "Ajuda: tudo o que o launcher faz")) { Location = new Point(X, y), Width = W });
             y += 32;
-            var discord = new Pill { Main = true, Text = L("Send errors to Discord", "Enviar erros no Discord"), Location = new Point(X, y), Size = new Size(220, 38) };
+            var discord = new Pill { Main = true, Text = L("Send errors (GitHub / Discord)", "Enviar erros (GitHub / Discord)"), Location = new Point(X, y), Size = new Size(220, 38) };
             discord.Click += (s, e) => ReportErrors();
             page.Controls.Add(discord);
             var join = new Pill { Text = L("Join the Discord", "Entrar no Discord"), Location = new Point(X + 230, y), Size = new Size(170, 38) };

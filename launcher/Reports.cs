@@ -1,7 +1,8 @@
-// Julia's Launcher: "Send errors to Discord". The player picks launcher errors or game errors, ticks what
-// happened and writes a line; the launcher puts the right files in a zip on the Desktop (user name
-// taken out of every path), opens the folder and asks them to send it in the Discord channel.
-// Nothing is sent by the launcher itself.
+// Julia's Launcher: "Send errors". The player picks launcher errors or game errors, ticks what happened
+// and writes a line; the launcher puts the right files in a zip on the Desktop (user name taken out of
+// every path), opens the folder and offers two ways to send it: a GitHub issue on edupode's repository,
+// opened in the browser already filled in (the player attaches the zip and submits it), or the Discord
+// channel. Nothing is sent by the launcher itself.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,7 +20,7 @@ namespace VIctoryLauncher
     {
         void ReportErrors()
         {
-            var f = new Form { Text = L("Send errors to Discord", "Enviar erros no Discord"), ClientSize = new Size(640, 560), BackColor = Theme.Back, ForeColor = Theme.Text,
+            var f = new Form { Text = L("Send errors", "Enviar erros"), ClientSize = new Size(640, 560), BackColor = Theme.Back, ForeColor = Theme.Text,
                 Font = Theme.Ui(9.75f), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon };
             const int X = 20, W = 600;
             int y = 16;
@@ -77,10 +78,15 @@ namespace VIctoryLauncher
                             if (zip == null) { MessageBox.Show(this, L("The package could not be made: ", "Nao deu para criar o pacote: ") + error, "Julia's Launcher"); return; }
                             try { Clipboard.SetText(summary); } catch (Exception) { }
                             try { Process.Start("explorer.exe", "/select,\"" + zip + "\""); } catch (Exception) { }
-                            var msg = string.Format(L("Done: {0}\r\n\r\nSend this zip on Discord, in the channel \"{1}\".\r\nA short summary is already copied: paste it with the zip.\r\n\r\nOpen Discord now?",
-                                                      "Feito: {0}\r\n\r\nEnvia este zip no Discord, no canal \"{1}\".\r\nUm resumo curto ja esta copiado: cola-o junto com o zip.\r\n\r\nAbrir o Discord agora?"), Path.GetFileName(zip), DiscordChannel);
-                            if (MessageBox.Show(this, msg, L("Send it on Discord", "Envia no Discord"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                                OpenUrl(DiscordInvite);
+                            var body = string.Format(L("Done: {0} is on your Desktop.\r\n\r\nSend it to edupode one of two ways:\r\n\r\n" +
+                                                       "•  GitHub issue: the page opens already filled in. Drag the zip into the text box, then press 'Submit new issue' (a free GitHub account is needed).\r\n" +
+                                                       "•  Discord: send the zip in the channel \"{1}\" and paste the summary (already copied).",
+                                                       "Feito: {0} esta no Ambiente de trabalho.\r\n\r\nEnvia-o ao edupode de uma de duas formas:\r\n\r\n" +
+                                                       "•  Issue no GitHub: a pagina abre ja preenchida. Arrasta o zip para a caixa de texto e carrega em 'Submit new issue' (precisa de uma conta GitHub gratuita).\r\n" +
+                                                       "•  Discord: envia o zip no canal \"{1}\" e cola o resumo (ja copiado)."), Path.GetFileName(zip), DiscordChannel);
+                            var answer = Notice(L("Send the report", "Enviar o relatorio"), body, L("Open a GitHub issue", "Abrir uma issue no GitHub"), L("Open Discord", "Abrir o Discord"));
+                            if (answer == 1) OpenUrl(IssueUrl(game, ticked, said, summary, Path.GetFileName(zip)));
+                            if (answer == 2) OpenUrl(DiscordInvite);
                         }));
                     }
                     catch (Exception) { }
@@ -151,6 +157,25 @@ namespace VIctoryLauncher
             if (File.Exists(zip)) File.Delete(zip);
             ZipFile.CreateFromDirectory(dir, zip, CompressionLevel.Optimal, false);
             return zip;
+        }
+
+        // A new issue on edupode's repository, filled in through the address (title, body, label): GitHub
+        // opens it for the player to attach the zip and submit. The summary is already scrubbed of the user
+        // name; the address stays under the length browsers and GitHub take.
+        static string IssueUrl(bool game, List<string> ticked, string said, string summary, string zipName)
+        {
+            var first = ticked.Count > 0 ? ticked[0] : said.Length > 0 ? said : (game ? "Game problem" : "Launcher problem");
+            if (first.Length > 70) first = first.Substring(0, 70) + "...";
+            var title = "[" + (game ? "game" : "launcher") + "] " + first;
+            var text = new StringBuilder();
+            text.AppendLine("<!-- Drag " + zipName + " from your Desktop into this box before submitting. -->");
+            text.AppendLine("**Package:** drag `" + zipName + "` (on your Desktop) here.");
+            text.AppendLine();
+            text.AppendLine("```text");
+            text.AppendLine(summary.Length > 4500 ? summary.Substring(0, 4500) + "\n..." : summary.TrimEnd());
+            text.AppendLine("```");
+            return "https://github.com/edupode/cold-project-vi/issues/new?labels=" + Uri.EscapeDataString(game ? "bug,game" : "bug,launcher")
+                + "&title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(text.ToString());
         }
 
         // Paths name the player (C:\Users\<name>): the name is taken out.

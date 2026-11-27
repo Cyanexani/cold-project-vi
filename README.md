@@ -8,6 +8,7 @@
   <a href="#quick-start-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-start%20here-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
   <a href="docs/GUIDE-30FPS.md"><img src="https://img.shields.io/badge/Guide-English-C8102E?style=for-the-badge" alt="Guide"/></a>
   <a href="README.pt.md"><img src="https://img.shields.io/badge/Leia%20em-Portugu%C3%AAs-006600?style=for-the-badge" alt="Portugues"/></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Lire%20en-Fran%C3%A7ais-0055A4?style=for-the-badge" alt="Francais"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/by-%40edupode-222?style=for-the-badge&logo=github" alt="by edupode"/></a>
 </p>
 
@@ -73,6 +74,21 @@ The engine every card plays with by default. Measured on the author's RTX 5070 T
 | Cutscenes / menus | ~26 / 30-33 FPS | **35-38 / 60 FPS** |
 | Long sessions | | **missions without crashes** |
 
+## Progress on PortWatch VI's scale
+
+**About 77 % or more** (measured on the author's RTX 5070 Ti laptop, 27/11/2026). PortWatch's scale: up to 50 %,
+each step needs the one before; beyond that, story, picture, speed and stability share the last 50 points.
+Points past 50 are our estimate (PortWatch counts them only with proof, a video).
+
+| Milestone | % | State |
+|---|---|---|
+| Groundwork, executable, first picture, main menu, in the world | 0-40 | ✅ |
+| Playable (you control a character) | 50 | ✅ missions playable |
+| Story (17.5 points) | 3 or more | ✅ prologue done, missions played; more as the story goes on |
+| Picture (12.5 points) | about 8 | ✅ NVIDIA lighting, water right, night scenes lit; ⏳ ray tracing and the `_Tiled` volumetrics still off |
+| Speed (10 points: fps ÷ 30) | about 8 | ✅ 22-26 fps in the open world, 35-38 in cutscenes, 60 in menus |
+| Stability (10 points) | about 8 | ✅ long sessions and missions without crashes |
+
 ## Download
 
 **[Releases](https://github.com/edupode/cold-project-vi/releases/latest)**: get `VI-Setup-<version>.exe` and run it.
@@ -87,7 +103,7 @@ The engine every card plays with by default. Measured on the author's RTX 5070 T
 - **Nothing to compile:** you don't need Rust or Build Tools.
 - **Updates install themselves.** See [What the launcher does](#what-the-launcher-does).
 
-**Discord:** <https://discord.gg/648WEXCAsZ>. Send bugs in the **"Send bugs here please"** channel; the launcher makes the package for you (see [Logs and errors](#logs-and-errors)).
+**Bugs:** open an [issue](https://github.com/edupode/cold-project-vi/issues) or post in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ); the launcher makes the package and fills the issue in for you (see [Logs and errors](#logs-and-errors)).
 
 ### Checking a release
 
@@ -145,7 +161,7 @@ No winget? Download Git from <https://git-scm.com/download/win>, or skip Git: on
 The launcher checks your GPU, video memory, RAM, Resizable BAR and Smooth Motion support and sets everything
 else. Point at any option to see what it does; **★** marks what was tested on the author's PC. On cards with
 less than 10 GB or PCs with less than 24 GB of RAM it picks the **Modest PC** mode.
-English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the same from a command line
+English by default, **Português** in the side bar; this page also in [Português](README.pt.md) and [Français](README.fr.md). `Jogar-Luz.cmd` does the same from a command line
 (`Jogar-Luz.cmd tudo`).
 
 ### What the launcher does
@@ -172,11 +188,15 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 
 - **Game logs:** `%LOCALAPPDATA%\VIctory\luz\logs`. `session-*.log` is one file per game; `prepare.log`, `build.log` and `build-amd.log` cover shaders and builds.
 - **Launcher errors:** `%TEMP%\vi-launcher-error.txt`.
-- **Send errors to Discord** (side bar or Help):
+- **Send errors (GitHub / Discord)** (side bar or Help):
   1. Choose **launcher errors** or **game errors**.
   2. Tick what happened (shaders not rendering, virtual memory not turning on, ...) and write a line.
   3. The launcher puts the right files in a zip on your Desktop, with your user name taken out of every path. It opens the folder and copies a short summary.
-  4. Send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ). Nothing is sent by the launcher itself.
+  4. Send it one of two ways:
+     - **Open a GitHub issue:** a new [issue](https://github.com/edupode/cold-project-vi/issues) opens in your browser already filled in (hardware, what you ticked, your words). Drag the zip into it and press **Submit new issue** (a free GitHub account is needed).
+     - **Discord:** send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ).
+
+  Nothing is sent by the launcher itself.
 
 ## Modes
 
@@ -191,8 +211,8 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 Options: ★ FPS overlay (F3), ★ borderless full screen (test A: 22-24 FPS on the author's PC; needed by Smooth
 Motion), ★ the 60 FPS clock, pipelines loaded before the game (new), NVIDIA Smooth Motion, the video memory
 reserve, crowds and fights (2 GB of the game's buffers on the card; 12 GB cards and up), anti-stretch (fewer
-stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental), more CPU cores (a test: half the
-cores copy the game's memory; compare AVG 1M on F3 with it on and off).
+stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental), ★ more CPU cores (half the cores
+copy the game's memory: +1 FPS on the author's PC).
 
 ## Controls
 
