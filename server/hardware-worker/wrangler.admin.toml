@@ -8,7 +8,7 @@ workers_dev = false
 [[d1_databases]]
 binding = "DB"
 database_name = "vi-hardware"
-database_id = "PUT-THE-D1-DATABASE-ID-HERE"
+database_id = "f5666469-a523-4611-a529-36d95f9ca3cc"
 
 [vars]
 ACCESS_TEAM = "PUT-YOUR-ACCESS-TEAM-NAME"

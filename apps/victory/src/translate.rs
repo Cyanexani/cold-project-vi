@@ -404,12 +404,21 @@ pub fn precompile(paths: Vec<PathBuf>, jobs: Option<usize>) -> Result<()> {
     let seen = Mutex::new(HashSet::new());
     let done = AtomicUsize::new(0);
     let failed = Mutex::new(BTreeMap::<String, (usize, String)>::new());
-    for root in &paths {
-        for entry in walkdir::WalkDir::new(root).into_iter().filter_map(Result::ok) {
-            if !entry.file_type().is_file() || entry.metadata().map_or(0, |m| m.len()) > MAX_FILE {
-                continue;
-            }
-            let Ok(data) = std::fs::read(entry.path()) else {
+    // The files first, so how far it is can be told (`progress <read> of <total> MB`, which the
+    // launcher shows as a bar): shaders sit in the game's files in no even way, bytes are the measure.
+    let files: Vec<(PathBuf, u64)> = paths
+        .iter()
+        .flat_map(|root| walkdir::WalkDir::new(root).into_iter().filter_map(Result::ok))
+        .filter(|e| e.file_type().is_file())
+        .map(|e| (e.path().to_owned(), e.metadata().map_or(0, |m| m.len())))
+        .filter(|(_, len)| *len <= MAX_FILE)
+        .collect();
+    let total_mb = files.iter().map(|(_, len)| len).sum::<u64>() >> 20;
+    let mut read = 0u64;
+    {
+        for (path, len) in &files {
+            read += len;
+            let Ok(data) = std::fs::read(path) else {
                 continue;
             };
             let jobs = sources(&data);
@@ -439,6 +448,14 @@ pub fn precompile(paths: Vec<PathBuf>, jobs: Option<usize>) -> Result<()> {
                     });
                 }
             });
+            if !jobs.is_empty() {
+                println!(
+                    "progress {} of {total_mb} MB, {} shaders, {:.0} s",
+                    read >> 20,
+                    done.load(Ordering::Relaxed),
+                    started.elapsed().as_secs_f64()
+                );
+            }
         }
     }
     let failed = failed.into_inner().unwrap_or_else(|e| e.into_inner());

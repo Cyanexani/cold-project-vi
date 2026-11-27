@@ -43,6 +43,8 @@ namespace VIctoryLauncher
                 L("Preparing shaders fails", "Preparar os shaders falha"),
                 L("Low FPS or stutter", "FPS baixos ou engasgos"),
                 L("Black squares or wrong colours", "Quadrados pretos ou cores erradas"),
+                L("Frame generation test (how it ran)", "Teste da geracao de frames (como correu)"),
+                L("AMD card: tried the edupode engine", "Placa AMD: experimentei o motor edupode"),
             };
             var boxes = new List<Toggle>();
             for (int i = 0; i < picks.Length; i++)

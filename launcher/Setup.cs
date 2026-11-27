@@ -438,8 +438,20 @@ namespace VIctoryLauncher
             Log(L("Translating the game's shaders and preparing pipelines (about 5 minutes)... Log: ", "A traduzir os shaders do jogo e a preparar pipelines (cerca de 5 minutos)... Log: ") + log);
             Progress(L("Translating the game's shaders (about 5 minutes)...", "A traduzir os shaders do jogo (cerca de 5 minutos)..."), 0.05f);
             WriteSetting("shaders", "0");
-            var p = Start("shaders \"" + dir + "\"", log);
+            Stage(0, 0f, L("Shaders: starting...", "Shaders: a comecar..."), true);
+            Stage(1, 0f, L("Pipelines: after the shaders", "Pipelines: depois dos shaders"), true);
+            // `progress <read> of <total> MB, <n> shaders, <s> s` (victory shaders): the game's files read so far.
+            var p = Start("shaders \"" + dir + "\"", log, line => {
+                var m = Regex.Match(line, @"^progress (\d+) of (\d+) MB, (\d+) shaders, (\d+) s");
+                if (!m.Success) return;
+                float part = float.Parse(m.Groups[1].Value) / Math.Max(1f, float.Parse(m.Groups[2].Value));
+                var text = string.Format(L("Shaders: {0:N0} translated · {1:0}% of the game's files · {2} s", "Shaders: {0:N0} traduzidos · {1:0}% dos ficheiros do jogo · {2} s"),
+                    int.Parse(m.Groups[3].Value), part * 100, m.Groups[4].Value);
+                Stage(0, part, text, true);
+                Progress(text, 0.05f + 0.55f * part);
+            });
             p.WaitForExit();
+            Stage(0, 1f, p.ExitCode == 0 ? L("Shaders: done", "Shaders: feito") : L("Shaders: failed (see the errors below)", "Shaders: falhou (ve os erros em baixo)"), true);
             if (p.ExitCode != 0)
             {
                 Log(string.Format(L("Translating the shaders failed (code {0}).", "A traducao dos shaders falhou (codigo {0})."), p.ExitCode));
@@ -453,9 +465,14 @@ namespace VIctoryLauncher
                 {
                     int n = int.Parse(m.Groups[1].Value), of = int.Parse(m.Groups[2].Value);
                     Progress(string.Format(L("Preparing pipelines: {0} of {1}", "A preparar pipelines: {0} de {1}"), n, of), 0.6f + 0.4f * n / Math.Max(1, of));
+                    Stage(1, (float)n / Math.Max(1, of), string.Format(L("Pipelines: {0:N0} of {1:N0} made · {2} s", "Pipelines: {0:N0} de {1:N0} feitas · {2} s"), n, of, m.Groups[3].Value), true);
                 }
+                var none = Regex.Match(line, @"; 0 to make");
+                if (none.Success) Stage(1, 1f, L("Pipelines: all ready", "Pipelines: todas prontas"), true);
             });
             w.WaitForExit();
+            Stage(1, 1f, L("Pipelines: done", "Pipelines: feito"), false);
+            Stage(0, 1f, L("Shaders: done", "Shaders: feito"), false);
             if (w.ExitCode != 0)
             {
                 // The shaders are there; pipelines are made again before each game (and after it).

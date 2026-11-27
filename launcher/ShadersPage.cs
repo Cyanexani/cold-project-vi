@@ -16,7 +16,9 @@ namespace VIctoryLauncher
     {
         Label[] shaderMarks, shaderTexts;
         TextBox shaderErrors;
-        LoadBar shaderBar;
+        LoadBar shaderBar, pipeBar;
+        // A stage being worked on (0 shaders, 1 pipelines) shows its live progress; else the cache's state.
+        readonly bool[] stageLive = new bool[2];
         System.Windows.Forms.Timer shaderTimer;
         volatile bool shaderReading;
 
@@ -51,9 +53,12 @@ namespace VIctoryLauncher
             }
             page.Controls.Add(card);
             y += card.Height + 10;
-            shaderBar = new LoadBar { Location = new Point(X, y), Size = new Size(W, 26), Visible = false };
+            shaderBar = new LoadBar { Location = new Point(X, y), Size = new Size(W, 28) };
             page.Controls.Add(shaderBar);
-            y += 34;
+            y += 36;
+            pipeBar = new LoadBar { Location = new Point(X, y), Size = new Size(W, 28) };
+            page.Controls.Add(pipeBar);
+            y += 40;
             var repair = new Pill { Text = L("Repair", "Reparar"), Location = new Point(X, y), Size = new Size(150, 36) };
             repair.Click += (s, e) => RepairShaders(false);
             page.Controls.Add(repair);
@@ -83,6 +88,16 @@ namespace VIctoryLauncher
         // The AMD engine keeps a cache of its own (Hardware.cs, AmdEnvironment).
         string ActiveCacheDir { get { return UseAmdEngine ? Path.Combine(dataRoot, "cache-amd") : cacheDir; } }
 
+        // A stage's live progress on the Shaders page (0 shaders, 1 pipelines); `live` false hands
+        // the bar back to the cache's state (RefreshShaders).
+        void Stage(int stage, float part, string text, bool live)
+        {
+            if (InvokeRequired) { try { BeginInvoke(new Action<int, float, string, bool>(Stage), stage, part, text, live); } catch (Exception) { } return; }
+            stageLive[stage] = live;
+            var bar = stage == 0 ? shaderBar : pipeBar;
+            if (bar != null) bar.Set(part, text);
+        }
+
         static int Lines(string file)
         {
             try { return File.Exists(file) ? File.ReadLines(file).Count(l => l.Trim().Length > 0) : 0; } catch (Exception) { return 0; }
@@ -97,17 +112,19 @@ namespace VIctoryLauncher
             new Thread(() => {
                 var rows = new List<Tuple<int, string>>();
                 string errors = "";
+                int shaders = 0, done = 0, bad = 0, used = 0;
+                bool prepared = false;
                 try
                 {
-                    int shaders = 0; long bytes = 0;
+                    long bytes = 0;
                     var sdir = Path.Combine(cache, "shaders");
                     if (Directory.Exists(sdir))
                         foreach (var f in new DirectoryInfo(sdir).EnumerateFiles("*", SearchOption.AllDirectories)) { shaders++; bytes += f.Length; }
                     var pdir = Path.Combine(cache, "pipelines");
-                    int done = Lines(Path.Combine(pdir, "warm-done.txt")), bad = Lines(Path.Combine(pdir, "warm-bad.txt")), used = Lines(Path.Combine(pdir, "early-pipelines.txt"));
+                    done = Lines(Path.Combine(pdir, "warm-done.txt")); bad = Lines(Path.Combine(pdir, "warm-bad.txt")); used = Lines(Path.Combine(pdir, "early-pipelines.txt"));
                     long free = -1;
                     try { Directory.CreateDirectory(cache); free = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(cache))).AvailableFreeSpace; } catch (Exception) { }
-                    bool prepared = ReadSetting("shaders") == "1";
+                    prepared = ReadSetting("shaders") == "1";
                     var pathOk = cache.All(c => c < 128);
                     rows.Add(Tuple.Create(shaders >= 1000 ? 1 : 0, string.Format(L("Shaders translated: {0:N0}  ({1:0.0} GB)", "Shaders traduzidos: {0:N0}  ({1:0.0} GB)"), shaders, bytes / 1073741824.0)));
                     rows.Add(Tuple.Create(prepared || shaders >= 1000 ? 1 : 0, prepared ? L("Last preparation finished well", "A ultima preparacao acabou bem")
@@ -144,8 +161,13 @@ namespace VIctoryLauncher
                         }
                         var t = errors.Length == 0 ? L("(no errors)", "(sem erros)") : Scrub(errors);
                         if (shaderErrors.Text != t) shaderErrors.Text = t;
-                        shaderBar.Visible = setupBar != null && setupBar.Visible;
-                        if (shaderBar.Visible) shaderBar.Set(setupProgress, setupBar.Text);
+                        if (!stageLive[0])
+                            shaderBar.Set(shaders >= 1000 || prepared ? 1f : 0f, shaders >= 1000 || prepared
+                                ? string.Format(L("Shaders: {0:N0} translated, ready", "Shaders: {0:N0} traduzidos, prontos"), shaders)
+                                : L("Shaders: not prepared yet (press Prepare shaders)", "Shaders: ainda nao preparados (carrega em Preparar shaders)"));
+                        if (!stageLive[1])
+                            pipeBar.Set(used > 0 ? Math.Min(1f, (float)done / used) : done > 0 ? 1f : 0f,
+                                string.Format(L("Pipelines: {0:N0} made for the driver (your sessions used {1:N0})", "Pipelines: {0:N0} feitas para o driver (as tuas sessoes usaram {1:N0})"), done, used));
                         shaderReading = false;
                     }));
                 }
@@ -184,3 +206,4 @@ namespace VIctoryLauncher
         }
     }
 }
+

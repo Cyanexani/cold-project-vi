@@ -236,6 +236,10 @@ namespace VIctoryLauncher
             }) { IsBackground = true }.Start();
             ProbeGpu();
             StartChecks();
+            // Once the window is up: the notices of new things to try (Hardware.cs).
+            var later = new System.Windows.Forms.Timer { Interval = 1500 };
+            later.Tick += (s, a) => { later.Stop(); later.Dispose(); if (!setupBusy) ShowNotices(); };
+            later.Start();
             StartUpdates();
             StartHardwareShare();
         }
@@ -1489,11 +1493,13 @@ namespace VIctoryLauncher
                 {
                     int n = int.Parse(p.Groups[1].Value), of = int.Parse(p.Groups[2].Value);
                     BeginInvoke(new Action(() => loadBar.Set(of > 0 ? (float)n / of : 1f, string.Format(L("Loading pipelines: {0} of {1}", "A carregar pipelines: {0} de {1}"), n, of))));
+                    Stage(1, of > 0 ? (float)n / of : 1f, string.Format(L("Pipelines: {0:N0} of {1:N0} loaded before the game · {2} s", "Pipelines: {0:N0} de {1:N0} carregadas antes do jogo · {2} s"), n, of, p.Groups[3].Value), true);
                 }
                 else if (m.Success)
                     BeginInvoke(new Action(() => loadBar.Set(total == 0 ? 1f : 0f, total == 0 ? L("Pipelines ready.", "Pipelines prontas.") : string.Format(L("Loading pipelines: 0 of {0}", "A carregar pipelines: 0 de {0}"), total))));
             });
             w.WaitForExit();
+            Stage(1, 1f, "", false);
             Log(total == 0 ? L("Pipelines were already ready.", "As pipelines ja estavam prontas.") : string.Format(L("{0} pipelines loaded.", "{0} pipelines carregadas."), total));
             BeginInvoke(new Action(() => { loadBar.Set(1f, L("Starting the game...", "A abrir o jogo...")); }));
             Thread.Sleep(600);

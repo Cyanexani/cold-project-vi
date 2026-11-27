@@ -254,7 +254,7 @@ namespace VIctoryLauncher
 
         // Where the hardware report goes (server\hardware-worker). Empty: the database is not online
         // yet, and nothing is sent.
-        public const string HardwareEndpoint = "";
+        public const string HardwareEndpoint = "https://vi-hardware.edupodept.workers.dev/v1/hw";
 
         static string Wmi(string query, string field)
         {
@@ -432,7 +432,8 @@ namespace VIctoryLauncher
         // goes and what never does. "Don't ask again" ends it; Hardware & ID changes it any time.
         void AskToShare()
         {
-            if (ReadSetting("share") == "1" || ReadSetting("share_ask") == "never") return;
+            // Never asked while the database is not online (HardwareEndpoint empty): nothing would be sent.
+            if (HardwareEndpoint.Length == 0 || ReadSetting("share") == "1" || ReadSetting("share_ask") == "never") return;
             var f = new Form { Text = L("Help the game run on more PCs", "Ajuda o jogo a correr em mais PCs"), ClientSize = new Size(660, 520), BackColor = Theme.Back, ForeColor = Theme.Text,
                 Font = Theme.Ui(9.75f), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon };
             f.Controls.Add(new Heading(L("Share your hardware?", "Partilhar o teu hardware?")) { Location = new Point(20, 16), Width = 620 });
@@ -495,6 +496,111 @@ namespace VIctoryLauncher
             never.Click += (s, e) => { WriteSetting("share_ask", "never"); f.Close(); };
             f.Controls.Add(yes); f.Controls.Add(later); f.Controls.Add(never);
             f.ShowDialog(this);
+        }
+
+        // ---------------------------------------------------------------- notices, once each
+        // New things players should try and tell us about on Discord: VIctory's own frame
+        // generation (cards without Smooth Motion), and the edupode engine on AMD cards.
+        void ShowNotices()
+        {
+            if (OwnFrameGen && ReadSetting("notice_fg") != "1")
+            {
+                WriteSetting("notice_fg", "1");
+                var body = string.Join("\r\n", Pt ? new[] {
+                    "A tua placa (" + gpuName + ") nao tem o NVIDIA Smooth Motion. Agora o Julia's Launcher tem a sua",
+                    "propria geracao de frames: cria um frame entre cada dois do jogo, so a partir das imagens.",
+                    "",
+                    "O QUE MUDA",
+                    "   O movimento fica mais fluido. Os FPS reais do jogo nao sobem, e ha meio frame a mais de atraso.",
+                    "",
+                    "AINDA NINGUEM A TESTOU NO JOGO: es dos primeiros.",
+                    "   1.  Liga 'Geracao de frames' nas Opcoes de arranque (ou carrega em 'Ligar agora').",
+                    "   2.  Joga uns minutos com o F3 ligado.",
+                    "   3.  Conta no Discord, no canal \"" + DiscordChannel + "\": a tua placa, se ficou mais fluido,",
+                    "        se ha tremeliques ou rastos, e se o jogo fechou. O 'Enviar erros no Discord' tem a opcao",
+                    "        'Teste da geracao de frames' e junta os logs.",
+                    "",
+                    "Se correr mal, desliga a opcao e fica tudo como antes.",
+                } : new[] {
+                    "Your card (" + gpuName + ") has no NVIDIA Smooth Motion. Julia's Launcher now has its own",
+                    "frame generation: it makes a frame between each two of the game's, from the pictures alone.",
+                    "",
+                    "WHAT CHANGES",
+                    "   Motion looks smoother. The game's real FPS do not go up, and there is half a frame more delay.",
+                    "",
+                    "NOBODY HAS TESTED IT IN THE GAME YET: you are among the first.",
+                    "   1.  Turn on 'Frame generation' in Launch options (or press 'Turn it on now').",
+                    "   2.  Play a few minutes with F3 on.",
+                    "   3.  Tell us on Discord, in the \"" + DiscordChannel + "\" channel: your card, whether it looks",
+                    "        smoother, any flicker or ghosting, and whether the game closed. 'Send errors to Discord'",
+                    "        has a 'Frame generation test' tick and adds the logs.",
+                    "",
+                    "If it goes wrong, turn the option off and everything is as before.",
+                });
+                var answer = Notice(L("New: frame generation for your card (experimental)", "Novo: geracao de frames para a tua placa (experimental)"), body,
+                    L("Turn it on now", "Ligar agora"), L("Open Discord", "Abrir o Discord"));
+                if (answer == 1) { smoothBox.Checked = true; SaveSettings(); Log(L("Frame generation is on (experimental). Tell us how it runs on Discord!", "Geracao de frames ligada (experimental). Conta-nos como corre no Discord!")); }
+                if (answer == 2) OpenUrl(DiscordInvite);
+            }
+            if (hasRadeon && !hasNvidia && ReadSetting("notice_amd") != "1")
+            {
+                WriteSetting("notice_amd", "1");
+                var body = string.Join("\r\n", Pt ? new[] {
+                    "Placa AMD detetada (" + gpuName + "). Jogas com o motor AMD do Belobug (VIctory-Belobug-AMD); o credito e dele.",
+                    "",
+                    "QUERES EXPERIMENTAR O MOTOR EDUPODE?",
+                    "   Tem o trabalho de memoria deste projeto: na placa do autor a VRAM passou de ~12 GB para 6-8 GB,",
+                    "   e cabem cerca de 4 vezes mais texturas na mesma memoria (de ~10 mil para ~40 mil).",
+                    "   Foi feito numa placa NVIDIA e ainda nao foi testado em AMD: pode correr melhor, pior ou nao arrancar.",
+                    "",
+                    "   1.  Carrega em 'Experimentar o motor edupode' (o Preparar compila-o uma vez).",
+                    "   2.  Joga uns minutos com o F3 ligado.",
+                    "   3.  Conta no Discord, no canal \"" + DiscordChannel + "\": a tua placa, FPS e VRAM com cada motor.",
+                    "",
+                    "Voltas ao motor do Belobug quando quiseres: Hardware e ID > Motor.",
+                } : new[] {
+                    "AMD card found (" + gpuName + "). You play with Belobug's AMD engine (VIctory-Belobug-AMD); the credit is his.",
+                    "",
+                    "WANT TO TRY THE EDUPODE ENGINE?",
+                    "   It has this project's memory work: on the author's card video memory went from ~12 GB to 6-8 GB,",
+                    "   and about 4 times more textures fit in the same memory (from ~10 thousand to ~40 thousand).",
+                    "   It was made on an NVIDIA card and has not been tested on AMD: it may run better, worse, or not start.",
+                    "",
+                    "   1.  Press 'Try the edupode engine' (Setup builds it once).",
+                    "   2.  Play a few minutes with F3 on.",
+                    "   3.  Tell us on Discord, in the \"" + DiscordChannel + "\" channel: your card, FPS and video memory with each engine.",
+                    "",
+                    "You can go back to Belobug's engine any time: Hardware & ID > Engine.",
+                });
+                var answer = Notice(L("AMD card: try the edupode engine?", "Placa AMD: experimentar o motor edupode?"), body,
+                    L("Try the edupode engine", "Experimentar o motor edupode"), L("Keep Belobug's", "Ficar com o do Belobug"));
+                if (answer == 1)
+                {
+                    WriteSetting("engine", "edupode");
+                    if (engineBox != null) engineBox.SelectedIndex = 1;
+                    UpdateBanner(); Refresh2();
+                    if (VictoryExe == null) { Show(PageSetup); Build(); }
+                }
+            }
+        }
+
+        // A notice in the launcher's style: 1 for the first button, 2 for the second, 0 for "Later".
+        int Notice(string title, string body, string first, string second)
+        {
+            int answer = 0;
+            var f = new Form { Text = title, ClientSize = new Size(700, 470), BackColor = Theme.Back, ForeColor = Theme.Text, Font = Theme.Ui(9.75f),
+                StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon };
+            f.Controls.Add(new Heading(title) { Location = new Point(20, 16), Width = 660 });
+            f.Controls.Add(new Label { Location = new Point(20, 50), Size = new Size(660, 340), Text = body, ForeColor = Theme.Text, BackColor = Theme.Back });
+            var a = new Pill { Main = true, Text = first, Location = new Point(20, 408), Size = new Size(250, 42) };
+            var b = new Pill { Text = second, Location = new Point(280, 412), Size = new Size(220, 34) };
+            var c = new Pill { Text = L("Later", "Mais tarde"), Location = new Point(510, 412), Size = new Size(170, 34) };
+            a.Click += (s, e) => { answer = 1; f.Close(); };
+            b.Click += (s, e) => { answer = 2; f.Close(); };
+            c.Click += (s, e) => f.Close();
+            f.Controls.Add(a); f.Controls.Add(b); f.Controls.Add(c);
+            f.ShowDialog(this);
+            return answer;
         }
 
         // ---------------------------------------------------------------- Hardware & ID page
