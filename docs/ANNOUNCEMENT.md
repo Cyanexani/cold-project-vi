@@ -1,10 +1,9 @@
 ## Julia's Launcher {tag} is out 🔧
 **Fix**
-🖱️ **The cursor stayed in the middle of the screen** while you looked around with the mouse. It is now hidden while the game has the mouse, and comes back with Alt, F1 or another window in front.
+📁 **"Shaders won't prepare" / the game won't start because of the game folder.** Auto-detect now looks for a *complete* dump (game_scarlett_master.exe with shaders.rpf, levels.rpf and the rest beside it), and the launcher tells you exactly what to move when the game's files are not next to the executable.
+🧩 **"Shaders ready" with only a dozen shaders** is now a clear error: a complete dump gives about 25,000.
 
-**Also since 0.3.3**
-🎮 VIctory always takes your graphics card, not the processor's graphics: no more "AMD card" on an NVIDIA PC, and Resizable BAR is found.
-🌐 Changing the language reopens the launcher.
+**Tip:** keep the whole dump in a folder of its own, for example `C:\Games\GTA6`, not loose in Downloads.
 
 **Install**
 🔄 On 0.3.x: nothing to do, it installs itself within 5 minutes while the game is closed.
