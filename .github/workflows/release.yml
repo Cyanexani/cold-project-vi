@@ -8,9 +8,8 @@ name: Release
 
 # (felicienradio builds and signs his own releases on his PC with scripts\release-local.ps1; on the edupode
 # branch a pushed tag builds them here, and edupode signs them.)
+# On felicienradio's main a pushed tag starts nothing: he builds and signs on his PC (scripts\release-local.ps1).
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:

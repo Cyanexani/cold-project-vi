@@ -86,7 +86,11 @@ namespace VIctoryLauncher
                                                        "Feito: {0} esta no Ambiente de trabalho.\r\n\r\nEnvia-o ao edupode:\r\n\r\n" +
                                                        "•  Enviar ao edupode: um clique. Uma copia compacta (resumo, definicoes, o fim de cada log; sem o teu nome de utilizador) vai para a caixa privada de relatorios do edupode. So o edupode a pode ler.\r\n" +
                                                        "•  Issue no GitHub: a pagina abre ja preenchida. Arrasta o zip para a caixa de texto e carrega em 'Submit new issue' (precisa de uma conta GitHub gratuita).\r\n" +
-                                                       "•  Discord: envia o zip no canal \"{1}\" e cola o resumo (ja copiado)."), Path.GetFileName(zip), DiscordChannel);
+                                                       "•  Discord: envia o zip no canal \"{1}\" e cola o resumo (ja copiado).",
+                                                       "Terminé : {0} est sur ton Bureau.\r\n\r\nEnvoie-le à edupode :\r\n\r\n" +
+                                                       "•  Envoyer à edupode : un clic. Une copie compacte (résumé, réglages, la fin de chaque log ; sans ton nom d'utilisateur) part dans la boîte à rapports privée d'edupode. Seul edupode peut la lire.\r\n" +
+                                                       "•  Issue GitHub : la page s'ouvre déjà remplie. Glisse le zip dans la zone de texte, puis appuie sur 'Submit new issue' (il faut un compte GitHub gratuit).\r\n" +
+                                                       "•  Discord : envoie le zip dans le salon \"{1}\" et colle le résumé (déjà copié)."), Path.GetFileName(zip), DiscordChannel);
                             var answer = Notice(L("Send the report", "Enviar o relatorio"), body, L("Send to edupode", "Enviar ao edupode"), L("Open a GitHub issue", "Abrir uma issue no GitHub"));
                             if (answer == 1) SendReport(zip, game);
                             if (answer == 2) OpenUrl(IssueUrl(game, ticked, said, summary, Path.GetFileName(zip)));

@@ -23,13 +23,13 @@ namespace VIctoryLauncher
         // This launcher's version; a release with a higher one is an update.
         // felicienradio's 0.3.1 with edupode's fixes: above 0.3.1, on edupode's release channel and key.
         public const string Version = "0.3.2-edupode";
-        public const string ManifestUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.json";
-        public const string SignatureUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.sig";
-        public const string DownloadPrefix = "https://github.com/edupode/cold-project-vi/releases/download/";
+        public const string ManifestUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.json";
+        public const string SignatureUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.sig";
+        public const string DownloadPrefix = "https://github.com/felicienradio/cold-project-vi/releases/download/";
         // Every release of the repository, newest first, whatever branch it was cut from (main or edupode),
         // pre-releases included: the newest one that carries a signed manifest is the update. A release
         // without one (a draft turned public, a release from main with other files) no longer hides it.
-        public const string ReleasesApi = "https://api.github.com/repos/edupode/cold-project-vi/releases?per_page=15";
+        public const string ReleasesApi = "https://api.github.com/repos/felicienradio/cold-project-vi/releases?per_page=15";
         // What an update may bring, and where each goes (beside the launcher).
         public static readonly string[] Allowed = { "Julia's Launcher.exe", "victory.exe", "tools/nvsmooth30/version.dll" };
 
