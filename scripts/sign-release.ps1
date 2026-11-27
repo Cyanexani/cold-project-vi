@@ -4,7 +4,7 @@
 # 2. writes manifest.json (version, notes, each file with its SHA-256) and manifest.sig (RSA-SHA256 with
 #    the private key from scripts\new-release-key.ps1, %USERPROFILE%\.vi-release\release-key.xml);
 # 3. uploads both and publishes the release. Every launcher then installs it within 5 minutes.
-param([Parameter(Mandatory = $true)][string]$Tag, [switch]$Yes)
+param([Parameter(Mandatory = $true)][string]$Tag, [switch]$Yes, [switch]$NoAnnounce)
 $ErrorActionPreference = 'Stop'
 $repo = 'edupode/cold-project-vi'
 $key = Join-Path $env:USERPROFILE '.vi-release\release-key.xml'
@@ -48,3 +48,5 @@ if (-not $Yes) {
 gh release upload $Tag -R $repo --clobber $manifestPath (Join-Path $work 'manifest.sig')
 gh release edit $Tag -R $repo --draft=false --latest
 Write-Host "Published $Tag."
+# The announcement (docs\ANNOUNCEMENT.md) in the Discord channel, through the webhook kept beside the key.
+if (-not $NoAnnounce) { & (Join-Path $PSScriptRoot 'post-announcement.ps1') -Tag $Tag }
