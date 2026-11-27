@@ -1,16 +1,8 @@
-Julia's Launcher 0.2.0: a grande renovação.
+Julia's Launcher 0.2.1
 
-- Visual novo (estilo Cold Project). Páginas novas: Shaders (ao vivo), Hardware e ID, Atualizações, Ajustes avançados.
-- Instalador: um pedido de administrador e o Windows fica configurado em segundo plano. Nada para compilar.
-- Atualizações: verificadas no GitHub de 5 em 5 minutos, assinadas, instaladas sozinhas com o jogo fechado.
-- Correções:
-  - O JOGAR já não fica preso atrás de um jogo que crashou: aparece FECHAR E JOGAR.
-  - O "could not find Cargo.toml" deixa de aparecer quando o launcher está fora da pasta do código.
-  - O Resizable BAR é detetado como o jogo o vê.
-  - A memória virtual liga sempre.
-  - Dumps com vários executáveis funcionam.
-  - As definições já não se perdem.
-- Predefinições novas: Ultra baixo (muito pouca memória) e Personalizado, com códigos de perfil para copiar e colar.
-- Placas AMD: detetadas sozinhas; jogam com o VIctory-Belobug-AMD do Belobug (todo o crédito ao Belobug).
-- Enviar erros no Discord: cria o pacote para o canal "Send bugs here please".
-- Partilha de hardware (desligada por defeito): só hardware, para uma base de dados que só o edupode lê.
+- O motor edupode é o predefinido para todas as placas (NVIDIA, AMD, Intel): VRAM de ~12 GB para 6-8 GB. O VIctory-Belobug-AMD do Belobug fica como alternativa para placas Radeon, com todo o crédito para o Belobug.
+- ★ Mais núcleos do processador, ligado por defeito: metade dos teus núcleos copia a memória do jogo. +1 FPS no mundo aberto e menos 2,3 ms a preparar cada frame no PC do autor.
+- Resolução de saída: 1080p, 1440p (2K) ou 2160p (4K), ao lado das predefinições. O 2K e o 4K são novos: conta-nos como correm.
+- Enviar erros: além do Discord, "Abrir uma issue no GitHub" abre uma issue já preenchida; arrasta o zip e envia.
+- Acabou o falso aviso de "memória insuficiente" antes de JOGAR: a memória virtual gerida pelo Windows que ainda pode crescer passa a contar.
+- Atualizações: a release assinada mais recente do repositório é encontrada seja de que ramo for.

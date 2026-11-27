@@ -1,16 +1,8 @@
-Julia's Launcher 0.2.0: the big revamp.
+Julia's Launcher 0.2.1
 
-- New look (Cold Project style). New pages: Shaders (live), Hardware & ID, Updates, Advanced Tweaks.
-- Installer: one administrator prompt, then Windows is set up in the background. Nothing to compile.
-- Updates: checked on GitHub every 5 minutes, signed, installed on their own while the game is closed.
-- Fixes:
-  - PLAY no longer gets stuck behind a crashed game. It shows CLOSE AND PLAY instead.
-  - "could not find Cargo.toml" is gone when the launcher is outside the source folder.
-  - Resizable BAR is detected the way the game sees it.
-  - Virtual memory turns on reliably.
-  - Dumps with several game executables work.
-  - Settings are no longer lost.
-- New presets: Ultra Low (very little memory) and Custom, with profile codes to copy and paste.
-- AMD cards: detected on their own; they play with Belobug's VIctory-Belobug-AMD (all credit to Belobug).
-- Send errors to Discord: makes the package for the "Send bugs here please" channel.
-- Hardware sharing (off by default): only hardware, to a database only edupode can read.
+- The edupode engine is the default for every card (NVIDIA, AMD, Intel): video memory from ~12 GB down to 6-8 GB. Belobug's VIctory-Belobug-AMD stays as an alternative for Radeon cards, with all credit to Belobug.
+- ★ More CPU cores, on by default: half your cores copy the game's memory. +1 FPS in the open world and 2.3 ms less preparing each frame on the author's PC.
+- Output resolution: 1080p, 1440p (2K) or 2160p (4K), beside the presets. 2K and 4K are new: tell us how they run.
+- Send errors: besides Discord, "Open a GitHub issue" opens an issue already filled in; drag the zip in and submit.
+- No more false "not enough memory" warning before PLAY: Windows-managed virtual memory that can still grow now counts.
+- Updates: the newest signed release of the repository is found whatever branch it comes from.
