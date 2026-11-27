@@ -5,6 +5,7 @@
 <p>
   <a href="#come%C3%A7ar-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-come%C3%A7a%20aqui-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Read%20in-English-C8102E?style=for-the-badge" alt="English"/></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Lire%20en-Fran%C3%A7ais-0055A4?style=for-the-badge" alt="Francais"/></a>
   <a href="docs/LUZ-24FPS.md"><img src="https://img.shields.io/badge/Notas-Portugu%C3%AAs-006600?style=for-the-badge" alt="Notas"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/por-%40edupode-222?style=for-the-badge&logo=github" alt="por edupode"/></a>
 </p>
@@ -14,7 +15,7 @@
   <img src="https://img.shields.io/badge/VRAM-6--8%20GB%20de%2012-ffc371?style=flat-square" alt="VRAM"/>
   <img src="https://img.shields.io/badge/RAM-~20%20GB-ffc371?style=flat-square" alt="RAM"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
-  <img src="https://img.shields.io/badge/GPU-NVIDIA%20RTX-76B900?style=flat-square&logo=nvidia" alt="NVIDIA RTX"/>
+  <img src="https://img.shields.io/badge/GPU-NVIDIA%20%7C%20AMD%20%7C%20Intel-76B900?style=flat-square" alt="NVIDIA, AMD, Intel"/>
 </p>
 
 </div>
@@ -30,11 +31,42 @@
 > **Este repositório não tem ficheiros do jogo**: nem executável, nem dados, nem shaders extraídos. Precisas da
 > tua própria cópia do jogo. Sem ligação nem apoio do estúdio ou da editora do jogo.
 
-GTA VI a partir do **teu próprio dump de Xbox Series**, no Windows com uma placa NVIDIA RTX, através do
+GTA VI a partir do **teu próprio dump de Xbox Series**, no Windows, através do
 [VIctory](https://github.com/Marvisak/VIctory). Este ramo é a build do cgbj com a iluminação do VIctory-NVIDIA
 e muitas mudanças nossas. **Não inclui ficheiros do jogo.**
 
+### O motor edupode
+
+O motor com que todas as placas jogam por defeito. Medido no portátil do autor (RTX 5070 Ti de 12 GB, 32 GB de RAM):
+
+| | cgbj antes | motor edupode |
+|---|---|---|
+| VRAM | ~12 GB, acima do limite do sistema | **6-8 GB** |
+| Texturas que cabem na placa | ~10 000 | **~40 000** |
+| RAM | 27-29 GB | **20-21 GB** |
+| Mundo aberto | 10-15 FPS | **22-26 FPS** |
+| Multidões e lutas | 10-15 FPS | **14-17 FPS** |
+| Cutscenes / menus | ~26 / 30-33 FPS | **35-38 / 60 FPS** |
+| Sessões longas | | **missões sem crashes** |
+
+## Progresso na escala do PortWatch VI
+
+**Cerca de 79 %** (27/11/2026: o portátil do autor, RTX 5070 Ti, e jogadores com 30 fps estáveis). A escala do PortWatch: até 50 %,
+cada passo precisa do anterior; depois disso, história, imagem, velocidade e estabilidade dividem os últimos 50
+pontos. Os pontos acima de 50 são a nossa estimativa (o PortWatch só os conta com prova, um vídeo).
+
+| Marco | % | Estado |
+|---|---|---|
+| Base, executável, primeira imagem, menu, no mundo | 0-40 | ✅ |
+| Jogável (controlas uma personagem) | 50 | ✅ missões jogáveis |
+| História (17,5 pontos) | cerca de 3 | ✅ a abertura e as suas missões jogam-se até ao fim; o resto da história ainda não foi jogado |
+| Imagem (12,5 pontos) | cerca de 8 | ✅ iluminação NVIDIA, água certa, cenas noturnas iluminadas; ⏳ ray tracing e a volumetria `_Tiled` ainda desligados |
+| Velocidade (10 pontos: fps ÷ 30) | cerca de 10 | ✅ jogadores a 30 fps estáveis; 22-26 fps no mundo aberto no portátil do autor, 35-38 nas cutscenes, 60 nos menus |
+| Estabilidade (10 pontos) | cerca de 8 | ✅ sessões longas e missões sem crashes |
+
 ## Download
+
+> Este ramo segue o **Julia's Launcher 0.3.1** do felicienradio (nomes de utilizador com acentos, francês) com as correções do edupode por cima: **0.3.2-edupode**.
 
 **[Versões](https://github.com/edupode/cold-project-vi/releases/latest)**: descarrega o `VI-Setup-<versão>.exe` e corre-o.
 
@@ -111,7 +143,7 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
 
 | | |
 |---|---|
-| **Jogar** | Na primeira vez escolhe uma predefinição pelo teu hardware.<br>**Predefinições:** Recomendado (720p), Mais rápido e PC modesto (540p), **Ultra baixo** (placas de 4-6 GB, 8-16 GB de RAM), Nítido e cgbj clássico (1080p), **Personalizado** (os teus valores).<br>Uma faixa mostra se o dump, o emulador, os shaders e o Windows estão prontos. Um **aviso amarelo** diz o que falta ao jogo (memória virtual, energia, Resizable BAR, placa gráfica dedicada, shaders) e abre a correção. |
+| **Jogar** | Na primeira vez escolhe uma predefinição pelo teu hardware.<br>**Predefinições:** Recomendado (720p), Mais rápido e PC modesto (540p), **Ultra baixo** (placas de 4-6 GB, 8-16 GB de RAM), Nítido e cgbj clássico (1080p), **Personalizado** (os teus valores).<br>**Saída:** 1080p, 1440p (2K) ou 2160p (4K); a escala da predefinição aplica-se por cima (o Recomendado em 4K desenha 2560x1440 e amplia).<br>Uma faixa mostra se o dump, o emulador, os shaders e o Windows estão prontos. Um **aviso amarelo** diz o que falta ao jogo (memória virtual, energia, Resizable BAR, placa gráfica dedicada, shaders) e abre a correção. |
 | **Jogo preso** | Um VIctory que deixou de responder (um crash, uma janela de erro) nunca bloqueia o JOGAR: aparece **FECHAR E JOGAR**, e **Fechar o jogo** termina-o. |
 | **Vários executáveis** | Quando o dump tem mais do que um `game_scarlett*.exe`, escolhes qual ao lado da pasta do jogo.<br>Um ficheiro estragado (um download que parou, um pacote encriptado) é indicado antes do JOGAR, em vez do "malformed image" do VIctory. |
 | **Barra de carregamento antes do jogo** | Todas as pipelines usadas em sessões anteriores são preparadas antes de o jogo abrir, por isso não há engasgos a primeira vez que vês um sítio. |
@@ -120,11 +152,13 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
 | **Shaders** | Ao vivo: shaders traduzidos, pipelines feitas, as que falharam, o driver, o espaço em disco e os últimos erros.<br>Duas barras de progresso: **Shaders** (quanto dos ficheiros do jogo já foi traduzido) e **Pipelines** (quantas estão feitas, também durante o carregamento antes de cada jogo).<br>**Reparar** tenta de novo o que falhou; **Refazer tudo** recomeça do zero. |
 | **Desempenho** | As apps que ocupam VRAM e RAM; marca-as e elas fecham.<br>A reserva de VRAM e a geração de frames definem-se aqui. |
 | **Geração de frames** | **RTX 40/50:** NVIDIA Smooth Motion, escrito no perfil do driver (sem a NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Todas as outras placas (GTX 10, RTX 20, AMD com o motor edupode, Intel):** geração de frames VI (experimental, desligada por defeito). Cria um frame entre cada dois do jogo só a partir das imagens, à custa de meio frame de atraso. |
-| **Placas AMD** | Detetadas sozinhas. Jogam com o **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) do Belobug**, o fork dele afinado para Radeon (GPL-3.0). Todo o crédito do motor AMD é dele. O Preparar descarrega-o e compila-o uma vez. |
+| **Placas AMD** | Também jogam com o **motor edupode**, como todas as placas. Como alternativa afinada para Radeon há o **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) do Belobug** (GPL-3.0; todo o crédito é dele): escolhe-se em Hardware e ID, e o Preparar descarrega-o e compila-o uma vez. Se o motor edupode fechar ao arrancar duas vezes seguidas numa Radeon, o launcher muda sozinho para o do Belobug e diz como voltar. |
 | **Ajustes avançados (Personalizado)** | Resolução, tamanho das texturas, buffers, proteções de memória e relógio de FPS.<br>**Copiar o meu perfil** dá um código (`VI1-...`) para partilhar. Cola o código de um amigo na caixa e carrega em **Aplicar**: mostra primeiro o que muda, e um código só pode ter estes valores. |
+| **Saves do jogo** | Hardware e ID > **Saves do jogo**: exporta o teu save para um zip no Ambiente de trabalho, ou importa o de um amigo (o teu fica primeiro numa cópia de segurança, em `%LOCALAPPDATA%\VIctory\save-backups`). |
+| **Gráficas integradas** | Todas as placas são lidas por DXGI. Um PC só com gráfica integrada (Intel Iris Xe / UHD) fica em Ultra baixo com as opções pesadas desligadas e recebe um aviso antes de JOGAR: é preciso uma placa de 4 GB ou mais para correr bem. |
 | **Hardware e ID** | O teu ID permanente (`VI-XXXX-XXXX`, feito a partir de peças do PC; fica igual depois de reinstalar o Windows) com botão de copiar, o teu hardware e a escolha do motor. |
 | **Partilha de hardware** | **Desligada por defeito.** Ligada, envia **só hardware** (placa gráfica, processador, RAM, placa-mãe, Windows, tipo de disco), no máximo uma vez por dia, para uma base de dados que só recebe dados e que só o edupode lê.<br>Nunca envia logs, opções, caminhos, nomes nem o IP. A página mostra exatamente o que é enviado.<br>Enquanto está desligada, o launcher pergunta antes de cada jogo e explica porque ajuda; **Não perguntar mais** acaba com isso. Só as médias são públicas: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), atualizadas de 6 em 6 horas. |
-| **Atualizações** | Verifica o GitHub ao abrir e **de 5 em 5 minutos**. Uma versão nova instala-se sozinha quando o jogo não está a correr, e só se a assinatura e o SHA-256 baterem certo.<br>Isto e a partilha de hardware (opcional) são o único tráfego de rede do launcher. |
+| **Atualizações** | Verifica o GitHub ao abrir e **de 5 em 5 minutos**: a release mais recente do repositório com um manifest assinado, seja de que ramo for (`main` ou `edupode`). Uma versão nova instala-se sozinha quando o jogo não está a correr, e só se a assinatura e o SHA-256 baterem certo.<br>Isto e a partilha de hardware (opcional) são o único tráfego de rede do launcher. |
 | **Overlay de FPS (F3)** | FPS agora, média do último minuto (AVG 1M), média desde o início (ALL), o pior meio segundo (LOW), tempo por frame, draws, VRAM e RAM. |
 
 ### Logs e erros

@@ -8,6 +8,7 @@
   <a href="#quick-start-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-start%20here-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
   <a href="docs/GUIDE-30FPS.md"><img src="https://img.shields.io/badge/Guide-English-C8102E?style=for-the-badge" alt="Guide"/></a>
   <a href="README.pt.md"><img src="https://img.shields.io/badge/Leia%20em-Portugu%C3%AAs-006600?style=for-the-badge" alt="Portugues"/></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Lire%20en-Fran%C3%A7ais-0055A4?style=for-the-badge" alt="Francais"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/by-%40edupode-222?style=for-the-badge&logo=github" alt="by edupode"/></a>
 </p>
 
@@ -16,7 +17,7 @@
   <img src="https://img.shields.io/badge/VRAM-6--8%20GB%20of%2012-ffc371?style=flat-square" alt="VRAM"/>
   <img src="https://img.shields.io/badge/RAM-~20%20GB-ffc371?style=flat-square" alt="RAM"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
-  <img src="https://img.shields.io/badge/GPU-NVIDIA%20RTX-76B900?style=flat-square&logo=nvidia" alt="NVIDIA RTX"/>
+  <img src="https://img.shields.io/badge/GPU-NVIDIA%20%7C%20AMD%20%7C%20Intel-76B900?style=flat-square" alt="NVIDIA, AMD, Intel"/>
   <img src="https://img.shields.io/badge/Rust-pinned-B7410E?style=flat-square&logo=rust" alt="Rust"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-845ec2?style=flat-square" alt="GPL-3.0"/>
 </p>
@@ -55,11 +56,42 @@
 > Hope this helps anyone, missions are already possible and doesn't crash even after long sessions  
 > on menus it goes from 30-32/33fps now its 60 fixed  
 
-GTA VI from **your own Xbox Series dump**, on Windows with an NVIDIA RTX card, through
-[VIctory](https://github.com/Marvisak/VIctory) (this branch: the cgbj build with the VIctory-NVIDIA
-lighting and many changes of our own). **No game files are included.**
+GTA VI from **your own Xbox Series dump**, on Windows, through [VIctory](https://github.com/Marvisak/VIctory)
+(this branch: the cgbj build with the VIctory-NVIDIA lighting and many changes of our own). **No game files are
+included.**
+
+### The edupode engine
+
+The engine every card plays with by default. Measured on the author's RTX 5070 Ti laptop (12 GB, 32 GB RAM):
+
+| | cgbj before | edupode engine |
+|---|---|---|
+| Video memory | ~12 GB, over the system's budget | **6-8 GB** |
+| Textures that fit on the card | ~10,000 | **~40,000** |
+| RAM | 27-29 GB | **20-21 GB** |
+| Open world | 10-15 FPS | **22-26 FPS** |
+| Crowds and fights | 10-15 FPS | **14-17 FPS** |
+| Cutscenes / menus | ~26 / 30-33 FPS | **35-38 / 60 FPS** |
+| Long sessions | | **missions without crashes** |
+
+## Progress on PortWatch VI's scale
+
+**About 79 %** (27/11/2026: the author's RTX 5070 Ti laptop, and players reporting a steady 30 fps). PortWatch's scale: up to 50 %,
+each step needs the one before; beyond that, story, picture, speed and stability share the last 50 points.
+Points past 50 are our estimate (PortWatch counts them only with proof, a video).
+
+| Milestone | % | State |
+|---|---|---|
+| Groundwork, executable, first picture, main menu, in the world | 0-40 | ✅ |
+| Playable (you control a character) | 50 | ✅ missions playable |
+| Story (17.5 points) | about 3 | ✅ the opening and its missions play through; the rest of the story not played yet |
+| Picture (12.5 points) | about 8 | ✅ NVIDIA lighting, water right, night scenes lit; ⏳ ray tracing and the `_Tiled` volumetrics still off |
+| Speed (10 points: fps ÷ 30) | about 10 | ✅ players at a steady 30 fps; 22-26 fps in the open world on the author's laptop, 35-38 in cutscenes, 60 in menus |
+| Stability (10 points) | about 8 | ✅ long sessions and missions without crashes |
 
 ## Download
+
+> This branch follows felicienradio's **Julia's Launcher 0.3.1** (accented user names, French) with edupode's fixes on top: **0.3.2-edupode**.
 
 **[Releases](https://github.com/edupode/cold-project-vi/releases/latest)**: get `VI-Setup-<version>.exe` and run it.
 
@@ -73,7 +105,7 @@ lighting and many changes of our own). **No game files are included.**
 - **Nothing to compile:** you don't need Rust or Build Tools.
 - **Updates install themselves.** See [What the launcher does](#what-the-launcher-does).
 
-**Discord:** <https://discord.gg/648WEXCAsZ>. Send bugs in the **"Send bugs here please"** channel; the launcher makes the package for you (see [Logs and errors](#logs-and-errors)).
+**Bugs:** open an [issue](https://github.com/edupode/cold-project-vi/issues) or post in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ); the launcher makes the package and fills the issue in for you (see [Logs and errors](#logs-and-errors)).
 
 ### Checking a release
 
@@ -131,14 +163,14 @@ No winget? Download Git from <https://git-scm.com/download/win>, or skip Git: on
 The launcher checks your GPU, video memory, RAM, Resizable BAR and Smooth Motion support and sets everything
 else. Point at any option to see what it does; **★** marks what was tested on the author's PC. On cards with
 less than 10 GB or PCs with less than 24 GB of RAM it picks the **Modest PC** mode.
-English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the same from a command line
+English by default, **Português** and **Français** in the side bar; this page also in [Português](README.pt.md) and [Français](README.fr.md). `Jogar-Luz.cmd` does the same from a command line
 (`Jogar-Luz.cmd tudo`).
 
 ### What the launcher does
 
 | | |
 |---|---|
-| **Play** | Picks a preset from your hardware the first time.<br>**Presets:** Recommended (720p), Fastest and Modest PC (540p), **Ultra Low** (4-6 GB cards, 8-16 GB of RAM), Sharp and Classic cgbj (1080p), **Custom** (your values).<br>A strip shows whether the dump, the emulator, the shaders and Windows are ready. A **yellow notice** lists what the game would run without (virtual memory, power, Resizable BAR, the dedicated graphics card, shaders) and opens the fix. |
+| **Play** | Picks a preset from your hardware the first time.<br>**Presets:** Recommended (720p), Fastest and Modest PC (540p), **Ultra Low** (4-6 GB cards, 8-16 GB of RAM), Sharp and Classic cgbj (1080p), **Custom** (your values).<br>**Output:** 1080p, 1440p (2K) or 2160p (4K); the preset's scale applies on top (Recommended at 4K draws 2560x1440 and upscales).<br>A strip shows whether the dump, the emulator, the shaders and Windows are ready. A **yellow notice** lists what the game would run without (virtual memory, power, Resizable BAR, the dedicated graphics card, shaders) and opens the fix. |
 | **Stuck game** | A VIctory that stopped answering (a crash, an error window) never blocks PLAY: it turns into **CLOSE AND PLAY**, and **Close game** ends it. |
 | **Several game executables** | When the dump has more than one `game_scarlett*.exe`, you choose which one beside the game folder.<br>A broken file (a download that stopped, an encrypted package) is named before PLAY, instead of VIctory's "malformed image". |
 | **Loading bar before the game** | Every pipeline earlier sessions drew with is made before the game opens, so there is no stutter the first time you see a place. |
@@ -147,22 +179,29 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 | **Shaders** | Live: shaders translated, pipelines made, the ones that failed, the driver, disk room, the last errors.<br>Two progress bars: **Shaders** (how much of the game's files has been translated) and **Pipelines** (how many are made, also during the loading before each game).<br>**Repair** retries what failed; **Rebuild everything** starts again. |
 | **Performance** | The apps holding video memory and RAM; tick them and they close.<br>The video memory reserve and frame generation are set here. |
 | **Frame generation** | **RTX 40/50:** NVIDIA Smooth Motion, written into the driver's profile (no NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Every other card (GTX 10, RTX 20, AMD with the edupode engine, Intel):** VI frame generation (experimental, off by default) makes a frame between each two of the game's from the pictures alone, at the cost of half a frame of delay. |
-| **AMD cards** | Detected on their own. They play with **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug**, his fork tuned for Radeon (GPL-3.0). All credit for the AMD engine is his. Setup downloads and builds it once. |
+| **AMD cards** | They play with the **edupode engine** too, like every card. As an alternative tuned for Radeon there is **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug** (GPL-3.0; all credit for it is his): pick it in Hardware & ID, and Setup downloads and builds it once. If the edupode engine ends at start twice in a row on a Radeon, the launcher switches to Belobug's on its own and says how to go back. |
 | **Advanced Tweaks (Custom)** | Resolution, texture size, buffers, memory guards and FPS clock.<br>**Copy my profile** gives a code (`VI1-...`) to share. Paste a friend's code in the box and **Apply**: it shows what changes first, and a code can only hold these values. |
+| **Game saves** | Hardware & ID > **Game saves**: export your save to a zip on the Desktop, or import a friend's (yours are kept in a backup first, in `%LOCALAPPDATA%\VIctory\save-backups`). |
+| **Integrated graphics** | Every adapter is read through DXGI. A PC with only integrated graphics (Intel Iris Xe / UHD) gets Ultra Low with the heavy options off and a warning before PLAY: a 4 GB+ graphics card is needed to run well. |
 | **Hardware & ID** | Your permanent ID (`VI-XXXX-XXXX`, from PC parts; it stays after reinstalling Windows) with a copy button, your hardware, and the engine choice. |
 | **Hardware sharing** | **Off by default.** When on, it sends **only hardware** (graphics card, processor, RAM, motherboard, Windows, disk type), at most once a day, to a write-only database only edupode can read.<br>It never sends logs, options, paths, names or your IP. The page shows exactly what is sent.<br>While it is off, the launcher asks before each game, explaining why it helps; **Don't ask again** ends that. Only the averages are public: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), updated every 6 hours. |
-| **Updates** | Checks GitHub when the launcher opens and **every 5 minutes**. A new version installs itself while the game is not running, and only when its signature and SHA-256 match.<br>This and the opt-in hardware report are the launcher's only network traffic. |
+| **Updates** | Checks GitHub when the launcher opens and **every 5 minutes**: the newest release of the repository that carries a signed manifest, whatever branch it was cut from (`main` or `edupode`). A new version installs itself while the game is not running, and only when its signature and SHA-256 match.<br>This and the opt-in hardware report are the launcher's only network traffic. |
 | **FPS overlay (F3)** | FPS now, the last minute's average (AVG 1M), the whole run's (ALL), the worst half second (LOW), frame time, draws, video memory and RAM. |
 
 ### Logs and errors
 
 - **Game logs:** `%LOCALAPPDATA%\VIctory\luz\logs`. `session-*.log` is one file per game; `prepare.log`, `build.log` and `build-amd.log` cover shaders and builds.
 - **Launcher errors:** `%TEMP%\vi-launcher-error.txt`.
-- **Send errors to Discord** (side bar or Help):
+- **Send errors (GitHub / Discord)** (side bar or Help):
   1. Choose **launcher errors** or **game errors**.
   2. Tick what happened (shaders not rendering, virtual memory not turning on, ...) and write a line.
   3. The launcher puts the right files in a zip on your Desktop, with your user name taken out of every path. It opens the folder and copies a short summary.
-  4. Send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ). Nothing is sent by the launcher itself.
+  4. Send it:
+     - **Send to edupode:** one click. A compact copy (summary, settings, the end of each log, your user name taken out) goes to a private report box on Cloudflare that only edupode can read; you get the report's number.
+     - **Open a GitHub issue:** a new [issue](https://github.com/edupode/cold-project-vi/issues) opens in your browser already filled in (hardware, what you ticked, your words). Drag the zip into it and press **Submit new issue** (a free GitHub account is needed).
+     - **Discord:** send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ).
+
+  Nothing is sent by the launcher itself.
 
 ## Modes
 
@@ -177,7 +216,8 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 Options: ★ FPS overlay (F3), ★ borderless full screen (test A: 22-24 FPS on the author's PC; needed by Smooth
 Motion), ★ the 60 FPS clock, pipelines loaded before the game (new), NVIDIA Smooth Motion, the video memory
 reserve, crowds and fights (2 GB of the game's buffers on the card; 12 GB cards and up), anti-stretch (fewer
-stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental).
+stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental), ★ more CPU cores (half the cores
+copy the game's memory: +1 FPS on the author's PC).
 
 ## Controls
 

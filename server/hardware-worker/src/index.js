@@ -1,6 +1,9 @@
 // VI hardware database: one way in, nothing out.
 //
-// The only route is POST /v1/hw. It takes the launcher's hardware report (the exact fields below,
+// Two routes take data in, none gives it out: POST /v1/hw (hardware, below) and POST /v1/report (a
+// bug report's zip the player chose to send from the launcher, see report()).
+//
+// POST /v1/hw It takes the launcher's hardware report (the exact fields below,
 // nothing else), keeps one row per ID, and answers with a bare status code. There is no route that
 // reads anything: the database is read only by edupode, in the Cloudflare dashboard or with the
 // separate admin Worker behind Cloudflare Access (admin.js).
@@ -92,9 +95,39 @@ async function stats(env) {
   };
 }
 
+// A bug report: the zip the launcher made (summary, settings and log tails, the user name taken out of
+// every path), sent only when the player presses "Send to edupode". Kept whole in `reports`, read only by
+// edupode (scripts/get-reports.ps1 or the dashboard). Headers: X-VI-Id (the launcher's ID), X-VI-Kind
+// (game or launcher); the body is the zip itself, at most MAX_REPORT bytes (a D1 row holds 2 MB).
+const MAX_REPORT = 1800 * 1024;
+const REPORTS_PER_HOUR = 5;
+
+async function report(request, env) {
+  const id = request.headers.get('X-VI-Id') || '';
+  const kind = request.headers.get('X-VI-Kind') || '';
+  if (!ID.test(id) || !['game', 'launcher'].includes(kind)) return new Response(null, { status: 400 });
+  const length = Number(request.headers.get('content-length') || '0');
+  if (length > MAX_REPORT) return new Response(null, { status: 413 });
+  const hour = Math.floor(Date.now() / 3600000);
+  const who = await sha256(`${env.RATE_SALT}|report|${request.headers.get('CF-Connecting-IP') || ''}|${hour}`);
+  await env.DB.prepare('DELETE FROM rate WHERE hour < ?').bind(hour).run();
+  const seen = await env.DB.prepare('INSERT INTO rate (who, hour, n) VALUES (?, ?, 1) ON CONFLICT(who) DO UPDATE SET n = n + 1 RETURNING n')
+    .bind(who, hour).first('n');
+  if (seen > REPORTS_PER_HOUR) return new Response(null, { status: 429 });
+  const zip = new Uint8Array(await request.arrayBuffer());
+  // A zip and nothing else: its first bytes are PK\x03\x04.
+  if (zip.length < 22 || zip.length > MAX_REPORT || zip[0] !== 0x50 || zip[1] !== 0x4b || zip[2] !== 3 || zip[3] !== 4)
+    return new Response(null, { status: 400 });
+  const n = await env.DB.prepare(
+    "INSERT INTO reports (created, vi_id, kind, bytes, zip) VALUES (datetime('now'), ?, ?, ?, ?) RETURNING n"
+  ).bind(id, kind, zip.length, zip).first('n');
+  return new Response(JSON.stringify({ n }), { status: 201, headers: { 'content-type': 'application/json' } });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/v1/report') return report(request, env);
     if (request.method === 'GET' && url.pathname === '/v1/stats') {
       const auth = request.headers.get('Authorization') || '';
       if (!env.STATS_TOKEN || !sameToken(auth.replace(/^Bearer /, ''), env.STATS_TOKEN)) return new Response(null, { status: 404 });

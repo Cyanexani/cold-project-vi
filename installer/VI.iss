@@ -1,5 +1,5 @@
 ; Julia's Launcher installer (Inno Setup 6). Built by .github\workflows\release.yml from the files in dist\:
-;   iscc /DAppVersion=0.2.0 installer\VI.iss
+;   iscc /DAppVersion=0.3.2 installer\VI.iss
 ; Asks for administrator rights once, installs outside Windows' protected folders (C:\Games\VI by
 ; default, writable by the player so updates install themselves), runs the Windows settings in the
 ; background (Julia's Launcher.exe --admin-setup: power, virtual memory, Defender's ransomware rule for this
@@ -15,7 +15,7 @@ AppId=VI-Launcher-edupode
 AppName=Julia's Launcher
 AppVersion={#AppVersion}
 AppPublisher=edupode
-AppPublisherURL=https://github.com/felicienradio/cold-project-vi/tree/main
+AppPublisherURL=https://github.com/edupode/cold-project-vi/tree/edupode
 AppSupportURL=https://discord.gg/648WEXCAsZ
 DefaultDirName={sd}\Games\VI
 DisableProgramGroupPage=yes

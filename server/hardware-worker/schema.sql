@@ -6,6 +6,14 @@ CREATE TABLE IF NOT EXISTS hardware (
   first_seen TEXT NOT NULL,
   last_seen TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS reports (
+  n INTEGER PRIMARY KEY AUTOINCREMENT,
+  created TEXT NOT NULL,
+  vi_id TEXT NOT NULL,          -- the launcher's ID, to match a report with a player on Discord
+  kind TEXT NOT NULL,           -- game or launcher
+  bytes INTEGER NOT NULL,
+  zip BLOB NOT NULL             -- the package the player sent (user name taken out of every path)
+);
 CREATE TABLE IF NOT EXISTS rate (
   who TEXT PRIMARY KEY,         -- salted hash of IP and hour; rows go after the hour
   hour INTEGER NOT NULL,

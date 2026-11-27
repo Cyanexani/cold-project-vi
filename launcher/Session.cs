@@ -129,6 +129,17 @@ namespace VIctoryLauncher
                 if (info.Length < (1L << 20) || got < 2 || head[0] != (byte)'M' || head[1] != (byte)'Z')
                     return string.Format(L("{0} is not a working program ({1:N0} bytes): the dump is incomplete or still encrypted. Download or extract it again.",
                         "{0} nao e um programa que funcione ({1:N0} bytes): o dump esta incompleto ou ainda encriptado. Volta a descarregar ou extrair."), Path.GetFileName(path), info.Length);
+                // Only the executable, not the game's data (the whole dump is ~100 GB): the game ends at once
+                // with code 1 (an RTX 3060 player's "Desktop\EXE" folder held 122 MB, 27/11/2026).
+                long seen = 0;
+                foreach (var f in Directory.EnumerateFiles(Path.GetDirectoryName(path), "*", SearchOption.AllDirectories))
+                {
+                    try { seen += new FileInfo(f).Length; } catch (Exception) { }
+                    if (seen >= (20L << 30)) break;
+                }
+                if (seen < (20L << 30))
+                    return string.Format(L("This game folder holds only {0:0.0} GB: the game's data is not in it (the whole dump is about 100 GB). Choose the folder of the complete dump, with all its files beside game_scarlett_master.exe.",
+                        "Esta pasta do jogo so tem {0:0.0} GB: os dados do jogo nao estao nela (o dump completo tem cerca de 100 GB). Escolhe a pasta do dump completo, com todos os ficheiros ao lado do game_scarlett_master.exe."), seen / 1073741824.0);
                 // Empty program libraries beside it end the game the same way.
                 var empty = Directory.GetFiles(Path.GetDirectoryName(path), "*.dll").Where(d => new FileInfo(d).Length < 64).Select(Path.GetFileName).Take(3).ToArray();
                 if (empty.Length > 0)
@@ -142,6 +153,7 @@ namespace VIctoryLauncher
         List<string> Missing()
         {
             var m = new List<string>();
+            if (integratedOnly) m.Add(L("a graphics card with 4 GB or more (only integrated graphics found)", "uma placa grafica com 4 GB ou mais (so ha grafica integrada)", "une carte graphique de 4 Go ou plus (seulement un graphique intégré)"));
             if (!pagefileOk) m.Add(L("virtual memory managed by Windows", "memoria virtual gerida pelo Windows"));
             if (!powerOk) m.Add(L("best performance power (plugged in)", "energia em melhor desempenho (ligado a corrente)"));
             if (!rebar && ReadSetting("rebar_ack") != "1") m.Add("Resizable BAR");
@@ -164,14 +176,43 @@ namespace VIctoryLauncher
             return -1;
         }
 
+        // How much more Windows can promise by growing a page file it manages itself ("?:\pagefile.sys"
+        // or "C:\pagefile.sys 0 0"), in GB: it grows on demand up to 3x the RAM, an eighth of the drive
+        // and what the drive has free. FreeVirtualMemory leaves that out, so with a managed page file the
+        // warning came at nearly every PLAY on a PC with 18 GB of RAM free (27/11/2026).
+        double PagefileGrowthGb()
+        {
+            try
+            {
+                if (!PagefileOk()) return 0;
+                double allocatedMb = 0;
+                string drive = "C:\\";
+                using (var s = new System.Management.ManagementObjectSearcher("SELECT Name, AllocatedBaseSize FROM Win32_PageFileUsage"))
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        allocatedMb += Convert.ToDouble(o["AllocatedBaseSize"]);
+                        var name = Convert.ToString(o["Name"]);
+                        if (!string.IsNullOrEmpty(name) && name.Length >= 3) drive = name.Substring(0, 3);
+                    }
+                var d = new DriveInfo(drive);
+                double gb = 1024.0 * 1024 * 1024;
+                double most = Math.Min(Math.Max(3 * ramGb, 4), d.TotalSize / 8.0 / gb);
+                double byDisk = allocatedMb / 1024.0 + Math.Max(0, d.AvailableFreeSpace / gb - 2);
+                return Math.Max(0, Math.Min(most, byDisk) - allocatedMb / 1024.0);
+            }
+            catch (Exception) { return 0; }
+        }
+
         // The game reserves about 24 GB as it starts: with less to promise, D3D12 refuses the device
         // ("not enough memory resources", 0x8007000E) and the window stays white.
         const double GameCommitGb = 24;
 
         bool EnoughMemory()
         {
-            var free = CommitFreeGb();
-            if (free < 0 || free >= GameCommitGb) return true;
+            var now = CommitFreeGb();
+            if (now < 0 || now >= GameCommitGb) return true;
+            var free = now + PagefileGrowthGb();
+            if (free >= GameCommitGb) return true;
             var ask = string.Format(L("Windows can only promise {0:0.0} GB more memory (RAM plus virtual memory); the game needs about {1:0} GB as it starts. With less, its window stays white.\r\n\r\n" +
                                       "•  Close apps (Performance page: what holds memory).\r\n•  Let Windows manage virtual memory (Setup), then restart the PC.\r\n\r\nPlay anyway?",
                                       "O Windows so pode prometer mais {0:0.0} GB de memoria (RAM mais memoria virtual); o jogo precisa de cerca de {1:0} GB ao arrancar. Com menos, a janela fica branca.\r\n\r\n" +

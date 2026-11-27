@@ -26,6 +26,7 @@ namespace VIctoryLauncher
             public Func<int> Check;
             public Func<bool> Fix;        // runs on a worker thread; true if it did its part
             public bool Auto = true;      // part of "Do everything for me"
+            public Func<bool> Applies;    // null: every PC; false: not for this one (another card maker)
             public Label Mark, Text, Detail;
             public Pill Button;
             public int State = -1;
@@ -117,9 +118,9 @@ namespace VIctoryLauncher
                 Fix = BuildBlocking,
             });
             steps.Add(new Step {
-                Title = L("AMD engine (Belobug)", "Motor AMD (Belobug)"),
-                Why = L("AMD cards play with VIctory-Belobug-AMD, Belobug's fork for Radeon (GPL-3.0). Downloads its source and builds it once.",
-                        "As placas AMD jogam com o VIctory-Belobug-AMD, o fork do Belobug para Radeon (GPL-3.0). Descarrega o codigo e compila-o uma vez."),
+                Title = L("AMD alternative engine (Belobug)", "Motor alternativo AMD (Belobug)"),
+                Why = L("Only if you chose it in Hardware & ID: VIctory-Belobug-AMD, Belobug's fork for Radeon (GPL-3.0). Downloads its source and builds it once.",
+                        "So se o escolheste em Hardware e ID: VIctory-Belobug-AMD, o fork do Belobug para Radeon (GPL-3.0). Descarrega o codigo e compila-o uma vez."),
                 FixText = L("Build it", "Compilar"),
                 Check = () => !UseAmdEngine ? -1 : VictoryExe != null ? 1 : 0,
                 Fix = BuildAmdEngine,
@@ -180,6 +181,7 @@ namespace VIctoryLauncher
                 Why = L("Driver frame generation for RTX 40/50, written into the driver's profile for victory.exe (no NVIDIA App needed).", "Geracao de frames do driver para RTX 40/50, escrita no perfil do driver para o victory.exe (sem NVIDIA App)."),
                 FixText = L("Turn on", "Ligar"),
                 Check = () => !rtxFrameGen ? -1 : (SmoothMotion.Status() == "on" ? 1 : 0),
+                Applies = () => rtxFrameGen,
                 Fix = () => { var err = SmoothMotion.Set(true); smoothState = SmoothMotion.Status(); if (err != null) Log("Smooth Motion: " + err); BeginInvoke(new Action(() => { UpdateBanner(); UpdateSmooth(); })); return err == null; },
             });
             steps.Add(new Step {
@@ -197,6 +199,7 @@ namespace VIctoryLauncher
                         "O driver da NVIDIA so usa o Resizable BAR nos jogos da lista dele: isto poe o victory.exe nessa lista (rBAR Enable, Enable v2, Options no perfil)."),
                 FixText = L("Turn on", "Ligar"),
                 Check = () => !hasNvidia || !rebarBios ? -1 : SmoothMotion.RebarSet() ? 1 : 0,
+                Applies = () => hasNvidia && rebarBios,
                 Fix = () => { var err = SmoothMotion.SetRebar(true); if (err != null) Log("rBAR: " + err); else Log(L("Resizable BAR is on in victory.exe's driver profile.", "Resizable BAR ligado no perfil do driver do victory.exe.")); return err == null; },
             });
         }
@@ -204,6 +207,7 @@ namespace VIctoryLauncher
         // ---------------------------------------------------------------- running steps
         void CheckAll()
         {
+            if (!IsHandleCreated || IsDisposed) return;
             if (setupBusy) return;
             new Thread(() => {
                 foreach (var st in steps)
@@ -227,7 +231,9 @@ namespace VIctoryLauncher
 
         void DoEverything()
         {
-            RunSteps(steps.Where(s => s.Auto && s.State != 1).ToArray());
+            // (Steps for another kind of PC are left out: on an AMD card "Do everything" tried NVIDIA's
+            // Smooth Motion and rBAR profile and showed them as failed, 27/11/2026.)
+            RunSteps(steps.Where(s => s.Auto && s.State != 1 && (s.Applies == null || s.Applies())).ToArray());
         }
 
         void RunSteps(Step[] which)
@@ -529,7 +535,9 @@ namespace VIctoryLauncher
                 var dir = Path.Combine(ActiveCacheDir, "shaders");
                 if (!Directory.Exists(dir)) return false;
                 var some = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Take(1000).Count();
-                return some >= 1000 || (ReadSetting("shaders") == "1" && some > 0);
+                // The game has ~25,000 shaders: a handful means the preparation saw almost nothing (a folder
+                // with only the executable showed 12 as "ready", 27/11/2026).
+                return some >= 1000;
             }
             catch (Exception) { return false; }
         }

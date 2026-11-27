@@ -110,7 +110,7 @@ namespace VIctoryLauncher
         Heading presetHeading, gameHeading;
         readonly List<ModeCard> cards = new List<ModeCard>();
         int modeIndex = -1;
-        CheckBox panelBox, borderlessBox, fps60Box, reserveBox, smoothBox, qualityBox, facesBox, loadingBox, fightsBox, warmBox;
+        CheckBox panelBox, borderlessBox, fps60Box, reserveBox, smoothBox, qualityBox, facesBox, loadingBox, fightsBox, warmBox, cpuBox;
         LoadBar loadBar;
         TextBox logBox;
         Pill playButton, prepareButton, buildButton, closeButton;
@@ -313,7 +313,7 @@ namespace VIctoryLauncher
                 nav.Add(b);
                 side.Controls.Add(b);
             }
-            var report = new Pill { Text = L("Send errors to Discord", "Enviar erros no Discord"), Size = new Size(184, 34), Location = new Point(16, 0), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            var report = new Pill { Text = L("Send errors (GitHub / Discord)", "Enviar erros (GitHub / Discord)"), Size = new Size(184, 34), Location = new Point(16, 0), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
             report.Click += (s, e) => ReportErrors();
             side.Controls.Add(report);
             var en = new Pill { Text = "EN", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = !Pt && !Fr };
@@ -440,8 +440,21 @@ namespace VIctoryLauncher
             page.Controls.Add(ExeBox(X + W - 300, y - 2, 300));
             y += 34;
 
-            presetHeading = new Heading(L("Render preset", "Predefinicao de imagem")) { Location = new Point(X, y), Width = W };
+            presetHeading = new Heading(L("Render preset", "Predefinicao de imagem")) { Location = new Point(X, y), Width = W - 230 };
             page.Controls.Add(presetHeading);
+            // The resolution the console reports to the game (VICTORY_DISPLAY_MODE): the preset's scale applies on top.
+            outputBox = new ComboBox { Location = new Point(X + W - 220, y - 2), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Theme.Card, ForeColor = Theme.Text };
+            outputBox.Items.AddRange(new object[] {
+                L("Output 1080p (Full HD)", "Saida 1080p (Full HD)"),
+                L("Output 1440p (2K)", "Saida 1440p (2K)"),
+                L("Output 2160p (4K)", "Saida 2160p (4K)"),
+            });
+            outputBox.SelectedIndex = 0;
+            outputBox.SelectedIndexChanged += (s, e) => { SaveSettings(); Refresh2(); };
+            new ToolTip { AutoPopDelay = 20000 }.SetToolTip(outputBox, L(
+                "The resolution the game draws its picture for; the preset's scale applies on top (Recommended at 4K draws 2560x1440 and upscales). Higher output: a sharper picture, more video memory for the screen's images (about +0.5 GB at 2K, +1.5 GB at 4K) and more work for the card; the CPU stays the limit on strong cards. 2K and 4K are new: tell us on Discord how they run.",
+                "A resolucao para a qual o jogo desenha a imagem; a escala do preset aplica-se por cima (o Recomendado em 4K desenha 2560x1440 e amplia). Saida maior: imagem mais nitida, mais VRAM para as imagens do ecra (cerca de +0,5 GB em 2K, +1,5 GB em 4K) e mais trabalho para a placa; em placas fortes o limite continua a ser o processador. 2K e 4K sao novos: conta-nos no Discord como correm."));
+            page.Controls.Add(outputBox);
             y += 32;
             int cw = (W - 6 * 8) / 7;
             for (int i = 0; i < CardOrder.Length; i++)
@@ -482,7 +495,8 @@ namespace VIctoryLauncher
             facesBox = T(L("Rainbow-face fix", "Correcao das caras arco-iris"), L("Textures finish uploading first; costs FPS", "Texturas acabam de subir primeiro; custa FPS"), 1, 2, false);
             loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), L("Shorter loading pauses; untested", "Pausas de carregamento mais curtas; nao testado"), 1, 3, false);
             warmBox = T(L("Load pipelines before the game", "Carregar pipelines antes do jogo"), L("No stutter the first time you see a place", "Sem engasgos a primeira vez que ves um sitio"), 1, 4, true);
-            y += 5 * 66 + 2;
+            cpuBox = T(L("★ More CPU cores", "★ Mais nucleos do processador"), L("Half the cores copy the game's memory (+1 FPS)", "Metade dos nucleos copia a memoria do jogo (+1 FPS)"), 0, 5, true);
+            y += 6 * 66 + 2;
             explain = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Cyan, BackColor = Theme.Back, Font = Theme.Ui(9f),
                 Text = L("Point at an option to see what it does. ★ marks what was tested on edupode's PC (RTX 5070 Ti laptop).", "Passa o rato por uma opcao para ver o que faz. ★ marca o que foi testado no PC do edupode (portatil RTX 5070 Ti).") };
             page.Controls.Add(explain);
@@ -528,6 +542,8 @@ namespace VIctoryLauncher
                               "Espera por todas as copias dos buffers do jogo antes de desenhar: menos corpos esticados ('esparguete'), mas varios FPS mais lento.");
             d[facesBox] = L("Waits for textures to finish uploading before use: fixes rainbow faces, costs FPS.",
                             "Espera que as texturas acabem de subir antes de as usar: corrige as caras arco-iris, custa FPS.");
+            d[cpuBox] = L("★ Tested on edupode's PC: +1 FPS in the open world (21.6 vs 20.5) and 2.3 ms less preparing each frame. The CPU is the limit (the card waits ~0 ms a frame): 6 helper threads used to refresh the game's buffers and textures (~18 ms of a 44 ms frame); this gives them half your cores (up to 12) and asks Windows which pages changed on a thread of its own.",
+                          "★ Testado no PC do edupode: +1 FPS no mundo aberto (21,6 contra 20,5) e menos 2,3 ms a preparar cada frame. O limite e o processador (a placa espera ~0 ms por frame): 6 ajudantes refrescavam os buffers e as texturas do jogo (~18 ms de um frame de 44 ms); isto da-lhes metade dos teus nucleos (ate 12) e pergunta ao Windows que paginas mudaram numa thread a parte.");
             d[warmBox] = L("New: before the game starts, a loading bar makes every pipeline earlier sessions drew with, in separate processes, so the driver has them ready: no stutter the first time you see a place. Takes seconds once the cache is ready; after a VIctory or driver update it takes longer, once.",
                            "Novo: antes de o jogo arrancar, uma barra de carregamento prepara todas as pipelines usadas nas sessoes anteriores, em processos a parte, para o driver ja as ter: sem engasgos a primeira vez que ves um sitio. Demora segundos com a cache pronta; depois de atualizar o VIctory ou o driver demora mais, uma vez.");
             d[loadingBox] = L("Experimental: textures the game builds on the CPU no longer wait for the game's memory to settle. Shorter loading pauses; untested.",
@@ -542,10 +558,12 @@ namespace VIctoryLauncher
             SelectMode(0);
             panelBox.Checked = true; borderlessBox.Checked = true; fps60Box.Checked = true; reserveBox.Checked = true;
             smoothBox.Checked = rtxFrameGen;
-            fightsBox.Checked = vramGb == 0 || vramGb >= 11; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
+            fightsBox.Checked = !integratedOnly && vramGb >= 11; cpuBox.Checked = true; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
             Log(L("Recommended setup (= the TUDO + lutas shortcut): Recommended 720p, overlay, borderless, 60 FPS clock, 2 GB of buffers for crowds, video memory reserve" + (rtxFrameGen ? ", Smooth Motion." : "."),
                   "Configuracao recomendada (= atalho TUDO + lutas): Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, 2 GB de buffers para multidoes, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : "."),
                   "Réglages recommandés (= raccourci TUDO + lutas) : Recommandé 720p, overlay, sans bordure, horloge à 60 FPS, 2 Go de buffers pour les foules, réserve de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
+            // Integrated graphics: the lightest setup, nothing that costs memory it does not have.
+            if (integratedOnly) { SelectMode(ModeUltraLow); fps60Box.Checked = false; smoothBox.Checked = false; fightsBox.Checked = false; }
         }
 
         void SelectMode(int k)
@@ -901,7 +919,7 @@ namespace VIctoryLauncher
             int y = 18;
             page.Controls.Add(new Heading(L("Help: everything the launcher does", "Ajuda: tudo o que o launcher faz")) { Location = new Point(X, y), Width = W });
             y += 32;
-            var discord = new Pill { Main = true, Text = L("Send errors to Discord", "Enviar erros no Discord"), Location = new Point(X, y), Size = new Size(220, 38) };
+            var discord = new Pill { Main = true, Text = L("Send errors (GitHub / Discord)", "Enviar erros (GitHub / Discord)"), Location = new Point(X, y), Size = new Size(220, 38) };
             discord.Click += (s, e) => ReportErrors();
             page.Controls.Add(discord);
             var join = new Pill { Text = L("Join the Discord", "Entrar no Discord"), Location = new Point(X + 230, y), Size = new Size(170, 38) };
@@ -965,7 +983,7 @@ namespace VIctoryLauncher
                 "PLACAS",
                 "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). Outras placas (GTX 10, RTX 20, AMD, Intel): geracao de frames VI",
                 "      (experimental, desligada por defeito): um frame entre cada dois do jogo, feito so com as imagens, com meio frame de atraso.",
-                "   •  AMD: o launcher deteta a placa e usa o motor AMD do Belobug (VIctory-Belobug-AMD).",
+                "   •  Todas as placas (NVIDIA, AMD, Intel) jogam com o motor edupode; para Radeon ha a alternativa do Belobug.",
                 "",
                 "TECLAS NO JOGO",
                 "   •  F3 mostra/esconde o overlay: FPS, media do ultimo minuto (AVG 1M), media total (ALL), pior meio segundo (LOW).",
@@ -1063,7 +1081,7 @@ namespace VIctoryLauncher
                 "GRAPHICS CARDS",
                 "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). Other cards (GTX 10, RTX 20, AMD, Intel): VI frame generation",
                 "      (experimental, off by default): a frame between each two of the game's, made from the pictures alone, half a frame later.",
-                "   •  AMD: the launcher detects the card and uses Belobug's AMD engine (VIctory-Belobug-AMD).",
+                "   •  Every card (NVIDIA, AMD, Intel) plays with the edupode engine; Radeon cards can pick Belobug's alternative.",
                 "",
                 "KEYS IN THE GAME",
                 "   •  F3 shows/hides the overlay: FPS, last minute's average (AVG 1M), average since the start (ALL), worst half second (LOW).",
@@ -1082,7 +1100,7 @@ namespace VIctoryLauncher
                 "   •  VIctory-NVIDIA (trustno1-coder) — the lighting for NVIDIA cards",
                 "   •  fxceless — rendering and performance fixes",
                 "   •  VIctory-7900XTX (avatarmanz) — adaptations from the AMD fork",
-                "   •  VIctory-Belobug-AMD (Belobug) — the AMD engine AMD cards play with: github.com/Belobug/VIctory-Belobug-AMD",
+                "   •  VIctory-Belobug-AMD (Belobug) — the alternative engine for Radeon cards: github.com/Belobug/VIctory-Belobug-AMD",
                 "   •  NVSmooth30 (ItsAdeline) — Smooth Motion on RTX 30 cards (experimental): github.com/ItsAdeline/NVSmooth30",
                 "   •  Cold Project VI (felicienradio) — the project page this remake follows",
             };
@@ -1170,7 +1188,7 @@ namespace VIctoryLauncher
             presetHeading.Invalidate();
             var state = State();
             // A stuck session never keeps PLAY off: PLAY closes it first.
-            bool ready = game && exe != null && state != GameState.Running && !busyNow;
+            bool ready = game && exe != null && state != GameState.Running && !busyNow && !setupBusy;
             playButton.Enabled = ready;
             if (prepareButton != null) { prepareButton.Enabled = ready && state == GameState.None; prepareButton.Invalidate(); }
             playButton.Text = state == GameState.Running ? L("RUNNING", "A CORRER") : busyNow ? L("WAIT...", "ESPERA...")
@@ -1214,6 +1232,49 @@ namespace VIctoryLauncher
             footerStatus.Text = string.Format("{0} ({1})  ·  {2:0} GB VRAM  ·  {3:0} GB RAM  ·  {4}", Selected.Name, Selected.Custom ? CustomTag() : Selected.Tag, vramGb, ramGb, EngineName);
         }
 
+        ComboBox outputBox;
+
+        // The output size picked: 1080p, 1440p or 2160p.
+        int OutputHeight { get { return outputBox == null ? 1080 : outputBox.SelectedIndex == 2 ? 2160 : outputBox.SelectedIndex == 1 ? 1440 : 1080; } }
+        int OutputWidth { get { return OutputHeight * 16 / 9; } }
+
+        // The edupode engine is the default on every card. On a Radeon, when it ends with an error in the first
+        // three minutes twice in a row, the launcher moves to Belobug's AMD engine on its own (built once by
+        // Setup if it is not there yet) and says how to go back. One early failure is not enough: a game can
+        // end at start once and then run (an RX 6800 player's first session, 27/11/2026).
+        void EngineFallback(bool failedEarly)
+        {
+            if (!failedEarly) { if (ReadSetting("edupode_fails") != "0") WriteSetting("edupode_fails", "0"); return; }
+            if (UseAmdEngine || !hasRadeon || hasNvidia) return;
+            int fails;
+            int.TryParse(ReadSetting("edupode_fails") ?? "0", out fails);
+            fails++;
+            WriteSetting("edupode_fails", fails.ToString());
+            if (fails < 2)
+            {
+                Log(L("The edupode engine ended at start on this Radeon (1 of 2): one more and the launcher moves to Belobug's AMD engine.",
+                      "O motor edupode fechou ao arrancar nesta Radeon (1 de 2): mais uma e o launcher passa para o motor AMD do Belobug."));
+                return;
+            }
+            WriteSetting("edupode_fails", "0");
+            WriteSetting("engine", "amd");
+            WriteSetting("engine_auto", "1");
+            try
+            {
+                BeginInvoke(new Action(() => {
+                    if (engineBox != null) engineBox.SelectedIndex = 1;
+                    UpdateBanner(); Refresh2();
+                    Log(L("The edupode engine ended at start twice on this Radeon: switched to Belobug's AMD engine.",
+                          "O motor edupode fechou ao arrancar duas vezes nesta Radeon: mudei para o motor AMD do Belobug."));
+                    MessageBox.Show(this, L("The edupode engine did not start twice in a row on your Radeon, so the launcher switched to Belobug's AMD engine (VIctory-Belobug-AMD, all credit to Belobug). If it is not built yet, Setup builds it now; then press PLAY.\r\n\r\nTo try the edupode engine again: Hardware & ID > Engine. A report ('Send errors') helps us make it start on your card.",
+                                            "O motor edupode nao arrancou duas vezes seguidas na tua Radeon, por isso o launcher mudou para o motor AMD do Belobug (VIctory-Belobug-AMD, todo o credito para o Belobug). Se ainda nao estiver compilado, o Preparar compila-o agora; depois carrega em JOGAR.\r\n\r\nPara experimentar o motor edupode outra vez: Hardware e ID > Motor. Um relatorio ('Enviar erros') ajuda-nos a pô-lo a arrancar na tua placa."),
+                                    "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (VictoryExe == null) { Show(PageSetup); RunSteps(steps.Where(st => st.Fix == (Func<bool>)BuildAmdEngine).ToArray()); }
+                }));
+            }
+            catch (Exception) { }
+        }
+
         // "1280×720 internal upscaled to 1080p · 60 FPS clock" for the preset's heading.
         string PresetSummary()
         {
@@ -1223,8 +1284,8 @@ namespace VIctoryLauncher
             string pic;
             double sc;
             if (scale != null && double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out sc) && sc < 0.999)
-                pic = string.Format(L("{0}×{1} internal upscaled to 1080p", "{0}×{1} interno ampliado para 1080p"), (int)Math.Round(1920 * sc), (int)Math.Round(1080 * sc));
-            else pic = L("native 1080p", "1080p nativo");
+                pic = string.Format(L("{0}×{1} internal upscaled to {2}p", "{0}×{1} interno ampliado para {2}p"), (int)Math.Round(OutputWidth * sc), (int)Math.Round(OutputHeight * sc), OutputHeight);
+            else pic = string.Format(L("native {0}p", "{0}p nativo"), OutputHeight);
             bool sixty = m.Custom ? custom.Fps == 60 : fps60Box.Checked && !m.UltraLow;
             return pic + " · " + (sixty ? L("60 FPS clock", "relogio de 60 FPS") : L("30 FPS clock", "relogio de 30 FPS"));
         }
@@ -1305,10 +1366,18 @@ namespace VIctoryLauncher
             DetectCards();
             rebar = rebarBios;
             if (!FrameGenAvailable) smoothBox.Checked = false;
+            // Integrated graphics, once: the lightest options whatever an earlier launcher saved (it had read the
+            // memory as unknown and turned on Crowds and fights and frame generation).
+            if (integratedOnly && ReadSetting("igpu_defaults") != "1")
+            {
+                fightsBox.Checked = false; smoothBox.Checked = false; fps60Box.Checked = false;
+                SelectMode(ModeUltraLow);
+                WriteSetting("igpu_defaults", "1");
+            }
             // VIctory's own frame generation is experimental: off until the player turns it on.
             else if (OwnFrameGen && ReadSetting("smooth") == null) smoothBox.Checked = false;
             if (modeIndex < 0)
-                SelectMode((ramGb > 0 && ramGb <= 16.5) || (vramGb > 0 && vramGb <= 6.5) ? ModeUltraLow
+                SelectMode(integratedOnly || (ramGb > 0 && ramGb <= 16.5) || (vramGb > 0 && vramGb <= 6.5) ? ModeUltraLow
                     : (vramGb > 0 && vramGb < 10) || (ramGb > 0 && ramGb < 24) ? 2 : 0);
             UpdateBanner();
             UpdateSmooth();
@@ -1346,7 +1415,7 @@ namespace VIctoryLauncher
             set("VICTORY_DATA_DIR", dataDir);
             set("VICTORY_LOG", "warn,victory_gpu::host=info,victory_gpu::copystat=info,victory_gpu::framegen=info");
             // The cgbj base (Play-VIctory.cmd pareto-residency) for a 12 GB card.
-            set("VICTORY_DISPLAY_MODE", "1920x1080");
+            set("VICTORY_DISPLAY_MODE", OutputWidth + "x" + OutputHeight);
             set("VICTORY_CARD_BUFFERS_MB", "1024");
             set("VICTORY_PIPELINE_BOOK", "1");
             set("VICTORY_RIPE_BLOCKS", "4");
@@ -1397,7 +1466,7 @@ namespace VIctoryLauncher
                 set("VICTORY_TEXTURE_STAGE_MB", "384");
                 if (rebar) set("VICTORY_WINDOWS_BAR_MB", "1024");
             }
-            if (m.Modest || (vramGb > 0 && vramGb < 10))
+            if (m.Modest || integratedOnly || (vramGb > 0 && vramGb < 10))
             {
                 // 6-8 GB cards: less of the game's buffers on the card, smaller textures and batches.
                 set("VICTORY_CARD_BUFFERS_MB", "768");
@@ -1427,7 +1496,9 @@ namespace VIctoryLauncher
                 e.Remove("VICTORY_POOL_FULLEST");
                 e.Remove("VICTORY_WINDOWS_BAR_MB");
             }
-            if (fightsBox.Checked && !m.Modest) set("VICTORY_CARD_BUFFERS_MB", "2048");
+            // 2 GB of the game's buffers only on cards of 11 GB and more: on 8 GB cards it overfilled video
+            // memory (6.9 of 7.0 GB, 7 GB spilled to RAM) and the game ran at 3 FPS (players, 27/11/2026).
+            if (fightsBox.Checked && !m.Modest && !m.UltraLow && !integratedOnly && vramGb >= 11) set("VICTORY_CARD_BUFFERS_MB", "2048");
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
             if (fps60Box.Checked && !m.UltraLow) set("VICTORY_FPS_MAX", "60");
@@ -1436,6 +1507,12 @@ namespace VIctoryLauncher
             // Advanced Tweaks: the player's values over the preset they start from (Custom.cs).
             if (m.Custom) ApplyCustom(e);
             set("VICTORY_VRAM_RESERVE", reserveBox.Checked ? "max" : "0");
+            if (cpuBox.Checked)
+            {
+                // Half the logical cores for the copy and refresh helpers (2-12), the write watch asked early.
+                set("VICTORY_WIDE_THREADS", Math.Max(2, Math.Min(12, Environment.ProcessorCount / 2)).ToString());
+                set("VICTORY_ASK_EARLY", "2");
+            }
             if (qualityBox.Checked) { set("VICTORY_RELAY", "1"); set("VICTORY_CARD_STEPS", "0"); }
             if (facesBox.Checked) set("VICTORY_TEXTURE_NO_WAIT", "0");
             if (loadingBox.Checked) set("VICTORY_BAKE_NO_WAIT", "1");
@@ -1477,6 +1554,25 @@ namespace VIctoryLauncher
         // ---------------------------------------------------------------- actions
         void Play()
         {
+            // Setup still at work (building, translating shaders): two VIctory processes on one cache. An AMD
+            // player started the game twice while shaders were being prepared and it ended at start (27/11/2026).
+            // Integrated graphics only: asked once, the player decides.
+            if (integratedOnly && ReadSetting("igpu_ack") != "1")
+            {
+                var body = L("Integrated graphics (Intel Iris Xe / UHD, AMD Radeon Graphics) found, and no graphics card of its own.\r\n\r\nThe game is very likely to crash or miss graphics: integrated graphics borrow the PC's RAM, which the game already needs, and the driver refuses some of its shaders. A graphics card with 4 GB or more of its own memory is needed.\r\n\r\nThe launcher has picked Ultra Low with the heavy options off. You can still try.",
+                             "Foi encontrada uma grafica integrada (Intel Iris Xe / UHD, AMD Radeon Graphics) e nenhuma placa grafica dedicada.\r\n\r\nE muito provavel que o jogo feche ou que faltem graficos: a grafica integrada usa a RAM do PC, de que o jogo ja precisa, e o driver recusa alguns shaders. E preciso uma placa grafica com 4 GB ou mais de memoria propria.\r\n\r\nO launcher escolheu o Ultra baixo com as opcoes pesadas desligadas. Podes tentar na mesma.",
+                             "Graphique intégré trouvé (Intel Iris Xe / UHD, AMD Radeon Graphics), sans carte graphique dédiée.\r\n\r\nLe jeu risque fort de planter ou d'avoir des graphismes manquants : le graphique intégré emprunte la RAM du PC, dont le jeu a déjà besoin, et le pilote refuse certains shaders. Il faut une carte graphique avec 4 Go ou plus de mémoire à elle.\r\n\r\nLe launcher a choisi Ultra bas avec les options lourdes désactivées. Tu peux essayer quand même.");
+                var answer = Notice(L("Integrated graphics", "Grafica integrada", "Graphique intégré"), body,
+                    L("Play anyway", "Jogar na mesma", "Jouer quand même"), L("Cancel", "Cancelar", "Annuler"));
+                if (answer != 1) return;
+                WriteSetting("igpu_ack", "1");
+            }
+            if (setupBusy)
+            {
+                MessageBox.Show(this, L("Setup is still working (building VIctory or preparing shaders). PLAY opens when it finishes.",
+                                        "O Preparar ainda esta a trabalhar (a compilar o VIctory ou a preparar shaders). O JOGAR abre quando acabar."), "Julia's Launcher");
+                return;
+            }
             SaveSettings();
             var state = State();
             if (state == GameState.Running)
@@ -1530,6 +1626,7 @@ namespace VIctoryLauncher
                 try
                 {
                     if (warmFirst) WarmWithBar(log);
+                    var started = DateTime.Now;
                     var p = Start("run \"" + game + "\" --console series-s --execute", log);
                     gameProc = p; gameHadWindow = false; windowGone = null;
                     WatchStart(log, p);
@@ -1545,6 +1642,7 @@ namespace VIctoryLauncher
                     gameProc = null;
                     if (code != 0)
                         Log(string.Format(L("The game ended with an error (code {0}). Log: {1}", "O jogo terminou com um erro (codigo {0}). Log: {1}"), code, log));
+                    EngineFallback(code != 0 && (DateTime.Now - started).TotalMinutes < 3);
                     Log(L("Game closed. Preparing this session's pipelines for the next one...", "Jogo fechado. A preparar as pipelines desta sessao para a proxima..."));
                     var w = Start("warm --used", log);
                     afterWarm = w;
@@ -1668,6 +1766,8 @@ namespace VIctoryLauncher
                         case "loading": loadingBox.Checked = v == "1"; break;
                         case "fights": fightsBox.Checked = v == "1"; break;
                         case "warm": warmBox.Checked = v == "1"; break;
+                        case "cpu": cpuBox.Checked = v == "1"; break;
+                        case "output": { int o; if (outputBox != null && int.TryParse(v, out o) && o >= 0 && o <= 2) outputBox.SelectedIndex = o; } break;
                     }
                 }
             }
@@ -1684,7 +1784,7 @@ namespace VIctoryLauncher
                     "lang=" + (Pt ? "pt" : Fr ? "fr" : "en"), "cache=" + cacheDir, "data=" + dataDir,
                     "game=" + gameBox.Text.Trim(), "exe=" + (exeChoice ?? ""), "mode=" + modeIndex,
                     "panel=" + b(panelBox), "borderless=" + b(borderlessBox), "fps60=" + b(fps60Box), "reserve=" + b(reserveBox),
-                    "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox),
+                    "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox), "cpu=" + b(cpuBox), "output=" + (outputBox == null ? 0 : outputBox.SelectedIndex),
                 };
                 // The other keys (shaders=, engine=, custom=, source=...) are kept: this used to drop them.
                 var keys = new HashSet<string>(mine.Select(l => l.Substring(0, l.IndexOf('=') + 1)));

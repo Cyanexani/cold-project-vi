@@ -21,10 +21,15 @@ namespace VIctoryLauncher
     static class Updater
     {
         // This launcher's version; a release with a higher one is an update.
-        public const string Version = "0.3.1";
-        public const string ManifestUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.json";
-        public const string SignatureUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.sig";
-        public const string DownloadPrefix = "https://github.com/felicienradio/cold-project-vi/releases/download/";
+        // felicienradio's 0.3.1 with edupode's fixes: above 0.3.1, on edupode's release channel and key.
+        public const string Version = "0.3.2-edupode";
+        public const string ManifestUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.json";
+        public const string SignatureUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.sig";
+        public const string DownloadPrefix = "https://github.com/edupode/cold-project-vi/releases/download/";
+        // Every release of the repository, newest first, whatever branch it was cut from (main or edupode),
+        // pre-releases included: the newest one that carries a signed manifest is the update. A release
+        // without one (a draft turned public, a release from main with other files) no longer hides it.
+        public const string ReleasesApi = "https://api.github.com/repos/edupode/cold-project-vi/releases?per_page=15";
         // What an update may bring, and where each goes (beside the launcher).
         public static readonly string[] Allowed = { "Julia's Launcher.exe", "victory.exe", "tools/nvsmooth30/version.dll" };
 
@@ -74,10 +79,16 @@ namespace VIctoryLauncher
                 SetUpdateState(L("Checking GitHub...", "A verificar o GitHub..."));
                 ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
                 byte[] manifestBytes, sig;
+                string manifestUrl, signatureUrl;
+                if (!NewestSignedRelease(out manifestUrl, out signatureUrl))
+                {
+                    // (The API refused or is out of reach: the release marked latest, as before.)
+                    manifestUrl = Updater.ManifestUrl; signatureUrl = Updater.SignatureUrl;
+                }
                 using (var web = new WebClient())
                 {
                     web.Headers[HttpRequestHeader.UserAgent] = "Julias-Launcher";
-                    try { manifestBytes = web.DownloadData(Updater.ManifestUrl); }
+                    try { manifestBytes = web.DownloadData(manifestUrl); }
                     catch (WebException e)
                     {
                         var r = e.Response as HttpWebResponse;
@@ -86,7 +97,7 @@ namespace VIctoryLauncher
                             : L("Could not reach GitHub; trying again in 5 minutes.", "Sem ligacao ao GitHub; nova tentativa daqui a 5 minutos."));
                         return;
                     }
-                    sig = Convert.FromBase64String(Encoding.ASCII.GetString(web.DownloadData(Updater.SignatureUrl)).Trim());
+                    sig = Convert.FromBase64String(Encoding.ASCII.GetString(web.DownloadData(signatureUrl)).Trim());
                 }
                 if (!SignedByEdupode(manifestBytes, sig)) { SetUpdateState(L("An update was refused: its signature is not the project's.", "Um update foi recusado: a assinatura nao e a do projeto.")); return; }
                 var m = ParseManifest(Encoding.UTF8.GetString(manifestBytes));
@@ -188,17 +199,62 @@ namespace VIctoryLauncher
             }
         }
 
-        static bool SignedByEdupode(byte[] data, byte[] signature)
+        // The manifest and signature of the newest release (any branch, pre-releases too) that has both;
+        // false when the list cannot be read (no network, GitHub's limit of 60 asks an hour reached).
+        static bool NewestSignedRelease(out string manifestUrl, out string signatureUrl)
         {
+            manifestUrl = signatureUrl = null;
             try
             {
-                using (var rsa = new RSACryptoServiceProvider())
+                string json;
+                using (var web = new WebClient())
                 {
-                    rsa.FromXmlString(ReleaseKey.PublicXml);
-                    return rsa.VerifyData(data, "SHA256", signature);
+                    web.Headers[HttpRequestHeader.UserAgent] = "Julias-Launcher";
+                    web.Headers[HttpRequestHeader.Accept] = "application/vnd.github+json";
+                    json = Encoding.UTF8.GetString(web.DownloadData(Updater.ReleasesApi));
+                }
+                var list = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(json) as object[];
+                if (list == null) return false;
+                foreach (var item in list)
+                {
+                    var rel = item as Dictionary<string, object>;
+                    if (rel == null || (rel.ContainsKey("draft") && rel["draft"] is bool && (bool)rel["draft"])) continue;
+                    var assets = rel.ContainsKey("assets") ? rel["assets"] as object[] : null;
+                    if (assets == null) continue;
+                    string m = null, s = null;
+                    foreach (var a in assets)
+                    {
+                        var asset = a as Dictionary<string, object>;
+                        if (asset == null) continue;
+                        var name = asset["name"] as string;
+                        var url = asset["browser_download_url"] as string;
+                        if (url == null || !url.StartsWith(Updater.DownloadPrefix)) continue;
+                        if (name == "manifest.json") m = url;
+                        if (name == "manifest.sig") s = url;
+                    }
+                    if (m != null && s != null) { manifestUrl = m; signatureUrl = s; return true; }
                 }
             }
-            catch (Exception) { return false; }
+            catch (Exception) { }
+            return false;
+        }
+
+        // Signed with one of the release keys (edupode's or felicienradio's, ReleaseKey.All).
+        static bool SignedByEdupode(byte[] data, byte[] signature)
+        {
+            foreach (var key in ReleaseKey.All)
+            {
+                try
+                {
+                    using (var rsa = new RSACryptoServiceProvider())
+                    {
+                        rsa.FromXmlString(key);
+                        if (rsa.VerifyData(data, "SHA256", signature)) return true;
+                    }
+                }
+                catch (Exception) { }
+            }
+            return false;
         }
 
         static string Sha256(string file)
