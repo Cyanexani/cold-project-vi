@@ -77,7 +77,11 @@ lighting and many changes of our own). **No game files are included.**
 If Windows says "Access denied", Defender's ransomware rule blocked the new exe. In an administrator
 PowerShell: `Add-MpPreference -AttackSurfaceReductionOnlyExclusions "<repo folder>	arget"`.
 
-The launcher checks your GPU, video memory and Resizable BAR and sets everything else.
+<p align="center"><img src="launcher/screenshot.png" alt="edu launcher" width="720"/></p>
+
+The launcher checks your GPU, video memory, RAM and Resizable BAR and sets everything else. On cards with
+less than 10 GB or PCs with less than 24 GB of RAM it picks the **Modest PC** mode (540p, textures over 1024
+texels halved, fewer buffers on the card, the memory guards on).
 `Jogar-Luz.cmd` does the same from a command line (`Jogar-Luz.cmd tudo`).
 
 ## Modes
@@ -85,12 +89,14 @@ The launcher checks your GPU, video memory and Resizable BAR and sets everything
 | Mode | What it does | RTX 5070 Ti laptop |
 |---|---|---|
 | **Recommended - 720p** | World at 1280x720 + the game's own upscaler to 1080p, texture levels held, 60 FPS clock | open world 22-26 FPS, cutscenes 35+, menus 60 |
-| Fastest - 540p | Softer picture, most frames; for 8 GB cards or slower CPUs | a few FPS more |
+| Fastest - 540p | Softer picture, most frames; for slower CPUs | a few FPS more |
+| Modest PC - 540p, light | For 6-8 GB cards and 16 GB of RAM: less video memory and RAM | |
 | Sharp - 1080p | Full resolution | slower in the open world |
 | Classic cgbj | The original cgbj settings | for comparison |
 
 Options: FPS/diagnostics overlay (F3), borderless full screen (needed by NVIDIA Smooth Motion), the 60 FPS
-clock, anti-stretch (fewer stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental).
+clock, anti-stretch (fewer stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental),
+crowds and fights (2 GB of the game's buffers compared on the card; for 12 GB cards and up).
 
 ## Controls
 

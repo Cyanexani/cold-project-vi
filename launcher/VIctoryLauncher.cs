@@ -32,9 +32,10 @@ namespace VIctoryLauncher
         public string Description;
         public string Scale;      // null: native 1080p
         public bool LightTextures;
-        public Mode(string name, string description, string scale, bool light)
+        public bool Modest;       // smaller textures and buffers for 6-8 GB cards and 16 GB of RAM
+        public Mode(string name, string description, string scale, bool light, bool modest)
         {
-            Name = name; Description = description; Scale = scale; LightTextures = light;
+            Name = name; Description = description; Scale = scale; LightTextures = light; Modest = modest;
         }
         public override string ToString() { return Name; }
     }
@@ -55,7 +56,7 @@ namespace VIctoryLauncher
         Label gameStatus, buildStatus, systemLabel;
         ListBox modeList;
         Label modeInfo;
-        CheckBox panelBox, borderlessBox, fps60Box, qualityBox, facesBox, loadingBox;
+        CheckBox panelBox, borderlessBox, fps60Box, qualityBox, facesBox, loadingBox, fightsBox;
         TextBox logBox;
         Button playButton, prepareButton, buildButton;
         bool rebar;
@@ -63,18 +64,19 @@ namespace VIctoryLauncher
         string gpuName = "unknown";
 
         readonly Mode[] modes = new Mode[] {
-            new Mode("Recommended - 720p", "The world drawn at 1280x720 and rebuilt to 1080p by the game's own upscaler, texture levels held (video memory under budget), 60 FPS clock. About 22-26 FPS in the open world and 35+ in cutscenes on an RTX 5070 Ti laptop.", "0.6666667", true),
-            new Mode("Fastest - 540p", "The world drawn at 960x540: the most frames, a softer picture. For 8 GB cards or slower CPUs.", "0.5", true),
-            new Mode("Sharp - 1080p", "The world at full 1080p with held texture levels. Needs a strong GPU with 12 GB or more; slower in the open world.", null, true),
-            new Mode("Classic cgbj - 1080p", "The original cgbj settings at 1080p, no texture changes. For comparison.", null, false),
+            new Mode("Recommended - 720p", "The world drawn at 1280x720 and rebuilt to 1080p by the game's own upscaler, texture levels held (video memory under budget), 60 FPS clock. About 22-26 FPS in the open world and 35+ in cutscenes on an RTX 5070 Ti laptop (6-8 GB of video memory, ~20 GB of RAM).", "0.6666667", true, false),
+            new Mode("Fastest - 540p", "The world drawn at 960x540: the most frames, a softer picture. For slower CPUs.", "0.5", true, false),
+            new Mode("Modest PC - 540p, light", "For 6-8 GB cards and 16 GB of RAM: 540p, textures over 1024 texels halved, fewer of the game's buffers on the card, smaller texture batches, the memory guards on. Less video memory and RAM, a softer picture.", "0.5", true, true),
+            new Mode("Sharp - 1080p", "The world at full 1080p with held texture levels. Needs a strong GPU with 12 GB or more; slower in the open world.", null, true, false),
+            new Mode("Classic cgbj - 1080p", "The original cgbj settings at 1080p, no texture changes. For comparison.", null, false, false),
         };
 
         public LauncherForm()
         {
             settingsFile = Path.Combine(Path.GetDirectoryName(dataRoot), "launcher.ini");
             Text = "edu launcher - VIctory for GTA VI (your own Xbox Series dump)";
-            ClientSize = new Size(940, 680);
-            MinimumSize = new Size(940, 680);
+            ClientSize = new Size(940, 760);
+            MinimumSize = new Size(940, 760);
             BackColor = Back;
             ForeColor = ColText;
             Font = new Font("Segoe UI", 9.75f);
@@ -131,7 +133,7 @@ namespace VIctoryLauncher
             page.Controls.Add(new Label { Text = "3. Mode", AutoSize = true, Location = new Point(16, y), ForeColor = ColText });
             page.Controls.Add(new Label { Text = "Options", AutoSize = true, Location = new Point(470, y), ForeColor = ColText });
             y += 24;
-            modeList = new ListBox { Location = new Point(16, y), Size = new Size(430, 96), BackColor = Panel, ForeColor = ColText, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.5f) };
+            modeList = new ListBox { Location = new Point(16, y), Size = new Size(430, 118), BackColor = Panel, ForeColor = ColText, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.5f) };
             foreach (var m in modes) modeList.Items.Add(m);
             modeList.SelectedIndexChanged += (s, e) => Refresh2();
             page.Controls.Add(modeList);
@@ -142,10 +144,11 @@ namespace VIctoryLauncher
             fps60Box = Check("Unlock the 30 FPS cap (60 FPS clock)", 470, oy, true); oy += 26;
             qualityBox = Check("Anti-stretch: fewer stretched bodies (slower)", 470, oy, false); oy += 26;
             facesBox = Check("Rainbow-face fix (slower)", 470, oy, false); oy += 26;
-            loadingBox = Check("Fast loading (experimental)", 470, oy, false);
-            foreach (var c in new[] { panelBox, borderlessBox, fps60Box, qualityBox, facesBox, loadingBox }) page.Controls.Add(c);
-            y += 104;
-            modeInfo = new Label { Location = new Point(16, y), Size = new Size(430, 64), ForeColor = Dim };
+            loadingBox = Check("Fast loading (experimental)", 470, oy, false); oy += 26;
+            fightsBox = Check("Crowds and fights: 2 GB of buffers on the card (12 GB+)", 470, oy, false);
+            foreach (var c in new[] { panelBox, borderlessBox, fps60Box, qualityBox, facesBox, loadingBox, fightsBox }) page.Controls.Add(c);
+            y += 190;
+            modeInfo = new Label { Location = new Point(16, y - 70), Size = new Size(440, 100), ForeColor = Dim };
             page.Controls.Add(modeInfo);
             y += 70;
 
@@ -295,7 +298,7 @@ namespace VIctoryLauncher
             catch (Exception) { }
             systemLabel.Text = string.Format("PC: {0}, {1:0} GB video memory, {2:0} GB RAM, Resizable BAR {3}", gpuName, vramGb, ramGb, rebar ? "on" : "off or unknown");
             if (modeList.SelectedIndex < 0)
-                modeList.SelectedIndex = vramGb > 0 && vramGb < 10 ? 1 : 0;
+                modeList.SelectedIndex = (vramGb > 0 && vramGb < 10) || (ramGb > 0 && ramGb < 24) ? 2 : 0;
         }
 
         static string RunCapture(string file, string args)
@@ -379,11 +382,24 @@ namespace VIctoryLauncher
                 set("VICTORY_TEXTURE_STAGE_MB", "384");
                 if (rebar) set("VICTORY_WINDOWS_BAR_MB", "1024");
             }
-            if (vramGb > 0 && vramGb < 10)
+            if (m.Modest || (vramGb > 0 && vramGb < 10))
             {
-                // 8 GB cards: less of the game's buffers on the card.
+                // 6-8 GB cards: less of the game's buffers on the card, smaller textures and batches.
                 set("VICTORY_CARD_BUFFERS_MB", "768");
+                set("VICTORY_TEXTURE_MAX", "1024");
+                set("VICTORY_TEXTURE_STAGE_MB", "128");
+                set("VICTORY_RIPE_BLOCKS", "2");
+                set("VICTORY_CARD_ROOM_FOR_TARGETS_MB", "1024");
+                e.Remove("VICTORY_WINDOWS_BAR_MB");
             }
+            if (m.Modest || (ramGb > 0 && ramGb < 24))
+            {
+                // 16 GB of RAM: the memory guards as cgbj has them (texture prefetch held back early).
+                e.Remove("VICTORY_PRESSURE_FREE_MB");
+                e.Remove("VICTORY_PRESSURE_CLEAR_MB");
+                e.Remove("VICTORY_TEXTURE_RAM_GUARD");
+            }
+            if (fightsBox.Checked && !m.Modest) set("VICTORY_CARD_BUFFERS_MB", "2048");
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
             if (fps60Box.Checked) set("VICTORY_FPS_MAX", "60");
@@ -498,6 +514,7 @@ namespace VIctoryLauncher
                         case "quality": qualityBox.Checked = v == "1"; break;
                         case "faces": facesBox.Checked = v == "1"; break;
                         case "loading": loadingBox.Checked = v == "1"; break;
+                        case "fights": fightsBox.Checked = v == "1"; break;
                     }
                 }
             }
@@ -513,7 +530,7 @@ namespace VIctoryLauncher
                 File.WriteAllLines(settingsFile, new[] {
                     "game=" + gameBox.Text.Trim(), "mode=" + modeList.SelectedIndex,
                     "panel=" + b(panelBox), "borderless=" + b(borderlessBox), "fps60=" + b(fps60Box),
-                    "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox),
+                    "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox),
                 });
             }
             catch (Exception) { }
