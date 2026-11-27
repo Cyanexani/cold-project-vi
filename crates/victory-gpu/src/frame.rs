@@ -49,11 +49,19 @@ pub(crate) extern "system" fn set_interval(
     _period: u32,
     _flags: u32,
 ) -> HRESULT {
-    let interval = match length {
+    let asked = match length {
         0 => SIXTIETH,
         us => Duration::from_micros(u64::from(us)),
     };
-    tracing::info!(?interval, "frame interval");
+    // `VICTORY_FPS_MAX=<n>`: frames as often as n a second when the title
+    // asks for fewer (Grand Theft Auto VI asks for 30 on the console). The
+    // title is then paced by the faster clock; what it does each frame is
+    // timed by its own clocks, which go on in real time.
+    let interval = match fps_max() {
+        Some(fastest) if fastest < asked => fastest,
+        _ => asked,
+    };
+    tracing::info!(?asked, ?interval, "frame interval");
     // A new interval starts from now, after the last tick handed out.
     let first = LAST
         .iter()
@@ -66,6 +74,16 @@ pub(crate) extern "system" fn set_interval(
         first,
     });
     S_OK
+}
+
+/// The shortest frame interval [`set_interval`] allows (`VICTORY_FPS_MAX`,
+/// frames a second; unset: the title's own).
+fn fps_max() -> Option<Duration> {
+    static MAX: std::sync::OnceLock<Option<Duration>> = std::sync::OnceLock::new();
+    *MAX.get_or_init(|| {
+        let fps: f64 = std::env::var("VICTORY_FPS_MAX").ok()?.trim().parse().ok()?;
+        (fps >= 1.0).then(|| Duration::from_secs_f64(1.0 / fps.min(1000.0)))
+    })
 }
 
 /// Device method: events are scheduled at every tick.

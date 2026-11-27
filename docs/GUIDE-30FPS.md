@@ -109,12 +109,15 @@ used in that session for the next one.
    watch asked early by a thread of its own (`VICTORY_ASK_EARLY=2`): the
    submitting thread spends ~5 ms a frame asking which pages the game wrote and
    ~9 ms refreshing copies. Under test.
-6. **Plug the laptop in** and use the vendor's performance mode.
-7. **Windows virtual memory: "System managed"** (System → About → Advanced
+6. **Past 30 FPS:** the game asks the console for a frame every 33.3 ms.
+   `VICTORY_FPS_MAX=60` (`Jogar-Luz.cmd ... 60`) answers with a 60 Hz clock, so
+   scenes the CPU can prepare faster than 33 ms go above 30. Under test.
+7. **Plug the laptop in** and use the vendor's performance mode.
+8. **Windows virtual memory: "System managed"** (System → About → Advanced
    system settings → Performance → Virtual memory). VIctory's memory grows over
    a long session (we saw 23 GB → 33 GB in 50 minutes); with a small page file
    the game can run out of memory.
-8. **Restart the game about every 45 minutes** for the same reason.
+9. **Restart the game about every 45 minutes** for the same reason.
 
 ## 6. Controls (keyboard and mouse)
 
@@ -176,7 +179,7 @@ Details, measurements and the full list of changes: [LUZ-24FPS.md](LUZ-24FPS.md)
   blocks (the `qualidade` mode reduces it).
 - Video memory above the system's budget in the open world; textures reload
   ("blinking" in the distance).
-- Memory grows during long sessions (see 5.7 and 5.8).
+- Memory grows during long sessions (see 5.8 and 5.9).
 - No ray tracing: its structure builder uses wave64 programs NVIDIA refuses.
 - Two wave64 shaders still untranslated (`DefragHeap`, `CollectTriangles_Meshlets`).
 

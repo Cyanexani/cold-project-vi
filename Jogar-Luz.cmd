@@ -6,7 +6,7 @@ rem
 rem   set VICTORY_GAME_DIR=D:\Jogos\MeuDump          (pasta com game_scarlett_master.exe)
 rem   Jogar-Luz.cmd preparar                         (1.a vez e depois de cada recompilacao: traduz shaders)
 rem   Jogar-Luz.cmd                                  (jogar a 1080p)
-rem   Jogar-Luz.cmd 720p                             (mais FPS; tambem: 540p, qualidade)
+rem   Jogar-Luz.cmd 720p texturas cpu 60             (o mais rapido; modos: 720p/540p, texturas, cpu, 60, qualidade)
 setlocal
 if not defined VICTORY_GAME_DIR (
   echo Define VICTORY_GAME_DIR com a pasta do teu dump ^(onde esta game_scarlett_master.exe^).
@@ -77,10 +77,13 @@ rem --- Modos (1.o ou 2.o argumento) ---
 rem  720p: o mundo a 1280x720 (escala 2/3) e o upscaler temporal do proprio jogo ate 1080p: ~23-26 FPS.
 rem  540p: escala 0.5, mais rapido e mais suave. (0.75 e 1.0 com o upscaler forcado param ao arrancar.)
 rem  qualidade: menos geometria esticada (relay 1, sem passos na placa), ~7 FPS a menos.
-for %%m in ("%~1" "%~2") do (
+for %%m in ("%~1" "%~2" "%~3" "%~4") do (
   if /i %%m=="720p" (set "VICTORY_RENDER_SCALE=0.6666667" & set "VICTORY_OWN_UPSCALER=1")
   if /i %%m=="540p" (set "VICTORY_RENDER_SCALE=0.5" & set "VICTORY_OWN_UPSCALER=1")
   if /i %%m=="qualidade" (set "VICTORY_RELAY=1" & set "VICTORY_CARD_STEPS=0")
+  if /i %%m=="texturas" (set "VICTORY_TEXTURE_MAX=2048" & set "VICTORY_LEVELS_ON_DEMAND=0" & set "VICTORY_CARD_BUFFERS_MB=1536" & set "VICTORY_WINDOWS_BAR_MB=1024")
+  if /i %%m=="cpu" (set "VICTORY_ASK_EARLY=2" & set "VICTORY_WIDE_THREADS=10")
+  if /i %%m=="60" set "VICTORY_FPS_MAX=60"
 )
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
   echo Ja ha um VIctory a correr. Fecha-o primeiro.

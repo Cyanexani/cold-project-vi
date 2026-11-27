@@ -18,11 +18,13 @@ on menus it goes from 30-32/33fps
 > - `Jogar-Luz.cmd 720p texturas`: open world **20-26 FPS** (was 14-15), cutscenes ~30. Video memory now
 >   **under** the system's budget (7.6 of 8.6 GB; was ~1 GB over), textures waiting ~130 (was 6,000-15,000).
 >   The big win: `VICTORY_LEVELS_ON_DEMAND=0` (host copies hold only the texture levels the game shows).
-> - `Jogar-Luz.cmd 720p texturas cpu`: the same plus 10 helper threads (`VICTORY_WIDE_THREADS`) and the write
+> - `Jogar-Luz.cmd 720p texturas cpu` (and `... cpu 60`): the same plus 10 helper threads (`VICTORY_WIDE_THREADS`) and the write
 >   watch asked early (`VICTORY_ASK_EARLY=2`); under test. The CPU is the limit now (~27 ms preparing, ~10 ms
 >   copying back per frame; the card ~0 ms).
 > - Water fixed (only the `_LocalLights` volumetrics shader translated wave-wide); `_Tiled` still off (black
 >   squares), being debugged with a test of its tile-bounds part and the frame recorder.
+> - `60` switch (`VICTORY_FPS_MAX=60`): the console's frame clock at 60 a second instead of the 30 the game asks
+>   for, so menus and light scenes can pass 30 FPS. Under test (the game's own timing should follow real time).
 > - Borderless window for NVIDIA Smooth Motion exists (`VICTORY_BORDERLESS=1`) but is off: it dropped the game
 >   to 1-2 FPS on a 2560x1600 screen at 150 %.
 > - Keyboard/mouse: click to capture the mouse (Alt/F1 releases), F enters vehicles and switches W/S to the
