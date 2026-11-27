@@ -1,3 +1,10 @@
+Julia's Launcher 0.2.2
+
+- Placas de 8 GB: o "Multidões e lutas" deixa de pôr 2 GB de buffers do jogo em placas com menos de 11 GB. Enchia a VRAM e o jogo corria a cerca de 3 FPS.
+- Uma pasta do jogo só com o executável (sem os ~100 GB de dados) é indicada antes de JOGAR; o jogo fechava logo.
+- Os shaders só contam como preparados quando os do jogo foram mesmo preparados (uma pasta com 12 aparecia "pronta").
+- Radeon: se o motor edupode fechar ao arrancar duas vezes seguidas (um "device removed" numa RX 6800), o launcher muda sozinho para o motor AMD do Belobug.
+
 Julia's Launcher 0.2.1
 
 - O motor edupode é o predefinido para todas as placas (NVIDIA, AMD, Intel): VRAM de ~12 GB para 6-8 GB. O VIctory-Belobug-AMD do Belobug fica como alternativa para placas Radeon, com todo o crédito para o Belobug.

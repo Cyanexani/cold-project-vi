@@ -1400,7 +1400,9 @@ namespace VIctoryLauncher
                 e.Remove("VICTORY_POOL_FULLEST");
                 e.Remove("VICTORY_WINDOWS_BAR_MB");
             }
-            if (fightsBox.Checked && !m.Modest) set("VICTORY_CARD_BUFFERS_MB", "2048");
+            // 2 GB of the game's buffers only on cards of 11 GB and more: on 8 GB cards it overfilled video
+            // memory (6.9 of 7.0 GB, 7 GB spilled to RAM) and the game ran at 3 FPS (players, 27/11/2026).
+            if (fightsBox.Checked && !m.Modest && !m.UltraLow && !(vramGb > 0 && vramGb < 11)) set("VICTORY_CARD_BUFFERS_MB", "2048");
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
             if (fps60Box.Checked && !m.UltraLow) set("VICTORY_FPS_MAX", "60");

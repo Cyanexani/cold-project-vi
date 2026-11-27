@@ -1,3 +1,10 @@
+Julia's Launcher 0.2.2
+
+- 8 GB cards: "Crowds and fights" no longer puts 2 GB of the game's buffers on cards under 11 GB. It overfilled video memory and the game ran at about 3 FPS.
+- A game folder with only the executable (not the ~100 GB of game data) is named before PLAY; the game used to close at once.
+- Shaders count as prepared only when the game's shaders really were (a folder with 12 showed "ready").
+- Radeon: if the edupode engine ends at start twice in a row (a "device removed" on an RX 6800), the launcher switches to Belobug's AMD engine on its own.
+
 Julia's Launcher 0.2.1
 
 - The edupode engine is the default for every card (NVIDIA, AMD, Intel): video memory from ~12 GB down to 6-8 GB. Belobug's VIctory-Belobug-AMD stays as an alternative for Radeon cards, with all credit to Belobug.

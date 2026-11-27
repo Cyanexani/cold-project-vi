@@ -129,6 +129,17 @@ namespace VIctoryLauncher
                 if (info.Length < (1L << 20) || got < 2 || head[0] != (byte)'M' || head[1] != (byte)'Z')
                     return string.Format(L("{0} is not a working program ({1:N0} bytes): the dump is incomplete or still encrypted. Download or extract it again.",
                         "{0} nao e um programa que funcione ({1:N0} bytes): o dump esta incompleto ou ainda encriptado. Volta a descarregar ou extrair."), Path.GetFileName(path), info.Length);
+                // Only the executable, not the game's data (the whole dump is ~100 GB): the game ends at once
+                // with code 1 (an RTX 3060 player's "Desktop\EXE" folder held 122 MB, 27/11/2026).
+                long seen = 0;
+                foreach (var f in Directory.EnumerateFiles(Path.GetDirectoryName(path), "*", SearchOption.AllDirectories))
+                {
+                    try { seen += new FileInfo(f).Length; } catch (Exception) { }
+                    if (seen >= (20L << 30)) break;
+                }
+                if (seen < (20L << 30))
+                    return string.Format(L("This game folder holds only {0:0.0} GB: the game's data is not in it (the whole dump is about 100 GB). Choose the folder of the complete dump, with all its files beside game_scarlett_master.exe.",
+                        "Esta pasta do jogo so tem {0:0.0} GB: os dados do jogo nao estao nela (o dump completo tem cerca de 100 GB). Escolhe a pasta do dump completo, com todos os ficheiros ao lado do game_scarlett_master.exe."), seen / 1073741824.0);
                 // Empty program libraries beside it end the game the same way.
                 var empty = Directory.GetFiles(Path.GetDirectoryName(path), "*.dll").Where(d => new FileInfo(d).Length < 64).Select(Path.GetFileName).Take(3).ToArray();
                 if (empty.Length > 0)

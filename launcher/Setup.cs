@@ -207,6 +207,7 @@ namespace VIctoryLauncher
         // ---------------------------------------------------------------- running steps
         void CheckAll()
         {
+            if (!IsHandleCreated || IsDisposed) return;
             if (setupBusy) return;
             new Thread(() => {
                 foreach (var st in steps)
@@ -534,7 +535,9 @@ namespace VIctoryLauncher
                 var dir = Path.Combine(ActiveCacheDir, "shaders");
                 if (!Directory.Exists(dir)) return false;
                 var some = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Take(1000).Count();
-                return some >= 1000 || (ReadSetting("shaders") == "1" && some > 0);
+                // The game has ~25,000 shaders: a handful means the preparation saw almost nothing (a folder
+                // with only the executable showed 12 as "ready", 27/11/2026).
+                return some >= 1000;
             }
             catch (Exception) { return false; }
         }

@@ -21,7 +21,7 @@ namespace VIctoryLauncher
     static class Updater
     {
         // This launcher's version; a release with a higher one is an update.
-        public const string Version = "0.2.1-edupode";
+        public const string Version = "0.2.2-edupode";
         public const string ManifestUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.json";
         public const string SignatureUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.sig";
         public const string DownloadPrefix = "https://github.com/edupode/cold-project-vi/releases/download/";
