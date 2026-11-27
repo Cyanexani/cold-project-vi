@@ -1,11 +1,14 @@
 ## Julia's Launcher {tag} is out 🔧
 **Fix**
-🎮 **"AMD card" on an NVIDIA PC, and Resizable BAR not found.** On PCs whose processor has its own graphics (Ryzen, Intel), VIctory could pick those instead of your graphics card. It now always takes the high-performance card, for the game and for the Resizable BAR check.
-🌐 **Changing the language closed the launcher for good.** It now reopens in EN, PT or FR.
+🖱️ **The cursor stayed in the middle of the screen** while you looked around with the mouse. It is now hidden while the game has the mouse, and comes back with Alt, F1 or another window in front.
+
+**Also since 0.3.3**
+🎮 VIctory always takes your graphics card, not the processor's graphics: no more "AMD card" on an NVIDIA PC, and Resizable BAR is found.
+🌐 Changing the language reopens the launcher.
 
 **Install**
 🔄 On 0.3.x: nothing to do, it installs itself within 5 minutes while the game is closed.
-📥 New here or on 0.2.x: download **VI-Setup-{version}.exe** from https://github.com/felicienradio/cold-project-vi/releases/latest and run it.
+📥 New here or on an older launcher: download **VI-Setup-{version}.exe** from https://github.com/felicienradio/cold-project-vi/releases/latest and run it.
 
 Still stuck? Use **Help > Send errors** in the launcher and post your hardware ID here 💙
 
