@@ -946,6 +946,7 @@ struct Waiting {
 /// Whether due texture slots are served in turns, a slot looked at before
 /// and one never looked at ([`TextureQueue::due`]; on unless
 /// `VICTORY_FAIR_DUE=0`).
+#[allow(dead_code)] // no caller since the edupode merge
 fn fair_due() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("VICTORY_FAIR_DUE").is_none_or(|v| v != "0"))
