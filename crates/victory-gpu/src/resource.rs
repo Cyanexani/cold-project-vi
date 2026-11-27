@@ -1299,6 +1299,34 @@ fn base_level(desc: &ResourceDesc, first: u32) -> u32 {
     base
 }
 
+/// The largest side a host copy of a texture the title fills may have
+/// (`VICTORY_TEXTURE_MAX`, in texels; unset or 0: any). Like quantising a
+/// model's weights: a texture larger than that keeps only its levels from the
+/// first that fits, a quarter of the memory for each level left out; views
+/// of the larger levels show the largest one kept ([`from_base`] in the
+/// descriptor code). shortcut: a shader that reads texels by their integer
+/// position in a level left out reads past the smaller level (zeros).
+#[cfg(windows)]
+fn texture_max() -> u64 {
+    static MAX: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *MAX.get_or_init(|| std::env::var("VICTORY_TEXTURE_MAX").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0))
+}
+
+/// The first level a host copy of `desc` keeps for [`texture_max`]: 0 when
+/// it fits whole or cannot begin later ([`base_level`]).
+#[cfg(windows)]
+fn level_cap(desc: &ResourceDesc) -> u32 {
+    let max = texture_max();
+    if max == 0 {
+        return 0;
+    }
+    let mut k = 0;
+    while (desc.width >> k > max || u64::from(desc.height) >> k > max) && k + 1 < u32::from(desc.mip_levels) {
+        k += 1;
+    }
+    if k == 0 { 0 } else { base_level(desc, k) }
+}
+
 /// The bytes of title memory a placed texture with the resource description
 /// `desc` is read from for a view that starts at level `first`; `None` as
 /// [`placed_bytes`]. Remembered: asked for every slot that is looked at.
@@ -1324,6 +1352,11 @@ pub(crate) fn placed_bytes_from(desc: &[u32; 14], first: u32) -> Option<u64> {
         })
     })
 }
+
+/// Host copies made without their largest levels for [`texture_max`], since
+/// the start.
+#[cfg(windows)]
+pub(crate) static CAPPED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Host copies replaced by ones with more levels, for as long as a thread
 /// that asked for one may still be about to record its use
@@ -1356,7 +1389,7 @@ pub(crate) fn want_level(this: This, first: u32) {
         r.host.wanted.fetch_min(first, Relaxed);
         return;
     };
-    if host.base == 0 || host.base <= base_level(&r.desc, first) {
+    if host.base == 0 || host.base <= base_level(&r.desc, first).max(level_cap(&r.desc)) {
         return;
     }
     r.host.wanted.store(first, Relaxed);
@@ -1586,6 +1619,14 @@ fn hosted(this: This, make: bool) -> Option<Made> {
             let first = wanted.min(viewed);
             if first != u32::MAX {
                 base = base_level(&r.desc, first);
+            }
+        }
+        // Large textures from the first level that fits ([`texture_max`]).
+        if texture.is_none() && shape_fits && r.host.placed.load(Relaxed) && alias_of(this).is_none() {
+            let cap = level_cap(&r.desc);
+            if cap > base {
+                base = cap;
+                CAPPED.fetch_add(1, Relaxed);
             }
         }
         let texture = match texture {
