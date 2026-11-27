@@ -447,7 +447,10 @@ namespace VIctoryLauncher
             Stage(0, 0f, L("Shaders: starting...", "Shaders: a comecar..."), true);
             Stage(1, 0f, L("Pipelines: after the shaders", "Pipelines: depois dos shaders"), true);
             // `progress <read> of <total> MB, <n> shaders, <s> s` (victory shaders): the game's files read so far.
+            int translated = -1;
             var p = Start("shaders \"" + dir + "\"", log, line => {
+                var done = Regex.Match(line, @"^(\d+) shaders in the cache");
+                if (done.Success) translated = int.Parse(done.Groups[1].Value);
                 var m = Regex.Match(line, @"^progress (\d+) of (\d+) MB, (\d+) shaders, (\d+) s");
                 if (!m.Success) return;
                 float part = float.Parse(m.Groups[1].Value) / Math.Max(1f, float.Parse(m.Groups[2].Value));
@@ -461,6 +464,19 @@ namespace VIctoryLauncher
             if (p.ExitCode != 0)
             {
                 Log(string.Format(L("Translating the shaders failed (code {0}).", "A traducao dos shaders falhou (codigo {0})."), p.ExitCode));
+                TellErrors(log, mark);
+                return false;
+            }
+            // A dump gives about 25,000 shaders; a dozen means the game's files were not read (a folder of other
+            // files, or a damaged dump). It used to say "Shaders ready" anyway (a player's report, 27/11/2026).
+            if (translated >= 0 && translated < 1000)
+            {
+                Stage(0, 1f, L("Shaders: failed (see the errors below)", "Shaders: falhou (ve os erros em baixo)"), false);
+                Log(string.Format(L("Only {0:N0} shaders were translated (a complete dump gives about 25,000): this folder does not hold the game's files, or the dump is damaged.",
+                    "So {0:N0} shaders foram traduzidos (um dump completo da cerca de 25 000): esta pasta nao tem os ficheiros do jogo, ou o dump esta estragado.",
+                    "Seulement {0:N0} shaders ont été traduits (un dump complet en donne environ 25 000) : ce dossier ne contient pas les fichiers du jeu, ou le dump est abîmé."), translated));
+                if (MissingDumpFiles(dir).Length > 0) Log(MissingDumpText(dir));
+                else Log(L("Download or extract the dump again, into a folder of its own.", "Volta a descarregar ou extrair o dump, para uma pasta so dele.", "Télécharge ou extrais le dump à nouveau, dans un dossier à lui."));
                 TellErrors(log, mark);
                 return false;
             }
@@ -552,36 +568,72 @@ namespace VIctoryLauncher
             foreach (var d in DriveInfo.GetDrives())
                 if (d.DriveType == DriveType.Fixed && d.IsReady) { places.Add(d.RootDirectory.FullName); places.Add(Path.Combine(d.RootDirectory.FullName, "Games")); }
             Progress(L("Looking for game_scarlett*.exe...", "A procurar o game_scarlett*.exe..."), 0.3f);
+            // A complete dump first (the game's files beside the executable), anywhere in these places; a lone
+            // executable only when no complete dump is found (a player's Downloads held the .exe among other files).
+            string loose = null;
             foreach (var place in places.Distinct())
             {
-                var found = Search(place, 3);
-                if (found != null)
-                {
-                    Invoke(new Action(() => { gameBox.Text = Path.GetDirectoryName(found); SaveSettings(); }));
-                    Log(L("Game found: ", "Jogo encontrado: ") + Path.GetDirectoryName(found));
-                    return true;
-                }
+                var found = Search(place, 4, ref loose);
+                if (found != null) return UseGameFolder(Path.GetDirectoryName(found));
+            }
+            if (loose != null)
+            {
+                UseGameFolder(Path.GetDirectoryName(loose));
+                Log(MissingDumpText(Path.GetDirectoryName(loose)));
+                return false;
             }
             Log(L("The game was not found: choose its folder with Browse on the Play page.", "O jogo nao foi encontrado: escolhe a pasta com Procurar na pagina Jogar."));
             return false;
         }
 
-        static string Search(string dir, int depth)
+        bool UseGameFolder(string dir)
+        {
+            Invoke(new Action(() => { gameBox.Text = dir; SaveSettings(); }));
+            Log(L("Game found: ", "Jogo encontrado: ") + dir);
+            return true;
+        }
+
+        // The game's own files that every dump has beside game_scarlett_master.exe. Without them the folder holds
+        // only the executable (or it sits among other files): the shaders do not prepare (12 of ~25,000) and the
+        // game ends at once.
+        static readonly string[] DumpFiles = { "shaders.rpf", "levels.rpf" };
+
+        static string[] MissingDumpFiles(string dir)
+        {
+            try { return DumpFiles.Where(f => !File.Exists(Path.Combine(dir, f))).ToArray(); }
+            catch (Exception) { return DumpFiles; }
+        }
+
+        static string MissingDumpText(string dir)
+        {
+            return string.Format(L("The game's files are not beside the executable in {0} ({1} missing). Move the whole dump (game_scarlett_master.exe with its .rpf files and its data and pack folders) into a folder of its own, for example C:\\Games\\GTA6, and choose that folder on the Play page.",
+                "Os ficheiros do jogo nao estao ao lado do executavel em {0} (falta {1}). Move o dump inteiro (o game_scarlett_master.exe com os ficheiros .rpf e as pastas data e pack) para uma pasta so dele, por exemplo C:\\Games\\GTA6, e escolhe essa pasta na pagina Jogar.",
+                "Les fichiers du jeu ne sont pas à côté de l'exécutable dans {0} ({1} manquant). Déplace tout le dump (game_scarlett_master.exe avec ses fichiers .rpf et ses dossiers data et pack) dans un dossier à lui, par exemple C:\\Games\\GTA6, et choisis ce dossier dans la page Jouer."),
+                dir, string.Join(", ", MissingDumpFiles(dir)));
+        }
+
+        // The first folder under dir with a game_scarlett*.exe and the game's files beside it; loose is the first
+        // executable seen without them.
+        static string Search(string dir, int depth, ref string loose)
         {
             try
             {
                 if (!Directory.Exists(dir)) return null;
                 var f = Path.Combine(dir, "game_scarlett_master.exe");
-                if (File.Exists(f)) return f;
                 // Dumps with another build's name (game_scarlett_*.exe): the Play page lets the player pick.
                 var other = GameExes(dir);
-                if (other.Length > 0) return Path.Combine(dir, other[0]);
+                var exe = File.Exists(f) ? f : other.Length > 0 ? Path.Combine(dir, other[0]) : null;
+                if (exe != null)
+                {
+                    if (MissingDumpFiles(dir).Length == 0) return exe;
+                    if (loose == null) loose = exe;
+                }
                 if (depth == 0) return null;
                 foreach (var sub in Directory.EnumerateDirectories(dir))
                 {
                     var name = Path.GetFileName(sub);
                     if (name.StartsWith("$") || name.Equals("Windows", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Program", StringComparison.OrdinalIgnoreCase) || name.Equals("AppData", StringComparison.OrdinalIgnoreCase)) continue;
-                    var r = Search(sub, depth - 1);
+                    var r = Search(sub, depth - 1, ref loose);
                     if (r != null) return r;
                 }
             }

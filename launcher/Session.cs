@@ -140,6 +140,9 @@ namespace VIctoryLauncher
                 if (seen < (20L << 30))
                     return string.Format(L("This game folder holds only {0:0.0} GB: the game's data is not in it (the whole dump is about 100 GB). Choose the folder of the complete dump, with all its files beside game_scarlett_master.exe.",
                         "Esta pasta do jogo so tem {0:0.0} GB: os dados do jogo nao estao nela (o dump completo tem cerca de 100 GB). Escolhe a pasta do dump completo, com todos os ficheiros ao lado do game_scarlett_master.exe."), seen / 1073741824.0);
+                // Big enough, but the game's own files are not beside the executable (it sits in Downloads among
+                // other files): the shaders do not prepare and the game cannot start.
+                if (MissingDumpFiles(Path.GetDirectoryName(path)).Length > 0) return MissingDumpText(Path.GetDirectoryName(path));
                 // Empty program libraries beside it end the game the same way.
                 var empty = Directory.GetFiles(Path.GetDirectoryName(path), "*.dll").Where(d => new FileInfo(d).Length < 64).Select(Path.GetFileName).Take(3).ToArray();
                 if (empty.Length > 0)
