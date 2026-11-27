@@ -187,6 +187,12 @@ fn tiled_bounds_two_host_waves_match_one_console_wave() {
         eprintln!("no WARP; skipped");
         return;
     };
+    // Not every WARP runs a fixed wave of 64 (the CI runner's refuses the
+    // pipeline: "The parameter is incorrect."), as in `diff_tests`.
+    if let Err(e) = warp.compute_pipeline(&wide) {
+        eprintln!("WARP runs no wave of 64 here ({e}); skipped");
+        return;
+    }
     let hw = Host::new(false).ok();
     for active in [64u32, 40, 33, 32, 20, 1] {
         // what the console computes

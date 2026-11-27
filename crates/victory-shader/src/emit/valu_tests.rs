@@ -2145,7 +2145,7 @@ fn build_table_typed_cs(body: &[u32], used: Vec<UsedResource>) -> HostShader {
 /// patterns with `buffer_load_format_d16_xyzw` and `buffer_store_format_d16_xyzw`.
 /// Verify bit-exact round-trips for UINT, SINT, and FLOAT views (including
 /// non-zero table offsets matching dynamic descriptor snapshots) on hardware
-/// GPU and WARP.
+/// GPU and WARP, each shown as the host shows a half view: its unsigned twin.
 #[test]
 fn typed_d16_table_uav_roundtrip_uint_sint_and_float() {
     use windows::Win32::Graphics::Dxgi::Common::{
@@ -2184,10 +2184,17 @@ fn typed_d16_table_uav_roundtrip_uint_sint_and_float() {
         })
         .collect();
     let shader = build_table_typed_cs(&body, used);
+    // Through a view of a table, d16 data moves as 16-bit halves (fxceless
+    // #927): no view-kind word is read, the two typed places are reported in
+    // `half_views`, and the host shows the shader their unsigned twin
+    // (`victory-gpu` `half_view`).
     assert!(
-        shader.root_srvs.contains(&super::SLOT_TABLE_STRIDES),
-        "table typed d16 shader should request SLOT_TABLE_STRIDES"
+        !shader.root_srvs.contains(&super::SLOT_TABLE_STRIDES),
+        "table typed d16 shader moves halves, it reads no SLOT_TABLE_STRIDES"
     );
+    let mut places: Vec<u32> = shader.half_views.iter().map(|p| p.1).collect();
+    places.sort_unstable();
+    assert_eq!(places, [0, 8], "the d16 load and store places are half views");
     assert!(
         !shader.root_srvs.contains(&super::SLOT_STRIDES),
         "table-only shader must not trigger the bindless SLOT_STRIDES sweep"
@@ -2218,31 +2225,36 @@ fn typed_d16_table_uav_roundtrip_uint_sint_and_float() {
     let zeros = [0u32; 8];
 
     let cases = [
-        ("R16G16B16A16_UINT @0", DXGI_FORMAT_R16G16B16A16_UINT, 8 | super::VIEW_INTEGER, &uint_bits, 0u32),
-        ("R16G16B16A16_UINT @3 (dynamic offset)", DXGI_FORMAT_R16G16B16A16_UINT, 8 | super::VIEW_INTEGER, &uint_bits, 3u32),
-        ("R16G16B16A16_SINT @0", DXGI_FORMAT_R16G16B16A16_SINT, 8 | super::VIEW_INTEGER | super::VIEW_SIGNED, &sint_bits, 0u32),
-        ("R16G16B16A16_FLOAT @0", DXGI_FORMAT_R16G16B16A16_FLOAT, 8, &float_bits, 0u32),
+        ("R16G16B16A16_UINT @0", DXGI_FORMAT_R16G16B16A16_UINT, &uint_bits, 0u32),
+        ("R16G16B16A16_UINT @3 (dynamic offset)", DXGI_FORMAT_R16G16B16A16_UINT, &uint_bits, 3u32),
+        ("R16G16B16A16_SINT @0", DXGI_FORMAT_R16G16B16A16_SINT, &sint_bits, 0u32),
+        ("R16G16B16A16_FLOAT @0", DXGI_FORMAT_R16G16B16A16_FLOAT, &float_bits, 0u32),
     ];
+    // What the host shows the shader at a half view: the title's 16-bit
+    // float or signed format as the unsigned one of the same layout.
+    let twin = |format| {
+        if format == DXGI_FORMAT_R16G16B16A16_FLOAT || format == DXGI_FORMAT_R16G16B16A16_SINT {
+            DXGI_FORMAT_R16G16B16A16_UINT
+        } else {
+            format
+        }
+    };
 
     for (backend, warp) in [("hardware", false), ("warp", true)] {
         let Ok(host) = Host::new(warp) else { continue };
         let (root, pso) = host
             .compute_pipeline(&shader)
             .unwrap_or_else(|e| panic!("{backend}: compute_pipeline failed: {e}"));
-        for &(label, format, stride_word, input, base_slot) in &cases {
+        for &(label, format, input, base_slot) in &cases {
+            let format = twin(format);
             let mut views = Vec::new();
-            let mut strides = Vec::new();
             for _ in 0..base_slot {
                 views.push(View::RawUav(1));
-                strides.push(0u32);
             }
             let uav_base = base_slot as usize;
             views.push(View::TypedUav { data: input, format, elem_bytes: 8 });
-            strides.push(stride_word);
             views.push(View::TypedUav { data: &zeros, format, elem_bytes: 8 });
-            strides.push(stride_word);
             views.push(View::RawUav(8));
-            strides.push(1);
 
             let mut ud = vec![0u32; shader.user_data_dwords().max(1) as usize];
             for u in &shader.user_data {
@@ -2255,10 +2267,7 @@ fn typed_d16_table_uav_roundtrip_uint_sint_and_float() {
                     &root,
                     &pso,
                     &Dispatch {
-                        roots: vec![
-                            (0, Root::Constants(ud)),
-                            (1, Root::View { srv: true, data: strides }),
-                        ],
+                        roots: vec![(0, Root::Constants(ud))],
                         views: &views,
                         samplers: &[],
                         groups: [1, 1, 1],
