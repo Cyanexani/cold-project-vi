@@ -165,6 +165,10 @@ namespace VIctoryLauncher
             set("VICTORY_CACHE_DIR", Path.Combine(dataRoot, "cache-amd"));
             set("VICTORY_DATA_DIR", dataDir);
             set("VICTORY_LOG", "warn");
+            // The pipelines each game uses are written down, so "Load pipelines before the game" (warm --used)
+            // has something to make: without it the AMD engine's warm-up made 0 and every pipeline was
+            // compiled during play (hundreds of draws dropped a frame for the first minutes).
+            set("VICTORY_PIPELINE_BOOK", "1");
             set("VICTORY_PORT_CONSTANTS", "1");
             set("VICTORY_PORT_DESCRIPTORS", "1");
             set("VICTORY_PORT_CBV", "1");
