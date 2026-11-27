@@ -24,10 +24,14 @@
 #[cfg(windows)]
 mod console_insn;
 mod crash;
+// LOCAL (victory-perf, via our wt5): VICTORY_RENDER_SCALE / VICTORY_OWN_UPSCALER / VICTORY_NO_WATCHDOG title patches.
 #[cfg(windows)]
 mod hooks;
 pub mod prepare;
+pub(crate) mod publish;
 pub mod resolve;
+#[cfg(all(windows, feature = "diagnostics"))]
+mod profile;
 #[cfg(all(windows, feature = "diagnostics"))]
 mod stacks;
 #[cfg(windows)]
@@ -37,6 +41,8 @@ mod thunks;
 #[cfg(windows)]
 mod tls;
 #[cfg(windows)]
+pub mod write_sites;
+#[cfg(windows)]
 mod windows;
 
 #[cfg(windows)]
@@ -45,11 +51,12 @@ pub use crash::{
 };
 #[cfg(all(windows, feature = "diagnostics"))]
 pub use crash::save_on_crash;
-pub use crash::CRASH_NOTE;
 pub use prepare::{PrepareError, PreparedImage, prepare};
 pub use resolve::{ImportResolver, Provenance, Resolution};
 #[cfg(all(windows, feature = "diagnostics"))]
 pub use stacks::{dump_stacks, dump_stacks_on_schedule};
+#[cfg(all(windows, feature = "diagnostics"))]
+pub use profile::profile_on_schedule;
 #[cfg(windows)]
 pub use threads::disable_thread_calls;
 #[cfg(windows)]
@@ -58,31 +65,6 @@ pub use thunks::{UnimplementedPolicy, unimplemented_call_count};
 pub use windows::{
     BindReport, LoadedImage, MissingImport, WithTitleDlls, load, load_title_dll, load_title_dlls,
 };
-
-/// Replaces the bytes at `at` with `new` if they are `expected` now (a
-/// patch of a loaded image's code in memory; the file is not touched).
-/// Returns whether it was written.
-#[cfg(windows)]
-pub fn patch_code(at: usize, expected: &[u8], new: &[u8]) -> bool {
-    use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtect};
-    if expected.len() != new.len() || new.is_empty() {
-        return false;
-    }
-    // SAFETY: the caller names bytes inside a mapped image; they are read
-    // and, when they match, made writable, written and protected again.
-    unsafe {
-        if std::slice::from_raw_parts(at as *const u8, expected.len()) != expected {
-            return false;
-        }
-        let mut old = 0u32;
-        if VirtualProtect(at as *const _, new.len(), PAGE_EXECUTE_READWRITE, &mut old) == 0 {
-            return false;
-        }
-        std::ptr::copy_nonoverlapping(new.as_ptr(), at as *mut u8, new.len());
-        VirtualProtect(at as *const _, new.len(), old, &mut old);
-    }
-    true
-}
 
 /// `DLL_PROCESS_ATTACH`, for TLS callbacks.
 pub const DLL_PROCESS_ATTACH: u32 = 1;

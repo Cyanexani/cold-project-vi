@@ -23,18 +23,7 @@ pub struct HleModule {
     pub exports: Vec<HleExport>,
 }
 
-/// Title DLLs of which we take over some exports only: the DLL is still
-/// mapped from the title's folder and its other exports are its own (the
-/// imports are looked up here first, then in the title's DLLs).
-const PARTIAL: &[&str] = &["amd_fidelityfx_loader_xbox.dll"];
-
 impl HleModule {
-    /// Whether the title's own DLL of this name is not mapped (its exports
-    /// are all ours); false for a DLL we take over in part ([`PARTIAL`]).
-    pub fn replaces(&self, dll: &str) -> bool {
-        self.serves(dll) && !PARTIAL.iter().any(|p| p.eq_ignore_ascii_case(dll))
-    }
-
     pub fn serves(&self, dll: &str) -> bool {
         let dll = dll.to_ascii_lowercase();
         self.dlls

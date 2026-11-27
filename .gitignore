@@ -77,10 +77,13 @@
 Thumbs.db
 .DS_Store
 
-# Local run logs and backups (game shader dumps live here: never commit)
-/logs/
-/sauvegarde-avant-fork/
-/apps/lanceur/target/
-
-# Config test reports (Tester.cmd)
-/rapports/
+# The launcher is built from launcher/VIctoryLauncher.cs (launcheruild-launcher.cmd)
+/edu-launcher.exe
+/Edu's Remake.exe
+/VI Launcher.exe
+/VI Launcher.old.exe
+/dist/
+/server/hardware-worker/node_modules/
+/server/hardware-worker/.wrangler/
+/Julia's Launcher.exe
+/Julia's Launcher.old.exe

@@ -29,7 +29,6 @@ const FIRST: u32 = 16;
 pub fn build(native: &NativeProgram) -> Result<Program, ShaderError> {
     let mut p = ir::build(&native.patched_code(), native.wave64, native.vgprs)?;
     user_data(&mut p, native);
-    crate::merged::prepare(&mut p, native);
     Ok(p)
 }
 

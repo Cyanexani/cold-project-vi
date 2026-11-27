@@ -37,7 +37,6 @@
 
 use std::collections::BTreeMap;
 use std::ffi::c_void;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use windows::Win32::Foundation::HANDLE;
@@ -104,17 +103,6 @@ fn most() -> u64 {
 /// because of [`most`]; and what was let go because its memory changed.
 static STATS: [AtomicU64; 8] = [const { AtomicU64::new(0) }; 8];
 
-/// Of the view memory turned down: with holes (views hold a part only),
-/// scattered (pages from more than one place), and a run of a section not
-/// made committed or past its end; with their bytes.
-static VIEW_STATS: [AtomicU64; 6] = [const { AtomicU64::new(0) }; 6];
-
-fn view_turned_down(kind: usize, len: u64) {
-    STATS[4].fetch_add(1, Ordering::Relaxed);
-    VIEW_STATS[kind * 2].fetch_add(1, Ordering::Relaxed);
-    VIEW_STATS[kind * 2 + 1].fetch_add(len, Ordering::Relaxed);
-}
-
 /// A buffer placed over title memory, and its heap.
 pub(crate) struct Placed {
     pub(crate) buffer: ID3D12Resource,
@@ -149,35 +137,12 @@ pub(crate) fn place_for(start: u64, len: u64, window: bool) -> Option<Placed> {
     if level() < if window { 1 } else { 2 } {
         return None;
     }
-    // View memory: known from the runtime without asking Windows. One run
-    // of a committed section (the page pool made with
-    // `VICTORY_POOL_COMMIT`) is opened through the section; the rest is
-    // turned down.
-    match cover(start as usize, len as usize) {
-        Cover::None => {
-            // Its first page unmapped, the rest maybe views of one section.
-            if holes_allowed()
-                && let Some((section, offset)) = linear(start as usize, len as usize)
-            {
-                return place_in_section(start, len, window, section, offset);
-            }
-        }
-        Cover::Run(section, offset) => return place_in_section(start, len, window, section, offset),
-        Cover::Holes => {
-            if holes_allowed()
-                && let Some((section, offset)) = linear(start as usize, len as usize)
-            {
-                return place_in_section(start, len, window, section, offset);
-            }
-            view_turned_down(0, len);
-            return None;
-        }
-        Cover::Scattered => {
-            view_turned_down(1, len);
-            return None;
-        }
+    // View memory: known from the runtime without asking Windows.
+    if cover(start as usize, len as usize) != Cover::None {
+        STATS[4].fetch_add(1, Ordering::Relaxed);
+        return None;
     }
-    if SECTION_BYTES.load(Ordering::Relaxed) + STATS[1].load(Ordering::Relaxed) + STATS[3].load(Ordering::Relaxed) + len > most() {
+    if STATS[1].load(Ordering::Relaxed) + STATS[3].load(Ordering::Relaxed) + len > most() {
         STATS[6].fetch_add(1, Ordering::Relaxed);
         return None;
     }
@@ -200,89 +165,6 @@ pub(crate) fn place_for(start: u64, len: u64, window: bool) -> Option<Placed> {
             None
         }
     }
-}
-
-/// Heaps opened on the page pool's committed sections, by section handle:
-/// one heap per section, opened on first use and kept (opening locks
-/// nothing; the heap keeps the section alive whatever its views do).
-static SECTION_HEAPS: Mutex<BTreeMap<usize, ID3D12Heap>> = Mutex::new(BTreeMap::new());
-
-/// Bytes of the sections opened in [`SECTION_HEAPS`]: opening one locks
-/// all of it into the PC's memory, so they count against [`most`].
-static SECTION_BYTES: AtomicU64 = AtomicU64::new(0);
-
-/// [`place_for`] for title memory that is one run of `section` from
-/// `offset` on: a buffer placed in the section's heap over that run, so
-/// shaders read and write the pages whatever address the title maps them
-/// at. Only a section made with `SEC_COMMIT` can be opened.
-///
-/// shortcut: the heap stays open until the process ends. Opening locks the
-/// whole section into the PC's memory (seen on an NVIDIA card: the working
-/// set grows by the section's size), so the sections opened count against
-/// [`most`] and the page pool is cut small (`VICTORY_POOL_BLOCK_MB`).
-fn place_in_section(start: u64, len: u64, window: bool, section: usize, offset: u64) -> Option<Placed> {
-    let bytes = views().sections.iter().find(|s| s.0 == section && s.2).map(|s| s.1);
-    let Some(bytes) = bytes else {
-        view_turned_down(2, len);
-        return None;
-    };
-    let at = offset & !(K64 as u64 - 1);
-    let size = (offset + len.max(1)).next_multiple_of(K64 as u64) - at;
-    if at + size > bytes {
-        view_turned_down(2, len);
-        return None;
-    }
-    let host = crate::host::host()?;
-    let refused = |e: &windows::core::Error, step: &str| {
-        if STATS[5].fetch_add(1, Ordering::Relaxed) < 8 {
-            tracing::warn!(
-                start = format_args!("{start:#x}"),
-                len,
-                section = format_args!("{section:#x}"),
-                section_mb = bytes >> 20,
-                step,
-                error = %e,
-                "page pool memory not opened in place: a copy instead"
-            );
-        }
-    };
-    let heap = {
-        let mut heaps = SECTION_HEAPS.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(heap) = heaps.get(&section).cloned() {
-            heap
-        } else if SECTION_BYTES.load(Ordering::Relaxed) + STATS[1].load(Ordering::Relaxed) + STATS[3].load(Ordering::Relaxed) + bytes > most() {
-            // Opening locks the whole section into the PC's memory.
-            STATS[6].fetch_add(1, Ordering::Relaxed);
-            return None;
-        } else {
-            match open(&host.device, From::Section(section)) {
-                Ok(heap) => {
-                    SECTION_BYTES.fetch_add(bytes, Ordering::Relaxed);
-                    tracing::info!(section = format_args!("{section:#x}"), mb = bytes >> 20, "page pool section opened as a host heap");
-                    heaps.insert(section, heap.clone());
-                    heap
-                }
-                Err(e) => {
-                    refused(&e, "opening the section");
-                    return None;
-                }
-            }
-        }
-    };
-    let buffer = match place(&host.device, &heap, at, size) {
-        Ok(buffer) => buffer,
-        Err(e) => {
-            refused(&e, "placing the buffer");
-            return None;
-        }
-    };
-    let bias = offset - at;
-    // SAFETY: a live buffer.
-    let gpu = unsafe { buffer.GetGPUVirtualAddress() } + bias;
-    let slot = if window { 0 } else { 2 };
-    STATS[slot].fetch_add(1, Ordering::Relaxed);
-    STATS[slot + 1].fetch_add(len, Ordering::Relaxed);
-    Some(Placed { buffer, heap, gpu, bias })
 }
 
 /// What [`place_for`] gave is gone.
@@ -316,27 +198,16 @@ fn say() {
     }
     let s: Vec<u64> = STATS.iter().map(|s| s.load(Ordering::Relaxed)).collect();
     tracing::info!(
-        "title memory in place: {} windows {} MB, {} title buffers {} MB (no copy, no refresh, no copy-back), page pool sections opened {} MB; turned down: {} view memory or not private memory committed whole, \
+        "title memory in place: {} windows {} MB, {} title buffers {} MB (no copy, no refresh, no copy-back); turned down: {} view memory or not private memory committed whole, \
          {} refused by the host, {} over VICTORY_INPLACE_MB; {} let go because their memory changed",
         s[0],
         s[1] >> 20,
         s[2],
         s[3] >> 20,
-        SECTION_BYTES.load(Ordering::Relaxed) >> 20,
         s[4],
         s[5],
         s[6],
         s[7]
-    );
-    let v: Vec<u64> = VIEW_STATS.iter().map(|s| s.load(Ordering::Relaxed)).collect();
-    tracing::info!(
-        "view memory turned down, since the start: {} with holes {} MB, {} scattered {} MB, {} in a section not committed {} MB",
-        v[0],
-        v[1] >> 20,
-        v[2],
-        v[3] >> 20,
-        v[4],
-        v[5] >> 20
     );
 }
 
@@ -400,36 +271,71 @@ struct Views {
     /// page is a write of the bytes every other view shows
     /// (`crate::watch` guards them all).
     pages: BTreeMap<(usize, u64), Vec<usize>>,
+    /// Of those, how many are shown more than once.
+    pages_twice: usize,
     /// Sections by handle: bytes, and whether made committed.
     sections: Vec<(usize, u64, bool)>,
+    /// Our own view of a whole section, by its handle (0: the host gave
+    /// none), made when first asked for ([`beside`]) and kept.
+    whole: Vec<(usize, usize)>,
 }
 
-static VIEWS: Mutex<Views> =
-    Mutex::new(Views { views: BTreeMap::new(), pages: BTreeMap::new(), sections: Vec::new() });
+/// Read by many threads at once (write faults, landings), changed when the
+/// runtime maps or unmaps.
+static VIEWS: std::sync::RwLock<Views> = std::sync::RwLock::new(Views {
+    views: BTreeMap::new(),
+    pages: BTreeMap::new(),
+    pages_twice: 0,
+    sections: Vec::new(),
+    whole: Vec::new(),
+});
 
-fn views() -> std::sync::MutexGuard<'static, Views> {
-    VIEWS.lock().unwrap_or_else(|e| e.into_inner())
+fn views() -> std::sync::RwLockReadGuard<'static, Views> {
+    VIEWS.read().unwrap_or_else(|e| e.into_inner())
+}
+
+fn views_mut() -> std::sync::RwLockWriteGuard<'static, Views> {
+    VIEWS.write().unwrap_or_else(|e| e.into_inner())
 }
 
 /// The runtime made a section of `bytes` for physical pages; `committed`
 /// if with `SEC_COMMIT` (only such a section can be opened as a heap).
 pub fn title_memory_section(section: usize, bytes: u64, committed: bool) {
-    let mut v = views();
+    let mut v = views_mut();
     v.sections.retain(|s| s.0 != section);
+    // A handle's number given out again: the view was of the section that
+    // had it before (it stays mapped: someone may be writing through it).
+    v.whole.retain(|w| w.0 != section);
     v.sections.push((section, bytes, committed));
-    drop(v);
-    // A handle number reused by a new section: the old one's heap is not it.
-    SECTION_HEAPS.lock().unwrap_or_else(|e| e.into_inner()).remove(&section);
+}
+
+/// The runtime lets go of a section, and of its handle: no view the title
+/// sees is of it any more, and [`beside`]'s view goes.
+pub fn title_memory_section_gone(section: usize) {
+    let whole = {
+        let mut v = views_mut();
+        let at = v.whole.iter().position(|w| w.0 == section);
+        at.map(|i| v.whole.swap_remove(i).1)
+    };
+    if let Some(base) = whole.filter(|&base| base != 0) {
+        // SAFETY: a view of ours. Who writes through it found the section
+        // in a view the title saw and holds off its unmapping
+        // (`crate::watch::title_memory_reading`), which came before this.
+        unsafe { mem::UnmapViewOfFile(mem::MEMORY_MAPPED_VIEW_ADDRESS { Value: base as *mut c_void }) };
+    }
 }
 
 /// The runtime mapped `[at, at + len)` as a view of `section` from
 /// `offset` on. Call after [`crate::title_memory_remapped`] of the range.
 pub fn title_memory_view(at: usize, len: usize, section: usize, offset: u64) {
     {
-        let mut v = views();
+        let mut v = views_mut();
         v.views.insert(at, (len, section, offset));
         for k in 0..len.div_ceil(K64) {
-            v.pages.entry((section, offset + (k * K64) as u64)).or_default().push(at + k * K64);
+            let shown = v.pages.entry((section, offset + (k * K64) as u64)).or_default();
+            shown.push(at + k * K64);
+            let twice = shown.len() == 2;
+            v.pages_twice += usize::from(twice);
         }
     }
     // This view is writable from now on: a guard over the same bytes at
@@ -442,7 +348,7 @@ pub fn title_memory_view(at: usize, len: usize, section: usize, offset: u64) {
 /// the views that touch it are forgotten (the runtime tells again those it
 /// maps anew).
 pub(crate) fn views_gone(at: usize, len: usize) {
-    let mut v = views();
+    let mut v = views_mut();
     if v.views.is_empty() {
         return;
     }
@@ -457,13 +363,40 @@ pub(crate) fn views_gone(at: usize, len: usize) {
             let key = (section, offset + (k * K64) as u64);
             if let Some(pages) = v.pages.get_mut(&key) {
                 let page = base + k * K64;
+                let before = pages.len();
                 pages.retain(|&shown| shown != page);
-                if pages.is_empty() {
+                let after = pages.len();
+                if after == 0 {
                     v.pages.remove(&key);
                 }
+                v.pages_twice = v.pages_twice.saturating_sub(usize::from(before >= 2 && after < 2));
             }
         }
     }
+}
+
+/// The 64 KiB pages of `[start, end)` that the title shows at other
+/// addresses too, in address order, each with those; not the ones it shows
+/// in very many views (`crate::watch::MANY_VIEWS`).
+pub(crate) fn shown_elsewhere(start: usize, end: usize) -> Vec<(usize, Vec<usize>)> {
+    let v = views();
+    let mut out = Vec::new();
+    if start >= end || v.pages_twice == 0 {
+        return out;
+    }
+    let first = v.views.range(..=start).next_back().filter(|(base, view)| *base + view.0 > start).map(|(base, _)| *base);
+    for (&base, &(bytes, section, offset)) in v.views.range(first.unwrap_or(start)..end) {
+        let from = start.max(base) & !(K64 - 1);
+        for page in (from..end.min(base + bytes)).step_by(K64) {
+            let Some(shown) = v.pages.get(&(section, offset + (page - base) as u64)) else {
+                continue;
+            };
+            if (2..=crate::watch::MANY_VIEWS).contains(&shown.len()) {
+                out.push((page, shown.iter().copied().filter(|&at| at != page).collect()));
+            }
+        }
+    }
+    out
 }
 
 /// The address of the 64 KiB page shown at `page` in every title view that
@@ -478,65 +411,6 @@ pub(crate) fn pages_of(page: usize) -> Vec<usize> {
         return Vec::new();
     }
     v.pages.get(&(section, offset + within as u64)).cloned().unwrap_or_default()
-}
-
-/// Batched lookup for `watch::protect`: acquires `VIEWS` once across all 64 KiB
-/// blocks in `[from_block, to_block)` and returns `(all_aliased_blocks,
-/// other_alias_blocks_sorted_deduped, guarded_block_count)` for every block
-/// whose physical page has between `2` and `max_views` views.
-pub(crate) fn alias_blocks_in(
-    from_block: usize,
-    to_block: usize,
-    max_views: usize,
-) -> (Vec<usize>, Vec<usize>, u64) {
-    let start = from_block.saturating_mul(K64);
-    let end = to_block.saturating_mul(K64);
-    if start >= end {
-        return (Vec::new(), Vec::new(), 0);
-    }
-    let v = views();
-    if v.views.is_empty() {
-        return (Vec::new(), Vec::new(), 0);
-    }
-    let mut all_aliased = Vec::new();
-    let mut others = Vec::new();
-    let mut blocks_counted = 0u64;
-    let first_view = v
-        .views
-        .range(..=start)
-        .next_back()
-        .filter(|&(&base, &(bytes, _, _))| base + bytes > start);
-    let overlapping = first_view
-        .into_iter()
-        .chain(v.views.range(start.saturating_add(1)..end));
-    for (&base, &(bytes, section, offset)) in overlapping {
-        let first = (base / K64).max(from_block);
-        let last = (base.saturating_add(bytes).div_ceil(K64)).min(to_block);
-        for block in first..last {
-            let page = block * K64;
-            let within = page.wrapping_sub(base);
-            if within >= bytes || !within.is_multiple_of(K64) {
-                continue;
-            }
-            let Some(shown) = v.pages.get(&(section, offset + within as u64)) else {
-                continue;
-            };
-            if shown.len() < 2 || shown.len() > max_views {
-                continue;
-            }
-            blocks_counted += 1;
-            for &alias_addr in shown {
-                let alias = alias_addr / K64;
-                all_aliased.push(alias);
-                if alias != block {
-                    others.push(alias);
-                }
-            }
-        }
-    }
-    others.sort_unstable();
-    others.dedup();
-    (all_aliased, others, blocks_counted)
 }
 
 /// The title views that show any of the physical bytes `[offset, offset +
@@ -573,6 +447,48 @@ pub(crate) fn views_of_section(section: usize, offset: u64, len: usize) -> Vec<(
     runs
 }
 
+/// How many bytes of `[at, at + len)` views of physical pages show; `None`
+/// if no view touches it (nothing is mapped there, or memory of another
+/// kind). The runtime's own record of what it mapped: no question to the
+/// host.
+pub(crate) fn shown_bytes(at: usize, len: usize) -> Option<u64> {
+    let end = at.saturating_add(len);
+    let v = views();
+    let first = v.views.range(..=at).next_back();
+    let rest = v.views.range(at.saturating_add(1)..end.max(at.saturating_add(1)));
+    let (mut there, mut any) = (0u64, false);
+    for (&base, view) in first.into_iter().chain(rest) {
+        let (from, to) = (base.max(at), base.saturating_add(view.0).min(end));
+        if from < to {
+            there += (to - from) as u64;
+            any = true;
+        }
+    }
+    any.then_some(there)
+}
+
+/// What of `[at, at + len)` views of physical pages show, in order, pieces
+/// that touch as one: (address, bytes). Empty: nothing, or memory of another
+/// kind.
+pub(crate) fn shown_runs(at: usize, len: usize) -> Vec<(usize, usize)> {
+    let end = at.saturating_add(len);
+    let v = views();
+    let first = v.views.range(..=at).next_back();
+    let rest = v.views.range(at.saturating_add(1)..end.max(at.saturating_add(1)));
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for (&base, view) in first.into_iter().chain(rest) {
+        let (from, to) = (base.max(at), base.saturating_add(view.0).min(end));
+        if from >= to {
+            continue;
+        }
+        match runs.last_mut() {
+            Some((run, bytes)) if *run + *bytes == from => *bytes += to - from,
+            _ => runs.push((from, to - from)),
+        }
+    }
+    runs
+}
+
 /// How the views cover `[at, at + len)`.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Cover {
@@ -604,48 +520,77 @@ fn cover_in(views: &BTreeMap<usize, (usize, usize, u64)>, at: usize, len: usize)
     if one { Cover::Run(first.0, first.1) } else { Cover::Scattered }
 }
 
-/// `VICTORY_INPLACE_HOLES` (on unless 0): a window whose mapped pages are
-/// all one run of one section, with pages between them not mapped, is
-/// placed over that run of the section as well.
-///
-/// shortcut: through the window's unmapped pages the GPU sees the
-/// section's pages that would be there, not nothing; a write there lands
-/// in them. The title maps 4 MiB windows partly (its tiled heaps) and
-/// reads only what it mapped; mapping more there later lets the window go
-/// (`title_memory_remapped`).
-fn holes_allowed() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("VICTORY_INPLACE_HOLES").map_or(true, |v| v.trim() != "0"))
-}
-
-/// The section and the offset in it of `at` if every view in
-/// `[at, at + len)` shows one section at the one offset that line gives
-/// (pages not mapped between them allowed), and that line stays inside the
-/// section from `at` on; `None` if no view is there or they disagree.
-fn linear_in(views: &BTreeMap<usize, (usize, usize, u64)>, at: usize, len: usize) -> Option<(usize, u64)> {
-    let end = at.checked_add(len.max(1))?;
-    let first = views.range(..=at).next_back().filter(|(base, view)| *base + view.0 > at);
-    let mut line: Option<(usize, i128)> = None;
-    for (&base, &(_, section, offset)) in first.into_iter().chain(views.range(at.saturating_add(1)..end)) {
-        // Where `at` would be in the section by this view.
-        let here = (section, offset as i128 - (base as i128 - at as i128));
-        match line {
-            None => line = Some(here),
-            Some(l) if l == here => {}
-            Some(_) => return None,
-        }
-    }
-    let (section, offset) = line?;
-    u64::try_from(offset).ok().map(|offset| (section, offset))
-}
-
-fn linear(at: usize, len: usize) -> Option<(usize, u64)> {
-    linear_in(&views().views, at, len)
-}
-
 /// [`Cover`] of `[at, at + len)` by the title's views as they are now.
 pub(crate) fn cover(at: usize, len: usize) -> Cover {
     cover_in(&views().views, at, len)
+}
+
+/// Another address of the title memory `[at, at + len)`, if it is a view of
+/// the title's pages, all of it one run of a section: in a view of ours of
+/// the whole section, which is never guarded (`crate::watch`) nor changed.
+///
+/// The section's pages are reserved and the runtime commits each before it
+/// shows it, which holds for every view of the section. The caller holds
+/// `crate::watch::title_memory_reading`: until it lets go the title sees
+/// the same pages at `at`.
+pub(crate) fn beside(at: usize, len: usize) -> Option<usize> {
+    let known = {
+        let v = views();
+        let Cover::Run(section, offset) = cover_in(&v.views, at, len) else {
+            return None;
+        };
+        v.whole.iter().find(|w| w.0 == section).map(|w| (w.1, offset))
+    };
+    if let Some((base, offset)) = known {
+        return (base != 0).then(|| base + offset as usize);
+    }
+    let mut v = views_mut();
+    let Cover::Run(section, offset) = cover_in(&v.views, at, len) else {
+        return None;
+    };
+    let base = match v.whole.iter().find(|w| w.0 == section) {
+        Some(w) => w.1,
+        None => {
+            let &(_, bytes, _) = v.sections.iter().find(|s| s.0 == section)?;
+            // SAFETY: the whole of a section the runtime made; a view the
+            // title sees is of it, so its handle is open.
+            let base = unsafe { mem::MapViewOfFile(section as _, mem::FILE_MAP_WRITE, 0, 0, bytes as usize) }.Value as usize;
+            if base == 0 {
+                tracing::warn!(error = %std::io::Error::last_os_error(), "no view of the title's pages beside its own");
+            }
+            v.whole.push((section, base));
+            base
+        }
+    };
+    (base != 0).then(|| base + offset as usize)
+}
+
+/// Our own address of the 64 KiB page the title sees at `page` ([`beside`]),
+/// and every address the title sees it at (0: no more); `None` if the page is
+/// in no view of a section, or in very many. While the caller holds
+/// `crate::watch::title_memory_reading`.
+pub(crate) fn beside_page(page: usize) -> Option<(usize, [usize; 8])> {
+    for asked in [false, true] {
+        {
+            let v = views();
+            let (&base, &(bytes, section, offset)) = v.views.range(..=page).next_back()?;
+            let within = page.wrapping_sub(base);
+            if within >= bytes || !within.is_multiple_of(K64) {
+                return None;
+            }
+            let offset = offset + within as u64;
+            if let Some(whole) = v.whole.iter().find(|w| w.0 == section) {
+                let mut shown = [0; 8];
+                let all = v.pages.get(&(section, offset))?;
+                shown.get_mut(..all.len())?.copy_from_slice(all);
+                return (whole.1 != 0).then(|| (whole.1 + offset as usize, shown));
+            }
+        }
+        if asked || beside(page, K64).is_none() {
+            return None;
+        }
+    }
+    None
 }
 
 /// Whether `[at, at + len)` is private memory, all committed and
@@ -1053,92 +998,6 @@ unsafe fn section(p: &mut Probe, rig: &mut Rig) {
     }
 }
 
-/// [`tiles`] on `device`, alone: on an NVIDIA card (and WARP) it loses
-/// the device, so it is never part of [`probe`] and never runs on the
-/// host's device; only the card test asks for it.
-#[cfg(test)]
-pub(crate) fn probe_tiles(device: &ID3D12Device) -> Probe {
-    let mut p = Probe::default();
-    match Rig::new(device) {
-        // SAFETY: memory of the probe's own, made and released there.
-        Ok(mut rig) => unsafe { tiles(&mut p, &mut rig) },
-        Err(e) => p.lines.push(format!("no queue of its own: {e}")),
-    }
-    p
-}
-
-/// A reserved buffer whose 64 KiB tiles are mapped, out of order, onto
-/// pages of a committed section opened as a heap: what one buffer needs to
-/// show a window of the page pool whose pages are scattered (the title's
-/// tiled heaps, its pool views). `Ok(true)` if the GPU reads the pages'
-/// bytes in the tiles' order and the CPU reads what a shader wrote.
-#[cfg(test)]
-unsafe fn tiles(p: &mut Probe, rig: &mut Rig) {
-    const PAGES: usize = 8;
-    // Tile k shows section page ORDER[k].
-    const ORDER: [u32; 4] = [5, 1, 6, 2];
-    // SAFETY (the whole function): the section and view made below.
-    unsafe {
-        let invalid = windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-        let handle = mem::CreateFileMappingW(invalid, std::ptr::null(), mem::PAGE_READWRITE | mem::SEC_COMMIT, 0, (PAGES * K64) as u32, std::ptr::null());
-        if handle.is_null() {
-            p.lines.push("tiles: no section to try with".to_owned());
-            return;
-        }
-        let view = mem::MapViewOfFile(handle, mem::FILE_MAP_WRITE, 0, 0, PAGES * K64);
-        let opened = open(&rig.device, From::Section(handle as usize));
-        let result = (|| -> windows::core::Result<(bool, bool)> {
-            let heap = opened.clone()?;
-            let mut tiled: Option<ID3D12Resource> = None;
-            let desc = D3D12_RESOURCE_DESC {
-                Alignment: K64 as u64,
-                ..buffer_desc((ORDER.len() * K64) as u64, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
-            };
-            rig.device.CreateReservedResource(&desc, D3D12_RESOURCE_STATE_COMMON, None, &mut tiled)?;
-            let tiled = tiled.ok_or_else(windows::core::Error::empty)?;
-            let starts = [D3D12_TILED_RESOURCE_COORDINATE::default()];
-            let sizes = [D3D12_TILE_REGION_SIZE { NumTiles: ORDER.len() as u32, ..Default::default() }];
-            let flags = [D3D12_TILE_RANGE_FLAG_NONE; ORDER.len()];
-            let counts = [1u32; ORDER.len()];
-            rig.queue.UpdateTileMappings(
-                &tiled,
-                1,
-                Some(starts.as_ptr()),
-                Some(sizes.as_ptr()),
-                &heap,
-                ORDER.len() as u32,
-                Some(flags.as_ptr()),
-                Some(ORDER.as_ptr()),
-                Some(counts.as_ptr()),
-                D3D12_TILE_MAPPING_FLAG_NONE,
-            );
-            let memory = view.Value.cast::<u8>();
-            fill(memory, PAGES * K64, 9);
-            let got = rig.fetch(&tiled, 0, ORDER.len() * K64)?;
-            let reads = ORDER.iter().enumerate().all(|(k, &page)| same(memory.add(page as usize * K64), &got[k * K64..(k + 1) * K64]));
-            // A shader writes through the tiles: word 2 of tile 0, which is
-            // section page ORDER[0].
-            let words = memory.add(ORDER[0] as usize * K64).cast::<[u32; 3]>();
-            words.write([40, 2, 0]);
-            rig.shade(tiled.GetGPUVirtualAddress())?;
-            let writes = words.read()[2] == 42;
-            Ok((reads, writes))
-        })();
-        p.lines.push(format!(
-            "tiles of a reserved buffer mapped out of order onto a committed section's heap: {}",
-            match &result {
-                Ok((reads, writes)) => format!("the GPU reads the pages in the tiles' order {reads}; the CPU reads what a shader wrote {writes}"),
-                Err(e) => format!("REFUSED {:#010x} ({})", e.code().0, e.message().trim()),
-            }
-        ));
-        drop(opened);
-        if !view.Value.is_null() {
-            mem::UnmapViewOfFile(view);
-        }
-        windows_sys::Win32::Foundation::CloseHandle(handle);
-    }
-}
-
 /// What opening costs, on `mb` MB each of private memory never touched
 /// and of a committed section never touched: the time, the working set,
 /// the card's account of the PC's memory shared with it; and how fast the
@@ -1414,6 +1273,34 @@ mod tests {
     /// views that continue each other in one section, is one run; over
     /// views from elsewhere it is scattered; over a gap it has holes.
     #[test]
+    fn the_views_say_how_much_of_a_range_is_there() {
+        const K64: usize = 64 << 10;
+        // Addresses nothing has: only the record is asked.
+        let at = 0x7ff1_0000_0000_usize;
+        for (block, blocks) in [(0, 1), (1, 1), (4, 2)] {
+            super::title_memory_view(at + block * K64, blocks * K64, 7, 0);
+        }
+        let shown = |from: usize, len: usize| super::shown_bytes(at + from, len);
+        assert_eq!(shown(0, 8 * K64), Some(4 * K64 as u64));
+        assert_eq!(shown(100, K64), Some(K64 as u64));
+        assert_eq!(shown(K64 + 100, 2 * K64), Some(K64 as u64 - 100));
+        assert_eq!(shown(5 * K64 + 1, 10), Some(10));
+        assert_eq!(shown(2 * K64, 2 * K64), None);
+        assert_eq!(shown(6 * K64, 2 * K64), None);
+        // The same as runs: views that touch are one, cut to the range.
+        let runs = |from: usize, len: usize| super::shown_runs(at + from, len);
+        assert_eq!(runs(0, 8 * K64), vec![(at, 2 * K64), (at + 4 * K64, 2 * K64)]);
+        assert_eq!(runs(100, K64), vec![(at + 100, K64)]);
+        assert_eq!(runs(5 * K64 + 1, 10), vec![(at + 5 * K64 + 1, 10)]);
+        assert_eq!(runs(2 * K64, 2 * K64), vec![]);
+        super::views_gone(at + K64, K64);
+        assert_eq!(shown(0, 2 * K64), Some(K64 as u64));
+        assert_eq!(runs(0, 2 * K64), vec![(at, K64)]);
+        super::views_gone(at, 8 * K64);
+        assert_eq!(shown(0, 8 * K64), None);
+    }
+
+    #[test]
     fn views_say_what_one_placed_buffer_could_show() {
         let mut views = BTreeMap::new();
         let at = 0x7_0000_0000usize;
@@ -1430,31 +1317,6 @@ mod tests {
         assert_eq!(cover_in(&views, at + 6 * K64, 3 * K64), Cover::Holes);
         assert_eq!(cover_in(&views, at + 7 * K64, K64), Cover::None);
         assert_eq!(cover_in(&views, at - K64, 2 * K64), Cover::None);
-    }
-
-    /// A window partly mapped is one line of a section when every view in
-    /// it agrees on where its start lies in the section.
-    #[test]
-    fn partly_mapped_windows_on_one_line_of_a_section() {
-        let mut views = BTreeMap::new();
-        let at = 0x7_0000_0000usize;
-        // Pages 2-3 and 6 of the window, at section pages 12-13 and 16.
-        views.insert(at + 2 * K64, (2 * K64, 9, 12 * K64 as u64));
-        views.insert(at + 6 * K64, (K64, 9, 16 * K64 as u64));
-        assert_eq!(cover_in(&views, at, 8 * K64), Cover::None);
-        assert_eq!(linear_in(&views, at, 8 * K64), Some((9, 10 * K64 as u64)));
-        assert_eq!(linear_in(&views, at + 3 * K64, 4 * K64), Some((9, 13 * K64 as u64)));
-        // Off the line: page 7 from elsewhere in the section, or another one.
-        views.insert(at + 7 * K64, (K64, 9, 40 * K64 as u64));
-        assert_eq!(linear_in(&views, at, 8 * K64), None);
-        views.insert(at + 7 * K64, (K64, 8, 17 * K64 as u64));
-        assert_eq!(linear_in(&views, at, 8 * K64), None);
-        // Before the section's start.
-        let mut early = BTreeMap::new();
-        early.insert(at + 4 * K64, (K64, 9, K64 as u64));
-        assert_eq!(linear_in(&early, at, 8 * K64), None);
-        // Nothing mapped.
-        assert_eq!(linear_in(&BTreeMap::new(), at, 8 * K64), None);
     }
 
     /// What the runtime forgets when memory is mapped anew.
@@ -1510,36 +1372,12 @@ mod tests {
         }
     }
 
-    fn card_probe_says_what_the_driver_allows() {
-        use windows::Win32::Graphics::Direct3D::D3D_FEATURE_LEVEL_12_0;
-        let mut device: Option<ID3D12Device> = None;
-        // SAFETY: plain creation on the default adapter.
-        if unsafe { D3D12CreateDevice(None, D3D_FEATURE_LEVEL_12_0, &mut device) }.is_err() {
-            return;
-        }
-        let device = device.unwrap();
-        let probe = probe(&device, &|| None, 0);
-        // Last: it loses the device.
-        let tiles = probe_tiles(&device);
-        for line in probe.lines.iter().chain(&tiles.lines) {
-            eprintln!("card probe: {line}");
-        }
-    }
-
-    /// The probe on the PC's own card (`cargo test -p victory-gpu
-    /// card_probe -- --ignored --nocapture`): what its driver allows.
-    #[test]
-    #[ignore = "opens the PC's card"]
-    fn card_probe() {
-        card_probe_says_what_the_driver_allows();
-    }
-
-
     /// The probe, whole, on the software adapter: the same calls the card
     /// gets. The runtime's and the kernel's rules hold there; the card's
     /// driver is what a run with `VICTORY_INPLACE_PROBE=1` adds.
     #[test]
     fn warp_probe_opens_title_like_memory_and_the_gpu_sees_its_bytes() {
+        let _turn = crate::indirect::tests::warp_turn();
         let Some(device) = warp() else { return };
         if device.cast::<ID3D12Device13>().is_err() {
             eprintln!("no ID3D12Device13 here: parts of an allocation cannot be opened");
@@ -1563,6 +1401,7 @@ mod tests {
     /// whole is turned down without asking the host.
     #[test]
     fn warp_a_title_buffer_in_place_shows_its_bytes_at_its_offset() {
+        let _turn = crate::indirect::tests::warp_turn();
         let Some(device) = warp() else { return };
         if device.cast::<ID3D12Device13>().is_err() {
             return;
@@ -1582,18 +1421,17 @@ mod tests {
             rig.store(&placed.buffer, placed.bias + 16, &[0xa5; 64]).unwrap();
             assert!(same((start + 16) as *const u8, &[0xa5; 64]), "the GPU's write is at the title's address");
             drop(placed);
-            // Half of it decommitted: turned down, the host not asked. The software
-            // adapter lets go of the placed pages a little after the buffer is dropped
-            // (under the load of the other tests it was still holding them in one run
-            // of four), so the decommit is tried again for up to a second.
-            let decommitted = (0..100).any(|_| {
-                mem::VirtualFree(base.add(2 * K64).cast(), K64, mem::MEM_DECOMMIT) != 0
-                    || {
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                        false
-                    }
+            // Half of it decommitted: turned down, the host not asked.
+            // The heap lets go of the pages a moment after its last
+            // reference, if the adapter is busy with other tests' work.
+            let gone = (0..500).any(|_| {
+                let done = mem::VirtualFree(base.add(2 * K64).cast(), K64, mem::MEM_DECOMMIT) != 0;
+                if !done {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                done
             });
-            assert!(decommitted, "the pages could be decommitted");
+            assert!(gone, "the heap keeps the pages");
             assert!(matches!(place_part(&device, start, len), Err(None)));
             mem::VirtualFree(base.cast(), 0, mem::MEM_RELEASE);
         }

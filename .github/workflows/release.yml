@@ -1,0 +1,72 @@
+name: Release
+
+# A tag v* on the edupode branch builds everything a release holds from this repository's code, with a
+# provenance attestation for each program (anyone can check a download came from this code:
+# gh attestation verify "<file>" -R edupode/cold-project-vi), and leaves a DRAFT release.
+# edupode then signs it on his own PC (scripts\sign-release.ps1 <tag>): the release key never
+# reaches GitHub, so the launchers out there only install what he signed.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: New-Item -ItemType Directory -Force dist
+        shell: pwsh
+      - name: VIctory
+        run: cargo build --locked --profile diag -p victory --features diagnostics
+      - name: Launcher
+        shell: cmd
+        run: launcher\build-launcher.cmd "%CD%\dist\Julia's Launcher.exe"
+      - name: NVSmooth30 (RTX 30, experimental; MIT, github.com/ItsAdeline/NVSmooth30)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          git clone --depth 1 https://github.com/ItsAdeline/NVSmooth30 nvsmooth30
+          cmake -S nvsmooth30 -B nvsmooth30/build -A x64
+          cmake --build nvsmooth30/build --config Release
+          Copy-Item nvsmooth30/build/Release/version.dll dist/nvsmooth30-version.dll
+          Copy-Item nvsmooth30/LICENSE dist/nvsmooth30-LICENSE.txt
+      - name: Files of the release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/diag/victory.exe dist/victory.exe
+          Compress-Archive -Path launcher/*.cs, launcher/build-launcher.cmd, launcher/icon.ico -DestinationPath dist/launcher-source.zip
+          $version = (Select-String -Path launcher/Updater.cs -Pattern 'Version = "([^"]+)"').Matches[0].Groups[1].Value
+          if ("v$version" -ne "${{ github.ref_name }}" -and "${{ github.event_name }}" -eq 'push') { throw "Updater.Version ($version) is not the tag (${{ github.ref_name }})" }
+          Get-ChildItem dist -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content dist/SHA256SUMS.txt
+          "VI_VERSION=$($version -replace '-.*','')" | Out-File -Append $env:GITHUB_ENV
+      - name: Installer
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=$env:VI_VERSION installer\VI.iss
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/Julia's Launcher.exe
+            dist/victory.exe
+            dist/VI-Setup-*.exe
+      - name: Draft release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Copy-Item "dist/Julia's Launcher.exe" dist/Julias-Launcher.exe
+          $files = Get-ChildItem dist -File | Where-Object { $_.Name -ne "Julia's Launcher.exe" } | ForEach-Object { $_.FullName }
+          gh release create "${{ github.ref_name }}" --draft --target edupode --title "Julia's Launcher ${{ github.ref_name }}" --notes-file docs/RELEASE-NOTES.md $files

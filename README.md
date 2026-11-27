@@ -1,487 +1,239 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5f6d,50:ffc371,100:845ec2&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=An%20Xbox%20Series%20game%20on%20PC&descAlignY=58&animation=fadeIn" alt="Cold Project VI" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5fa2,50:ffc371,100:5f6dff&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=edupode%20remake%20%E2%80%94%20GTA%20VI%20(Xbox%20Series)%20on%20an%20RTX%20laptop&descAlignY=58&animation=fadeIn" alt="Cold Project VI - edupode remake" width="100%"/>
 
-<a href="#where-the-game-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FFC371&center=true&vCenter=true&width=640&lines=The+prologue+is+playable%3A+you+control+the+heroine;4.2+fps+today%2C+measured+ceiling%3A+20;A+Rust+launcher+with+Discord+presence;Test+modes%3A+no+textures%2C+no+drawing" alt="animation"/></a>
+<a href="#where-it-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FF5FA2&center=true&vCenter=true&width=680&lines=Open+world+22-26+fps%2C+cutscenes+35%2B%2C+menus+60;NVIDIA+Smooth+Motion+set+up+for+you;Pipelines+loaded+before+the+game+opens;VI+Launcher%3A+one+window+to+build+and+play;Missions+playable%2C+long+sessions+without+crashes" alt="animation"/></a>
 
 <p>
-  <a href="README.md"><img src="https://img.shields.io/badge/English-current-C8102E?style=for-the-badge" alt="English"/></a>
-  <a href="README.fr.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-lire-0055A4?style=for-the-badge" alt="Français"/></a>
-  <a href="https://discord.gg/GBJT5E8E4E"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"/></a>
-  <a href="../../releases/latest"><img src="https://img.shields.io/badge/%E2%AC%87%20Download-launcher%20%2B%20build-2ea44f?style=for-the-badge" alt="Download"/></a>
+  <a href="#quick-start-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-start%20here-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
+  <a href="docs/GUIDE-30FPS.md"><img src="https://img.shields.io/badge/Guide-English-C8102E?style=for-the-badge" alt="Guide"/></a>
+  <a href="README.pt.md"><img src="https://img.shields.io/badge/Leia%20em-Portugu%C3%AAs-006600?style=for-the-badge" alt="Portugues"/></a>
+  <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/by-%40edupode-222?style=for-the-badge&logo=github" alt="by edupode"/></a>
 </p>
 
 <p>
-  <img src="https://img.shields.io/badge/progress-60%25-ffc371?style=flat-square" alt="progress 60%"/>
-  <img src="https://img.shields.io/badge/fps-4.2%20(measured%20max%2020)-ff5f6d?style=flat-square" alt="fps"/>
+  <img src="https://img.shields.io/badge/fps-22--26%20open%20world%20%7C%2060%20menus-ff5f6d?style=flat-square" alt="fps"/>
+  <img src="https://img.shields.io/badge/VRAM-6--8%20GB%20of%2012-ffc371?style=flat-square" alt="VRAM"/>
+  <img src="https://img.shields.io/badge/RAM-~20%20GB-ffc371?style=flat-square" alt="RAM"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
-  <img src="https://img.shields.io/badge/GPU-RTX%2020%2B%20%2F%20mesh%20shaders-76B900?style=flat-square&logo=nvidia" alt="RTX 20+"/>
-  <img src="https://img.shields.io/badge/Rust-1.98-B7410E?style=flat-square&logo=rust" alt="Rust"/>
+  <img src="https://img.shields.io/badge/GPU-NVIDIA%20RTX-76B900?style=flat-square&logo=nvidia" alt="NVIDIA RTX"/>
+  <img src="https://img.shields.io/badge/Rust-pinned-B7410E?style=flat-square&logo=rust" alt="Rust"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-845ec2?style=flat-square" alt="GPL-3.0"/>
 </p>
 
 <p>
-  <a href="#run-it"><img src="https://img.shields.io/badge/%E2%96%B6%20Run-222?style=for-the-badge" alt="Run"/></a>
-  <a href="#the-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Launcher-222?style=for-the-badge" alt="Launcher"/></a>
-  <a href="#speed"><img src="https://img.shields.io/badge/%E2%9A%A1%20Speed-222?style=for-the-badge" alt="Speed"/></a>
-  <a href="#memory"><img src="https://img.shields.io/badge/%F0%9F%A7%A0%20Memory-222?style=for-the-badge" alt="Memory"/></a>
-  <a href="#picture"><img src="https://img.shields.io/badge/%F0%9F%96%BC%20Picture-222?style=for-the-badge" alt="Picture"/></a>
-  <a href="#what-is-left"><img src="https://img.shields.io/badge/%F0%9F%93%8B%20To%20do-222?style=for-the-badge" alt="To do"/></a>
+  <a href="#quick-start-julias-launcher"><img src="https://img.shields.io/badge/%E2%96%B6%20Run-222?style=for-the-badge" alt="Run"/></a>
+  <a href="#modes"><img src="https://img.shields.io/badge/%E2%9A%A1%20Modes-222?style=for-the-badge" alt="Modes"/></a>
+  <a href="#controls"><img src="https://img.shields.io/badge/%F0%9F%95%B9%20Controls-222?style=for-the-badge" alt="Controls"/></a>
+  <a href="#where-it-stands"><img src="https://img.shields.io/badge/%F0%9F%93%8B%20Status-222?style=for-the-badge" alt="Status"/></a>
 </p>
 
 </div>
 
-A working version of [VIctory](https://github.com/Marvisak/VIctory), which runs
-the Xbox Series build of an open-world game natively on Windows, from game
-files you supply yourself. It starts from fxceless's
-[victory-fork](https://github.com/fxceless/victory-fork) (up to `4e17478`),
-with the view map of [Xeltax/VIcky](https://github.com/Xeltax/VIcky) and work
-from many other forks, named in each commit. *La même page en français :
-[README.fr.md](README.fr.md).*
+> [!NOTE]
+> **This is a remake by [@edupode](https://github.com/edupode)** of the Cold Project VI idea, internally
+> called **"luz"** (Portuguese for *light*, after the lighting work it started with). It combines
+> [VIctory](https://github.com/Marvisak/VIctory), the cgbj build (cputroll/cgbj-reupload), Leonidas's and
+> AnyXboxSeries's work, the VIctory-NVIDIA fork (trustno1-coder), fxceless's rendering fixes and adaptations from an AMD fork
+> (avatarmanz/VIctory-7900XTX), tuned and extended for an NVIDIA laptop. It is not the upstream Cold Project
+> VI (felicienradio/cold-project-vi), whose page inspired this one.
 
 > [!IMPORTANT]
-> **This repository contains no game files**: no executable, data or extracted
-> shaders. You need your own copy of the game. Not affiliated with or endorsed
-> by the game's developer or publisher.
+> **This repository contains no game files**: no executable, data or extracted shaders. You need your own copy
+> of the game. Not affiliated with or endorsed by the game's developer or publisher.
 
-> [!NOTE]
-> **New on 26 November**: 4.6-4.7 fps in the cell (an 85 ms wait per frame
-> removed), 16- and 22-minute runs without a crash from a new game through the
-> intro cutscene, night scenes lit (an ambient light floor), textures that
-> arrive in seconds instead of minutes, sharper reflections and fixed shadows,
-> [`Tester.cmd`](#test-your-pc-testercmd) to measure your own PC, and
-> [the plan](#the-plan-normal-pcs-first).
->
-> **25 November**: a [launcher](#the-launcher) with Discord presence and
-> saves by place, two [test modes](#test-modes) (no textures, no drawing), and
-> a measurement of [what the game costs on its own](#what-the-game-costs-alone-and-what-our-layer-costs).
+### From the author
 
-## Where the game stands
+> It runs 24-26 fps, all controls have been mapped,currently using -locallights  
+> On the Open world i get about 22-24fps  
+> Everything seems to be loading ok  
+> I need help to fix volumetric shaders _Tiled (i already know how to fix them but it will take some time)  
+> It's running on 12gb vram and 32gb ddr5  
+> Currently it uses about 6-8gb on vram and 20-21gb of ddr5  
+> it used to use 10-12gb on vram and 27-29gb of ram of ddr5  
+> I got a laptop with a rtx 5070 ti capped at 145w and a Intel i9 ultra 275hx  
+> Hope this helps anyone, missions are already possible and doesn't crash even after long sessions  
+> on menus it goes from 30-32/33fps now its 60 fixed  
 
-### Progress: about 65 %
+GTA VI from **your own Xbox Series dump**, on Windows with an NVIDIA RTX card, through
+[VIctory](https://github.com/Marvisak/VIctory) (this branch: the cgbj build with the VIctory-NVIDIA
+lighting and many changes of our own). **No game files are included.**
 
-`█████████████░░░░░░░` **about 65 %: playable** (you control the heroine in the prologue)
+## Download
 
-Measured on [PortWatch VI](https://portwatch-vi.xyz/#method)'s scale: up to
-50 %, each step needs the one before; beyond that, story, picture, speed and
-stability share the last 50 points. Those are our estimate: PortWatch counts
-them only with proof (a video).
+**[Releases](https://github.com/edupode/cold-project-vi/releases/latest)**: get `VI-Setup-<version>.exe` and run it.
 
-| Milestone | % | State |
-|---|---|---|
-| Groundwork (loader, libraries, shaders, D3D12 rendering) | 0-10 | ✅ |
-| The executable runs | 10 | ✅ |
-| First picture (logos, intro) | 20 | ✅ |
-| Main menu | 30 | ✅ |
-| In the world (the prologue loads and shows) | 40 | ✅ |
-| Playable (you control a character) | 50 | ✅ the heroine moves in the prologue |
-| Story (17.5 points) | about 3 | ⚠️ past the prologue: a community capture (26/11) shows the boat mission ("Collect the package") in game with this code; not confirmed further |
-| Picture (12.5 points) | about 6.5 | ⚠️ lit, night scenes lit by an ambient floor (26/11), but ray-traced light and shadows are missing: car and indoor night shots stay dark, some sunny interiors look washed out |
-| Speed (10 points: fps ÷ 30) | about 1.5 | ❌ 4.6-4.7 fps in the cell, 1.4-3 in cutscenes (26/11); goal 10, then 15 |
-| Stability (10 points) | about 4 | ⚠️ 16 and 22 minutes without a crash from a new game (26/11); a few stalls of 4-12 s |
+- **One administrator prompt at the start.** After that the installer does the rest in the background:
+  - power mode;
+  - virtual memory;
+  - Defender's ransomware rule for its folder;
+  - the dedicated graphics card for `victory.exe`;
+  - Smooth Motion.
+- **The launcher opens when it finishes.** It finds your game and prepares the shaders.
+- **Nothing to compile:** you don't need Rust or Build Tools.
+- **Updates install themselves.** See [What the launcher does](#what-the-launcher-does).
 
-| Step | State |
-|---|---|
-| Boot, menus, title screen | ✅ works, 30 fps |
-| Intro cutscene | ✅ plays through with its credits from a new game (26/11), at 1.4-3 fps; night shots are far too dark and the arrival at the prison is washed out (no indirect light without ray tracing); the heroine's outfit shows a wrong texture for a while before the inmate one |
-| Saves | ✅ the game saves and reloads a checkpoint |
-| Prologue | ✅ playable: characters, textures, sky, sunlit exterior |
-| Light in the shade | ⚠️ fallback light and an ambient floor by default (`VICTORY_AMBIENT_STUB=0` turns the floor off): the intro's night scenes now show lit faces; car and indoor night shots stay dark and the arrival at the prison is washed out (the game's ray tracing does not run yet) |
-| Textures | ⚠️ the catch-up has no time limit any more: a new scene's textures arrive in seconds (the oldest waiting 8-42 frames, it was up to 1,115). Many are still let go and made again when the 16 GB PC runs out of RAM |
-| Frame rate in the world | ❌ 4.6-4.7 fps in the cell (215-220 ms a frame: preparing 110, GPU 87, copy-back 65) on an RTX 3060 with 16 GB of RAM, dropping to about 3.7 after 15-20 minutes as memory settles; 30 in the menus. Other PCs: an RTX 3070 Ti + i5-14400F + 16 GB got 4.8 in its first test and 3 in a heavier scene, its GPU taking only 60 ms a frame: on 16 GB our preparing and the RAM limit, not the card. **Community capture (26/11, not a controlled measure):** 9 fps (114.5 ms a frame, 4,283 draws) in the boat mission with this repository's code on an Intel Core Ultra 9 275HX laptop with a 12 GB GPU and 32 GB of RAM; the water shows dark rectangles there |
-| Memory | ⚠️ about 22-25 GB committed on a 16 GB PC. The CPU side of the copies that live on the GPU is now ordinary memory Windows can page out (it was 3-4.5 GB locked for the GPU): at the end of a 10-minute run the game still has about 5 GB in RAM instead of under 1 GB |
-| Stability | ⚠️ 22 minutes in a row without a crash, from a new game through the intro cutscene into the cell (26/11), with a few stalls of 4-12 s; a full 10-minute run in the world without stopping (25/11 evening), where it used to stop silently about 9 minutes in. `VICTORY_HOLD=71B6330:1` pauses the game's hang watchdog and `VICTORY_PATCH=5AD8E60:E8DB605FFF:B800000100,5ABB240:E8FB3C61FF:B800000100` enlarges two object pools that ran empty (ideas from Tejvardhan-717); a page file of 32 GB or more still helps |
+**Discord:** <https://discord.gg/648WEXCAsZ>. Send bugs in the **"Send bugs here please"** channel; the launcher makes the package for you (see [Logs and errors](#logs-and-errors)).
 
-```mermaid
-pie showData
-    title Steps working (of 8)
-    "Working" : 3
-    "Partial" : 3
-    "Not yet" : 2
+### Checking a release
+
+Every program in a release is built by GitHub Actions from this repository's code ([`release.yml`](.github/workflows/release.yml)), never on a PC. Anyone can check that:
+
+1. **The download came from this code:**
+   ```powershell
+   gh attestation verify "Julias-Launcher.exe" -R edupode/cold-project-vi
+   ```
+2. **The SHA-256 of each file** matches `SHA256SUMS.txt` in the release.
+3. **The launcher's source is included:** `launcher-source.zip` sits beside every install. `launcher\build-launcher.cmd` builds it with the C# compiler that ships with Windows.
+4. **Each update is signed with edupode's release key.** The launcher installs a file only when the signature and its SHA-256 match ([`Updater.cs`](launcher/Updater.cs)).
+
+## Quick start: Julia's Launcher
+
+1. Get this branch (`git clone`, or **Code → Download ZIP** on GitHub) and build the launcher; it needs nothing
+   but Windows:
+   ```powershell
+   git clone -b edupode https://github.com/edupode/cold-project-vi.git
+   cd cold-project-vi
+   launcher\build-launcher.cmd
+   ```
+2. Open **`Julia's Launcher.exe`** and press **⚡ First-time auto-setup** (or the **Setup** page). It installs Rust and the
+   C++ Build Tools with winget, builds VIctory with a progress bar, adds the Defender exception (Windows asks
+   first), finds your game folder on its own, prepares the shaders, sets Windows to best performance and
+   system-managed virtual memory, and turns Smooth Motion on. By hand, the same steps are:
+   - **Build VIctory** (once, several minutes);
+   - choose your **game folder** (the one with `game_scarlett_master.exe`);
+   - **Prepare shaders** (about 5 minutes; again after each rebuild);
+   - press **★ Recommended setup** and **PLAY**.
+
+If Windows says "Access denied", Defender's ransomware rule blocked the new exe. In an administrator
+PowerShell: `Add-MpPreference -AttackSurfaceReductionOnlyExclusions "<repo folder>\target"`.
+
+### `git` is not recognized
+
+If PowerShell answers the `git clone` with:
+
+```text
+PS C:\Users\Will> git clone -b edupode https://github.com/edupode/cold-project-vi.git
+git : The term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program.
 ```
 
-## Run it
-
-**Easiest:** download the package from the
-[latest release](../../releases/latest), unzip it, set your game folder in
-`victory.toml` (`[paths] game_dir = '...'`, the folder that holds
-`game_scarlett_master.exe`), run `Prechauffer.cmd` once (it translates every
-shader into the cache, a few minutes), then `Lanceur.exe`. On the title
-screen press A (Enter on the keyboard).
-
-**From source:**
+Git is not installed. Install it, **close and reopen PowerShell**, and run the `git clone` again:
 
 ```powershell
-cargo build --profile diag -p victory --features diagnostics
-target\diag\victory.exe translate --cache
-target\diag\victory.exe run "<game folder>\game_scarlett_master.exe" --execute --console series-s
+winget install --id Git.Git -e --source winget
 ```
 
-**You need** Windows 10/11 x64 with AVX2, a D3D12 GPU with shader model 6.6
-and mesh shaders (NVIDIA RTX 20 series or newer), 16 GB of RAM or more,
-Microsoft's Visual C++ x64 redistributable and a **page file of at least
-32 GB** (Advanced system settings → Performance → Virtual memory): the game
-commits about 21 GB, and with the default page file Windows runs out and the
-game closes without a report.
+No winget? Download Git from <https://git-scm.com/download/win>, or skip Git: on this page press
+**Code → Download ZIP**, extract it and run `launcher\build-launcher.cmd` inside the extracted folder.
 
-Recommended settings, all on by default: the **Series S** profile
-(`--console series-s`, lighter settings), the **fallback light**
-(`VICTORY_RT_MISS`, `0` turns it off), and the speed options that used to be
-switches (`VICTORY_TEXTURE_NO_WAIT`, `VICTORY_CARD_BUFFERS_MIN_MB`,
-`VICTORY_CARD_BUFFERS_MB`). Run `Prechauffer.cmd` again after every update of
-the shader translator: without it the first run translates shaders on the fly
-(a black or broken picture for minutes). What is left to try in game is in
-[docs/TESTS-A-FAIRE.md](docs/TESTS-A-FAIRE.md) (French).
+<p align="center"><img src="launcher/screenshot.png" alt="Julia's Launcher" width="760"/></p>
 
-### The launcher
+The launcher checks your GPU, video memory, RAM, Resizable BAR and Smooth Motion support and sets everything
+else. Point at any option to see what it does; **★** marks what was tested on the author's PC. On cards with
+less than 10 GB or PCs with less than 24 GB of RAM it picks the **Modest PC** mode.
+English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the same from a command line
+(`Jogar-Luz.cmd tudo`).
 
-`Lanceur.exe` (source in `apps/lanceur`, Rust + egui, in French):
+### What the launcher does
 
-- **ready-made modes** and **manual settings**: Series S or X, internal
-  resolution (0.2 to 1.0), the game's own temporal upscaler, textures,
-  lighting, on-screen counter, AMD FSR (experimental), extra `VICTORY_…`
-  variables;
-- **live fps** while playing (ms a frame, draws, world or menus, play time,
-  last log lines); the full log goes to `logs\partie-lanceur-<date>.txt`;
-- **Discord presence**: "Playing" and the game's name, from the entry Discord
-  already has in its public list of games (nothing to create), with where you
-  are, the fps, the mode and the elapsed time;
-- **saves by place**: keep the current state under a name (cell, cafeteria,
-  boat...) and start from it next time (the saves before go to
-  `_avant-restauration`).
-
-It keeps its settings in `%LOCALAPPDATA%\victory\lanceur.toml`. Build it on
-its own (it is outside the game's workspace):
-
-```powershell
-cd apps\lanceur
-cargo build --release
-```
-
-then copy `target\release\lanceur.exe` to the repository root as
-`Lanceur.exe`. It does not pick chapters (the game has none; saves by place
-stand in) and cannot teleport or make you invincible (that would need the
-player's position and health found in game memory, without symbols).
-
-### Test modes
-
-| Switch | Effect |
+| | |
 |---|---|
-| `VICTORY_NO_TEXTURES=1` | the game's textures are neither sent to the GPU nor shown: every view reads a small grey texture of the same shape (2D, array, cube, 3D). Render targets, depth and what the GPU writes stay |
-| `VICTORY_NO_DRAWS=1` | no pipelines, no shaders: every draw is dropped and the screen stays black (the counter shows). The game still runs, to measure the game on its own |
+| **Play** | Picks a preset from your hardware the first time.<br>**Presets:** Recommended (720p), Fastest and Modest PC (540p), **Ultra Low** (4-6 GB cards, 8-16 GB of RAM), Sharp and Classic cgbj (1080p), **Custom** (your values).<br>A strip shows whether the dump, the emulator, the shaders and Windows are ready. A **yellow notice** lists what the game would run without (virtual memory, power, Resizable BAR, the dedicated graphics card, shaders) and opens the fix. |
+| **Stuck game** | A VIctory that stopped answering (a crash, an error window) never blocks PLAY: it turns into **CLOSE AND PLAY**, and **Close game** ends it. |
+| **Several game executables** | When the dump has more than one `game_scarlett*.exe`, you choose which one beside the game folder.<br>A broken file (a download that stopped, an encrypted package) is named before PLAY, instead of VIctory's "malformed image". |
+| **Loading bar before the game** | Every pipeline earlier sessions drew with is made before the game opens, so there is no stutter the first time you see a place. |
+| **Setup** | Every first-run step, checked (✓/✗), with a button that does it, plus **Do everything for me**:<br>Rust, Build Tools, build, AMD engine, Defender, game folder, shaders, power, virtual memory, dedicated graphics card, Smooth Motion, Resizable BAR.<br>**Build** installs what it needs first. If the launcher is not inside the source folder, it downloads the source; this fixes `could not find Cargo.toml in ...\Downloads`. |
+| **Resizable BAR** | Checked the way the game sees it (D3D12's GPU upload heaps), not only in the BIOS.<br>The guide covers your motherboard maker's menus, NVIDIA's firmware update for early RTX 30 cards, and Windows 11 24H2.<br>When it cannot be turned on, it says what to do instead, and **I can't turn it on** stops the warning. |
+| **Shaders** | Live: shaders translated, pipelines made, the ones that failed, the driver, disk room, the last errors.<br>Two progress bars: **Shaders** (how much of the game's files has been translated) and **Pipelines** (how many are made, also during the loading before each game).<br>**Repair** retries what failed; **Rebuild everything** starts again. |
+| **Performance** | The apps holding video memory and RAM; tick them and they close.<br>The video memory reserve and frame generation are set here. |
+| **Frame generation** | **RTX 40/50:** NVIDIA Smooth Motion, written into the driver's profile (no NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Every other card (GTX 10, RTX 20, AMD with the edupode engine, Intel):** VI frame generation (experimental, off by default) makes a frame between each two of the game's from the pictures alone, at the cost of half a frame of delay. |
+| **AMD cards** | Detected on their own. They play with **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug**, his fork tuned for Radeon (GPL-3.0). All credit for the AMD engine is his. Setup downloads and builds it once. |
+| **Advanced Tweaks (Custom)** | Resolution, texture size, buffers, memory guards and FPS clock.<br>**Copy my profile** gives a code (`VI1-...`) to share. Paste a friend's code in the box and **Apply**: it shows what changes first, and a code can only hold these values. |
+| **Hardware & ID** | Your permanent ID (`VI-XXXX-XXXX`, from PC parts; it stays after reinstalling Windows) with a copy button, your hardware, and the engine choice. |
+| **Hardware sharing** | **Off by default.** When on, it sends **only hardware** (graphics card, processor, RAM, motherboard, Windows, disk type), at most once a day, to a write-only database only edupode can read.<br>It never sends logs, options, paths, names or your IP. The page shows exactly what is sent.<br>While it is off, the launcher asks before each game, explaining why it helps; **Don't ask again** ends that. Only the averages are public: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), updated every 6 hours. |
+| **Updates** | Checks GitHub when the launcher opens and **every 5 minutes**. A new version installs itself while the game is not running, and only when its signature and SHA-256 match.<br>This and the opt-in hardware report are the launcher's only network traffic. |
+| **FPS overlay (F3)** | FPS now, the last minute's average (AVG 1M), the whole run's (ALL), the worst half second (LOW), frame time, draws, video memory and RAM. |
 
-### Test your PC (`Tester.cmd`)
+### Logs and errors
 
-We have measured on one PC only (RTX 3060 12 GB, Ryzen 7 5700G, 16 GB:
-4.5 fps steady, 5 at best). Reports from other PCs, above all with 32-64 GB
-of RAM or a stronger card, tell us what is our layer's cost and what is the
-PC's. Double-click `Tester.cmd` (run `Prechauffer.cmd` once before, after
-every update): it starts the game, presses A on the title screen, measures
-5 minutes in the world (`Tester.ps1 -Minutes 10` for longer, `-Console
-series-x` for the other profile), takes a screenshot every 30 s, closes the
-game and writes `rapports	est-<date>
-apport.md` (your PC, fps, where a
-frame goes, memory, errors) and a zip with the log and the screenshots.
-Your Windows user name is taken out of both; nothing is sent anywhere.
-Open a **Config test** issue, paste `rapport.md` and attach the zip.
+- **Game logs:** `%LOCALAPPDATA%\VIctory\luz\logs`. `session-*.log` is one file per game; `prepare.log`, `build.log` and `build-amd.log` cover shaders and builds.
+- **Launcher errors:** `%TEMP%\vi-launcher-error.txt`.
+- **Send errors to Discord** (side bar or Help):
+  1. Choose **launcher errors** or **game errors**.
+  2. Tick what happened (shaders not rendering, virtual memory not turning on, ...) and write a line.
+  3. The launcher puts the right files in a zip on your Desktop, with your user name taken out of every path. It opens the folder and copies a short summary.
+  4. Send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ). Nothing is sent by the launcher itself.
 
-## Speed
+## Modes
 
-Frame time in the world (the cell scene, RTX 3060, 16 GB, Series S profile):
-
-```mermaid
-xychart-beta
-    title "Frame time (ms), lower is better; goal 66 ms (15 fps)"
-    x-axis ["Before (24/11)", "24/11 fixes", "Best of 25/11", "Goal"]
-    y-axis "ms" 0 --> 1400
-    bar [1316, 540, 431, 66]
-```
-
-```mermaid
-xychart-beta
-    title "Where the 431 ms of a frame go, 25/11 (ms)"
-    x-axis ["GPU", "Preparing (copies)", "Copy-back"]
-    y-axis "ms" 0 --> 250
-    bar [207, 135, 50]
-```
-
-### What the game costs alone, and what our layer costs
-
-Three runs at the cell with the test modes:
-
-| Per frame | Normal | No textures, low resolution | No drawing (`VICTORY_NO_DRAWS`) |
-|---|---|---|---|
-| fps | 2.3 | **3.0** (steady) | **19 to 24** |
-| Frame time | 431 ms | 333 ms | 42 to 53 ms |
-| Preparing (our copies) | 135 ms | 130 ms (85 ms for 180 MB copied) | 0.4 ms |
-| GPU | 207 ms | 112 ms | 0 |
-| Copy-back into game memory | 50 ms | 34 ms | 0.1 ms |
-| Game RAM (committed) | 21 GB | 14.4 GB | **6 GB** |
-| GPU memory | 8 GB | 4 GB | — |
-
-```mermaid
-xychart-beta
-    title "Frame time at the cell (ms), lower is better"
-    x-axis ["Normal", "No textures + low resolution", "No drawing"]
-    y-axis "ms" 0 --> 450
-    bar [431, 333, 48]
-```
-
-What this says:
-
-1. **This PC tops out around 20 fps**: with nothing drawn, the game's own
-   code (world, characters, streaming, sound) and our system services take
-   42 to 53 ms a frame, and that time varies with what the game loads.
-2. **The 15 GB that overflow the RAM are our graphics layer's**, not the
-   game's (6 GB without drawing, 21 GB with).
-3. **Hypothesis**: textures and resolution are no longer the problem
-   (without them the GPU only goes from 207 to 112 ms). What is left does not
-   depend on pixels: our copies of about **180 MB of game memory to the GPU
-   every frame** (vertices, constants, instances the game changes; 130 ms,
-   the biggest wall, unmoved by any setting), our work around each indirect
-   draw (about 2,000 clamp passes, each with a pipeline drain, plus our
-   compares: about 110 ms at any resolution), and a full RAM (1 GB free).
-   The next real gain is to **keep the game's data on the GPU instead of
-   copying it every frame**.
-
-### What helped and what did not (25 November)
-
-| Change | Result | Kept? |
+| Mode | What it does | RTX 5070 Ti laptop |
 |---|---|---|
-| Windows of game memory written by the CPU straight into the GPU's memory (Resizable BAR, `VICTORY_REBAR=1`, now the default where the GPU has it) | 4.06 → 4.19 fps on average; memory shared with the GPU 6.1 → 3.9 GB, 2.1 GB of RAM left free instead of under 0.6 | ✅ default (25/11 night) |
-| Those fetches on a copy queue of their own, not behind everything queued since (`VICTORY_FETCH_QUEUE`) | fetch waits 75 → 7 ms a frame; **3.6-3.7 → 4.0-4.4 fps** | ✅ default (25/11 night) |
-| Changed pieces of GPU-side copies fetched by a copy, not written by our compare shader into PC memory (`VICTORY_CARD_INLINE_FETCH` now off) | compare passes 340-520 → 2.6 ms (timing run); in the world 450 → 270 ms a frame, **2.2 → 3.6-3.7 fps**, and the cell's walls and light draw | ✅ default (25/11 night) |
-| CPU side of GPU-side copies in ordinary, pageable memory (`VICTORY_CARD_PAGEABLE`) | a full 10-minute run instead of a silent stop about 9 minutes in | ✅ default |
-| In-place copies (`crate::plaincopy`, from fxceless `a253706`) | copies 140 → 105 ms | ✅ default |
-| Windows on a 1 MiB grid, with tails | 22.1 → 21.4 GB committed | ✅ default |
-| Copy-back through `plaincopy` | 50 → 48 ms | ✅ |
-| On-picture counter (`VICTORY_HUD=0` hides it), `Lancer.cmd` menu | — | ✅ |
-| Grouped indirect clamps (`VICTORY_HOIST_CLAMPS=1`, Belobug's idea) | GPU 207 → 239 ms, a window's fence vanished | ❌ |
-| Textures at 60 % of the GPU | 14,600 textures waiting, clothes in blocks | ❌ |
-| Windows and buffers on the GPU (90 %, 4 GB) | GPU +64 ms | ❌ |
-| Half resolution + simplified lighting | GPU −80 ms but 2.3 to 2.6 fps and blocks | ❌ |
-| In-place reads (`VICTORY_INPLACE`) | GPU lost after 30 s (NVIDIA locks the whole section in RAM); at 1 GB: 2.19 fps | ❌ on 16 GB |
-| Shaders note missing pages in a branch of their own | GPU 207 → 260 ms, 1.9 fps | ❌ reverted |
-| Clamps done by the CPU | at most 35 % of the 2,000 qualify (the rest read arguments a shader just wrote): about 25 ms at best | not done |
-| Card-memory copies off (`VICTORY_CARD_BUFFERS=0`) | GPU 30 to 130 ms (half our 207 ms is our own compare work), but preparing 490 ms and copy-back 190 ms: worse | ❌ |
-| ScarlettPort's runtime as-is, with its settings | black intro, 0.4 to 0.8 fps, thousands of draws dropped for want of pipelines | ❌ |
-| Upstream's page-marked copy-back (`cd94d35`) | about 100 conflicts on this branch: to be redone by hand | open |
+| **★ Recommended - 720p** (+ ★ crowds and fights: the author's daily setup) | World at 1280x720 + the game's own upscaler to 1080p, texture levels held, 60 FPS clock, borderless | open world 22-26 FPS, crowds 14-17, cutscenes 35+, menus 60 |
+| Fastest - 540p | Softer picture, most frames; for slower CPUs | a few FPS more |
+| Modest PC - 540p, light | For 6-8 GB cards and 16 GB of RAM: less video memory and RAM | |
+| Sharp - 1080p | Full resolution | slower in the open world |
+| Classic cgbj | The original cgbj settings | for comparison |
 
-**Where the GPU's time goes** (`VICTORY_GPU_TIMING=1`): no game program
-dominates, the most expensive takes 6 ms a frame. Of the 122 ms noted command
-by command, **80 ms go to the 4,100 indirect draws** (about 20 µs each: the
-clamp passes and barriers around them more than the work), 34 ms to compute
-dispatches, the rest to mesh draws, copies and texture uploads. The GPU counts
-about 200 ms a frame in all: NVIDIA's timestamps do not see the drains between
-passes.
+Options: ★ FPS overlay (F3), ★ borderless full screen (test A: 22-24 FPS on the author's PC; needed by Smooth
+Motion), ★ the 60 FPS clock, pipelines loaded before the game (new), NVIDIA Smooth Motion, the video memory
+reserve, crowds and fights (2 GB of the game's buffers on the card; 12 GB cards and up), anti-stretch (fewer
+stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental).
 
-### Other forks
+## Controls
 
-| Fork | GPU | fps | Of use here |
-|---|---|---|---|
-| This one (25/11) | RTX 3060, 16 GB | **4.2** (measured) | — |
-| [ScarlettPort](https://github.com/ZigZagBoi1/ScarlettPort) | RTX 3060, 32 GB advised | about 4 | copy-back for read-back buffers only, read waits 156 → 26 ms; tried here: under 1 fps |
-| [VItoriaBr](https://github.com/uiliannn/VItoriaBr) | RTX 5060 Ti, 40 GB | 3.5 to 6 | their GPU takes 50 to 65 ms a frame |
-| [DexNom/VIctory](https://github.com/DexNom/VIctory) | RX 7900 XTX | 1.03 | ray tracing that really runs (Radeon); precise tracking of shader writes |
-| [VIctory](https://github.com/Marvisak/VIctory) (`cd94d35`) | — | — | copy-back compares only the pages shaders wrote |
-| [ztrx](https://github.com/Zettrox/ztrx) | RTX 3050 | 1 to 3 | fxceless's code up to `4e17478` (already here); prologue to the boat chase, 1 h 30 without a crash |
+Keyboard and mouse are mapped to the Xbox pad (a connected controller replaces them). Click the game window
+to capture the mouse (Alt/F1 releases it). **F** enters vehicles and switches W/S to accelerate/brake (high
+beep); in aircraft hold **W** (throttle) and **K** (nose up) to take off, **I** for nose down. Full table:
+the launcher's Controls tab or [docs/GUIDE-30FPS.md](docs/GUIDE-30FPS.md).
 
-## Memory
+## Before and after
 
-Test PC: Windows 11, NVIDIA GPU, **16 GB of RAM**, 32 GB page file.
+| | Before (cgbj on this laptop) | Now (Julia's Launcher, Recommended) |
+|---|---|---|
+| Menus and map | 30-33 FPS | **60 FPS** |
+| Open world | 10-15 FPS | **22-26 FPS** |
+| Cutscenes | ~26 FPS | **35-38 FPS** |
+| Video memory | ~12 GB (over the system's budget) | **6-8 GB** |
+| RAM | 27-29 GB | **20-21 GB** |
 
-```mermaid
-xychart-beta
-    title "Private memory (GB) over a run, no options"
-    x-axis "seconds" [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300]
-    y-axis "GB" 0 --> 24
-    line [7.1, 7.7, 8.0, 8.2, 8.5, 12.7, 16.1, 16.4, 16.8, 16.7, 17.8, 17.7, 17.2, 17.9, 18.4, 18.6, 20.1, 21.6, 22.4, 22.4]
-```
+## FAQ
 
-The jump near 1 min 30 is the arrival in the world.
+**The first cutscene lags a lot.** On the first run the game draws everything for the first time: thousands of
+pipelines are made and the textures of the whole scene stream in. It runs at 7-15 FPS there, dropping to 2 now
+and then, and then settles at 21-25. Press *Prepare shaders* in the launcher first; each session also prepares
+the pipelines it used for the next one, so later runs start much faster.
 
-```mermaid
-pie showData
-    title Memory committed by the game at 5 min (GB)
-    "Views of game pages" : 7.4
-    "Buffers shared with the GPU" : 7.2
-    "Game heap" : 4.6
-    "Other allocations" : 4.3
-    "Windows of game memory" : 2.4
-    "Process heap" : 1.0
-```
+**Is a controller supported?** Yes, an Xbox controller connected to the PC replaces the keyboard and mouse.
 
-About 7 GB are taken before the game starts; closing Discord, Chrome and
-Overwolf frees about 3.3 GB.
+**Can it generate more frames, like DLSS Frame Generation?** DLSS FG needs the game's motion vectors, depth
+and a picture without the HUD, and VIctory cannot yet tell those apart among the game's buffers. NVIDIA
+**Smooth Motion** is the same idea done by the driver from the finished picture (2x), and the launcher turns
+it on for you. Tools such as Lossless Scaling can make 3x-4x from any window, but from a base of ~22 FPS that
+adds visible lag and artefacts: the real gains still come from the CPU work per frame.
 
-What we learned:
+**Why black or flat objects even on a strong PC?** Two causes: textures that have not reached the card yet
+(the game's memory is copied to the card by the CPU, and video memory runs out: the Performance page and the
+video memory reserve help), and the `_Tiled` volumetrics shader, still being fixed (see below).
 
-- NVIDIA's driver refuses to open the game's 6.1 GB pool as one section; split
-  in blocks (`VICTORY_POOL_BLOCK_MB`, 64 by default) each block opens.
-- **Opening a section on the GPU locks all of it in RAM**, even pages never
-  touched, so open sections count against `VICTORY_INPLACE_MB` (4096 by
-  default).
-- Most refused 4 MB windows are only **partly mapped** by the game (803
-  windows, 3.4 GB); very few have their pages out of order (32, 140 MB).
-  Partial windows whose pages follow one section are now read without a copy
-  (`VICTORY_INPLACE_HOLES=0` goes back to copying).
-- Pointing a reserved buffer's tiles at a section **loses the NVIDIA GPU**.
-- With `VICTORY_POOL_COMMIT=1` Windows commits 6.1 GB more at once: on this
-  PC the game crashes sooner. **For now, run without the memory options.**
+## Where it stands
 
-| Run | Peak memory | Copies of game memory | End |
-|---|---|---|---|
-| No options | 22.9 GB, rising | 4.2 GB | stopped at 5 min, no crash |
-| `VICTORY_POOL_COMMIT=1` + `VICTORY_INPLACE=1`, 512 MB blocks | 18.6 GB | 4.5 GB | crash at 183 s (RAM exhausted) |
-| same + windows with holes | 12.7 GB | almost none then | crash at 107 s (RAM exhausted) |
-| same, 64 MB blocks | 17.8 GB | 4.4 GB | crash at 168 s (Windows commit exhausted) |
+- Works: intro, prison, missions, open world, boats; long sessions without crashes.
+- Video memory under the system's budget (6-8 GB used on a 12 GB card), ~20 GB of RAM.
+- The CPU is the limit: crowds and fights now run at 14-17 FPS (were 10-15), with 6,000-8,000 draws a frame,
+  50-90 MB of the game's memory copied and ~10 ms copied back each frame.
+- New: copies of textures whose memory the game has already freed are let go at once (about 1 GB of video
+  memory sat in them), and VIctory reserves its video memory with Windows.
+- `_Tiled` (water volumetrics): off for now (black squares when on). F9 in the recording mode captures a
+  frame, which can be replayed on WARP (`VICTORY_REPLAY_WARP=1`) as one wave of 64 and as two of 32 to find
+  the instruction where the two disagree. (Fixed: on recent Windows builds D3D12Core swaps a command list's
+  method table when it is closed, which made the recorder crash at start.)
+- Known problems: stretched bodies for a frame or two ("spaghetti"), rainbow faces now and then, black
+  flickers on characters, no ray tracing.
 
-## Picture
+More: [docs/GUIDE-30FPS.md](docs/GUIDE-30FPS.md) (English guide and what each setting does),
+[docs/LUZ-24FPS.md](docs/LUZ-24FPS.md) (Portuguese notes), [docs/replay.md](docs/replay.md) (frame recorder).
+Earlier upstream notes: [docs/archive/README-upstream.md](docs/archive/README-upstream.md).
 
-### Shaders
+---
 
-The game holds 26,084 shaders; a scene uses about 2,000. Offline translation
-of the whole archive, with 32-lane waves as on an RTX 3060:
-
-| Kind | Translated | Total | % |
-|---|---|---|---|
-| Vertex and pixel | 14,246 | 14,247 | 99.99 % |
-| Compute | 2,654 | 2,682 | 98.95 % |
-| Mesh | 8,765 | 8,765 | 100 % |
-| **All** | **25,665** | **25,694** | **99.89 %** |
-
-```mermaid
-pie showData
-    title Shaders still refused (29)
-    "64-lane waves sharing LDS (particles, trails, water, hair shadows)" : 24
-    "Lane masks (water, shadows, adaptive tracer)" : 4
-    "Vertex and pixel (voxels)" : 1
-```
-
-Plus 195 geometry shaders (voxels, 0.7 % of the game) whose resources are not
-tracked yet: counting them, 98.4 % of the 26,084 shaders translate. The 24
-"64-lane waves" share group memory between several waves: step 8 of
-[docs/wave64-on-wave32.md](docs/wave64-on-wave32.md), still open.
-
-### Upscaling (FSR)
-
-As a Series S the game renders 1280×720 and asks **FSR 4** for 1920×1080. FSR 4
-cannot run here (its passes need an Xbox driver method we do not have, and its
-fallback programs are shader model 5), so a **plain stretch** stands in
-(`victory-gpu/src/upscale.rs`), with no sharpening and no accumulation: the
-picture is softer than on the console.
-
-Experimental: upstream's module (VIctory `0b35b7f`,
-`victory-hle/src/modules/fidelityfx.rs`) serves the game's calls with **AMD's
-PC FSR** (3.1.6 on an RTX). It needs the official
-`amd_fidelityfx_upscaler_dx12.dll` from the
-[FidelityFX SDK](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) in
-a folder named by `VICTORY_FIDELITYFX_DIR`; without it, the plain stretch runs.
-The game describes its images with console formats (an R9G9B9E5 output a PC
-cannot write: a flat green, blue or red picture in the first test), so the
-formats given are those of our copies and depth goes as an R32 copy. The
-second test lost the GPU: **do not use it to play**. FSR would only bring
-sharpness (1 to 2 ms of GPU), not frames. Not done yet: NVIDIA **DLSS**, for
-which the game already provides everything (colour, depth, motion vectors,
-jitter).
-
-### Ray tracing
-
-The game's indirect light and the shadows of its lamps and sun are ray traced,
-in its own compute shaders (no ray-tracing API): the builder programs
-(49 of 52), the trace programs (59 of 64) and the shading program translate,
-and the hardware ray/box and ray/triangle test is emulated and checked bit for
-bit on the GPU over 311 cases. The builder is **off by default**
-(`VICTORY_BVH_BUILDER=1` turns it on) and has not run end to end in the game.
-Meanwhile a **fallback light** is on: the ray test answers "nothing hit",
-which lights shaded areas without ray-traced shadows (`VICTORY_RT_MISS=0`
-turns it off). Details: [docs/fork-ray-tracing.md](docs/fork-ray-tracing.md).
-
-## The plan: normal PCs first
-
-Our goal is a game that runs on **normal PCs** (16 GB of RAM, a mid-range
-card), not only on big rigs. It already does: in game on an RTX 3060 with
-16 GB, from a new game through the whole intro cutscene, without crashing.
-
-Another port, **CGBJ** (built on VIctory and XCL), reports about 25 fps with
-8 GB of RAM and a 16 GB card: it keeps the game's graphics memory on the card
-instead of copying it every frame, which is exactly our wall on 16 GB (about
-21 GB committed, ~200 MB copied up and ~40 MB back a frame). Its code was
-public for a few minutes on 26/11 and is private again; we did not take it.
-We expect it to open once it reaches 100 % on big rigs. When it does, we will
-check its license and bring what it allows into this repository (parts that
-come from XCL, GPL-2.0-only, can only be rewritten, not copied), adapted to
-low-end PCs. Until then we keep working on speed, textures and lighting here.
-
-## What is left
-
-Measured on 25-26/11 (RTX 3060, 16 GB): about 4.1-4.2 fps, 230-250 ms a frame.
-
-1. Speed (goal: 10 fps steady, so about 100 ms a frame). What is left:
-   - GPU, 85-100 ms: mostly the fixed cost of about 4,400 small draws a
-     frame (the costliest program, the cascade shadow mesh, is short; its
-     23 ms come from 389 draws). The game changes pipeline between almost
-     every draw, so they cannot simply be merged. Faster 64-lane programs on
-     32-lane GPUs would help.
-   - Preparing, about 125 ms: 70 ms of copies (about 190 MB a frame of game
-     memory), the rest sending changed bytes up to GPU-side copies.
-   - Copy-back, about 55 ms; and the render thread waits about a quarter of
-     its time for it, because the game reads back memory the GPU just wrote
-     (letting those reads through brought the device down: they are real).
-   Tried and dropped: sending submissions ahead (`VICTORY_RELAY=2`),
-   clamp windows ahead, hoisted clamps, a word-wise merge, window copies off
-   the GPU.
-2. Picture: the ray-tracing structure builder gives a wrong picture on
-   NVIDIA (`VICTORY_BVH_BUILDER=1`: glowing hair, blown-out windows, 2.3
-   fps), so rays miss by default and interiors stay dark. Four programs are
-   still refused on 32-lane GPUs: alpha-tested cascade shadows (groups of two
-   64-lane waves with wave-wide operations), the alpha transmission
-   prefilter and two VFX triangle programs.
-3. Stability: a full 10-minute run without stopping; longer sessions still
-   to be measured.
-4. Memory: 21 GB committed on 16 GB, with 2 GB of RAM left free.
-
-## Useful switches
-
-| Variable | Effect |
-|---|---|
-| `VICTORY_NO_TEXTURES=1` | grey surfaces, no game textures (test) |
-| `VICTORY_NO_DRAWS=1` | nothing drawn, no pipelines or shaders (test) |
-| `VICTORY_RENDER_SCALE` | fixed internal resolution, 0.2 to 1.0 of the output |
-| `VICTORY_OWN_UPSCALER=1` | the game's own temporal upscaler instead of FSR |
-| `VICTORY_FIDELITYFX_DIR` | folder of AMD's PC FSR DLL (experimental) |
-| `VICTORY_HUD=0` | hides the on-picture counter |
-| `VICTORY_RT_MISS=0` | turns the fallback light off |
-| `VICTORY_BVH_BUILDER=1` | builds the ray-tracing structures |
-| `VICTORY_GPU_TIMING=1` | time of every GPU command, by program (diagnostics build, slower) |
-| `VICTORY_D3D12_DEBUG=1` | Direct3D debug layer, names errors (diagnostics build) |
-| `VICTORY_SKIP_PIPELINES=<hash>,...` | skips the draws of the listed programs (to compare) |
-| `VICTORY_PIPELINE_WAIT_MS` | longest wait for pipelines in a frame (500 by default) |
-| `VICTORY_POOL_COMMIT=1`, `VICTORY_INPLACE=1` | read game memory without a copy where possible (crashes sooner on 16 GB) |
-| `VICTORY_RELAY=2`, `VICTORY_LATE_WAIT=3` | submit without waiting for the GPU: slower on a 16 GB PC |
-| `VICTORY_MISSING_LOG=1` | `translate`: says which instruction has no value and why |
-| `VICTORY_PROFILE=4` | profiler (diagnostics build) |
-
-## Community
-
-Questions, results on your PC, bugs: the **[Discord server](https://discord.gg/GBJT5E8E4E)**.
-For a bug, attach `logs\partie-lanceur-<date>.txt` and, if there is one,
-`%LOCALAPPDATA%\victory\data\7952987A\crashes.log`.
-
-## Credits and license
-
-- **[VIctory](https://github.com/Marvisak/VIctory)**, by Marvisak and its
-  contributors, is the base of everything: the loader, the system services,
-  the Direct3D 12 renderer and the shader recompiler. GPL-3.0-or-later, like
-  this repository (see `LICENSE`).
-- **[victory-fork](https://github.com/fxceless/victory-fork)**, by fxceless:
-  the fork this work starts from (world rendering, ray tracing in progress).
-- **[VIcky](https://github.com/Xeltax/VIcky)**, by Xeltax: the view map for
-  NVIDIA's one-million-view limit.
-- **[XCL](https://github.com/ivall/xcl)**, by ivall (GPL-2.0-only), served as
-  a reference for the game's behaviour under another layer.
-- The work of many other forks (ScarlettPort, VItoriaBr, victory-perf,
-  Belobug and more), named in each commit that takes it.
-- The project's original text is in
-  [docs/README-original.en.md](docs/README-original.en.md).
-- Developed with [Claude Code](https://claude.com/claude-code).
+Maintained by **@edupode** on GitHub: <https://github.com/edupode>

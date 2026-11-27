@@ -5,10 +5,13 @@
 
 mod census;
 mod inspect;
-mod precompile;
+#[cfg(all(windows, feature = "diagnostics"))]
+mod replay;
 mod run;
 mod shader;
 mod translate;
+#[cfg(windows)]
+mod warm;
 
 use std::path::PathBuf;
 
@@ -85,33 +88,49 @@ enum Command {
         /// Worker threads (default: every logical core).
         #[arg(long)]
         jobs: Option<usize>,
-        /// Warm-up: translate every shader into the shader cache as a run
-        /// would, so that the game does not translate them while it plays.
+        /// Warm the run's shader cache: a file of shader hashes (the 16
+        /// hex digits a run's log names a shader by, anywhere in a line);
+        /// the containers with those hashes are translated into the
+        /// cache and nothing else is done. Set `VICTORY_HOST_WAVE` and
+        /// `VICTORY_VIEW_LIMIT` to what the run's log says of the host.
         #[arg(long)]
-        cache: bool,
+        warm: Option<PathBuf>,
     },
-    /// Translate shaders into the runtime cache ahead of time (resumable).
-    /// With --pipelines, also compile compute pipelines into the host
-    /// pipeline library and GPU driver cache.
-    Precompile {
+    /// Translate every shader found (as `translate` finds them) into the
+    /// shader cache, so that no run has to: a few minutes, once per change
+    /// of the translator.
+    Shaders {
         paths: Vec<PathBuf>,
-        /// Also compile compute shaders into `host-pipelines.bin` and the GPU
-        /// driver cache.
-        #[arg(long)]
-        pipelines: bool,
-        /// Restrict precompilation to one shader stage.
-        #[arg(long, value_enum)]
-        only: Option<precompile::StageFilter>,
-        /// Stop after this many unique shader containers.
-        #[arg(long)]
-        limit: Option<usize>,
-        /// Translation worker threads (default: every logical core).
+        /// Worker threads (default: every logical core).
         #[arg(long)]
         jobs: Option<usize>,
-        /// Concurrent GPU driver compute pipeline compilations (default: 4).
-        #[arg(long)]
-        pipeline_jobs: Option<usize>,
     },
+    /// Make the host pipelines of every pipeline the title ever created
+    /// (runs with `VICTORY_PIPELINE_BOOK=1` write them down), so that the
+    /// driver's cache on disk has them before a run needs one: once per change
+    /// of the translator or the driver. Goes on where it was stopped.
+    #[cfg(windows)]
+    Warm {
+        /// Processes at once (default: two thirds of the logical cores).
+        #[arg(long)]
+        jobs: Option<usize>,
+        /// At most this many pipelines.
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Those made before too.
+        #[arg(long)]
+        again: bool,
+        /// Only the pipelines earlier runs drew with.
+        #[arg(long)]
+        used: bool,
+        /// (What the processes it starts are given.)
+        #[arg(long, hide = true)]
+        these: Option<String>,
+    },
+    /// The host card as a run sees it (`key=value` lines): its name, video
+    /// memory, and whether D3D12 offers GPU upload heaps (resizable BAR).
+    #[cfg(windows)]
+    Gpu,
     /// Prepare, map and bind a title executable; with --execute, run it.
     Run {
         exe: PathBuf,
@@ -132,6 +151,10 @@ enum Command {
         #[arg(last = true)]
         title_args: Vec<String>,
     },
+    /// Run a captured frame's GPU work again (diagnostics builds; see
+    /// docs/replay.md).
+    #[cfg(all(windows, feature = "diagnostics"))]
+    Replay(replay::Replay),
     /// Show the resolved configuration and check it.
     Config,
 }
@@ -179,40 +202,44 @@ fn main() -> Result<()> {
             pipelines,
             list,
             jobs,
-            cache,
+            warm,
         } => {
             // `VICTORY_VIEW_LIMIT=<null slot>`: translate as on a host whose view heap is capped
-            if let Some(n) = std::env::var("VICTORY_VIEW_LIMIT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-            {
+            if let Some(n) = std::env::var("VICTORY_VIEW_LIMIT").ok().and_then(|v| v.parse().ok()) {
                 victory_shader::emit::set_view_heap_limit(n);
             }
             // `VICTORY_HOST_WAVE=32`: translate as for a GPU whose waves are at most 32 lanes
-            if let Some(n) = std::env::var("VICTORY_HOST_WAVE")
-                .ok()
-                .and_then(|v| v.parse().ok())
-            {
+            if let Some(n) = std::env::var("VICTORY_HOST_WAVE").ok().and_then(|v| v.parse().ok()) {
                 victory_shader::emit::set_host_max_wave(n);
             }
-            translate::run(paths, validate, pipelines, list, jobs, cache)
+            if let Some(file) = warm {
+                return translate::warm(paths, &file, jobs);
+            }
+            translate::run(paths, validate, pipelines, list, jobs)
         }
-        Command::Precompile {
-            paths,
-            pipelines,
-            only,
-            limit,
-            jobs,
-            pipeline_jobs,
-        } => precompile::run(paths, pipelines, only, limit, jobs, pipeline_jobs),
+        Command::Shaders { paths, jobs } => translate::precompile(paths, jobs),
+        #[cfg(windows)]
+        Command::Warm { jobs, limit, again, used, these } => warm::run(jobs, limit, again, used, these),
+        #[cfg(windows)]
+        Command::Gpu => {
+            for line in victory_hle::gpu_probe::report() {
+                println!("{line}");
+            }
+            Ok(())
+        }
         Command::Run {
             exe,
             unimplemented,
             strict,
             execute,
             console,
-            title_args: _,
-        } => run::run(&exe, unimplemented, strict, execute, console),
+            title_args,
+        } => {
+            victory_hle::runtime::set_title_args(title_args);
+            run::run(&exe, unimplemented, strict, execute, console)
+        }
+        #[cfg(all(windows, feature = "diagnostics"))]
+        Command::Replay(options) => replay::run(options),
         Command::Config => show_config(),
     }
 }
@@ -232,7 +259,6 @@ fn show_config() -> Result<()> {
     );
     println!("game_dir    : {}", status(&cfg.game_dir));
     println!("cache_dir   : {}", cfg.cache_dir.display());
-    println!("fidelityfx  : {}", status(&cfg.fidelityfx_dir));
     println!("data_dir    : {}", cfg.data_dir.display());
     for t in &cfg.test_titles {
         println!("test_title  : {}", status(&Some(t.clone())));

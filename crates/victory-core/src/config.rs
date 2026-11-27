@@ -22,9 +22,6 @@ pub struct Config {
     pub data_dir: PathBuf,
     /// Other titles used to exercise platform-level code.
     pub test_titles: Vec<PathBuf>,
-    /// The user's copy of AMD FidelityFX for PC (the folder with its
-    /// upscaler DLL), which replaces a title's console build.
-    pub fidelityfx_dir: Option<PathBuf>,
     /// The config file that was read, if any.
     pub source: Option<PathBuf>,
 }
@@ -44,13 +41,12 @@ struct FilePaths {
     data_dir: Option<PathBuf>,
     #[serde(default)]
     test_titles: Vec<PathBuf>,
-    fidelityfx_dir: Option<PathBuf>,
 }
 
 impl Config {
     /// Loads configuration from the environment and the config file.
     pub fn load() -> Result<Self> {
-        let explicit = std::env::var_os("VICTORY_CONFIG").map(PathBuf::from);
+        let explicit = explicit_config_path(|k| std::env::var_os(k));
         let path = explicit
             .clone()
             .unwrap_or_else(|| PathBuf::from("victory.toml"));
@@ -89,23 +85,17 @@ impl Config {
                 .collect(),
             _ => file.test_titles,
         };
-        let game_dir = env_path("VICTORY_GAME_DIR").or(file.game_dir);
-        // The cache (shaders, pipelines, images, up to 8 GB of textures a run) goes in the
-        // game's folder, on the game's disk, when there is one: the system disk of the
-        // 25/11 PC was 98% full.
         let cache_dir = env_path("VICTORY_CACHE_DIR")
             .or(file.cache_dir)
-            .or_else(|| game_dir.as_ref().map(|g| g.join("victory-cache")))
             .map_or_else(|| default_dir("cache"), Ok)?;
         let data_dir = env_path("VICTORY_DATA_DIR")
             .or(file.data_dir)
             .map_or_else(|| default_dir("data"), Ok)?;
         Ok(Config {
-            game_dir,
+            game_dir: env_path("VICTORY_GAME_DIR").or(file.game_dir),
             cache_dir,
             data_dir,
             test_titles,
-            fidelityfx_dir: env_path("VICTORY_FIDELITYFX_DIR").or(file.fidelityfx_dir),
             source,
         })
     }
@@ -127,6 +117,14 @@ impl Config {
     pub fn data_subdir(&self, sub: &str) -> Result<PathBuf> {
         subdir(&self.data_dir, sub)
     }
+}
+
+/// The config file explicitly named by the environment, if any. An empty
+/// `VICTORY_CONFIG` means unset, like the other path variables.
+fn explicit_config_path(env: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<PathBuf> {
+    env("VICTORY_CONFIG")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 fn subdir(root: &Path, sub: &str) -> Result<PathBuf> {
@@ -165,16 +163,6 @@ mod tests {
     }
 
     #[test]
-    fn cache_defaults_to_the_game_folder() {
-        let file = FilePaths {
-            game_dir: Some("game".into()),
-            ..Default::default()
-        };
-        let cfg = Config::resolve(file, None, |_| None).unwrap();
-        assert_eq!(cfg.cache_dir, Path::new("game").join("victory-cache"));
-    }
-
-    #[test]
     fn empty_env_values_are_ignored() {
         let file = FilePaths {
             game_dir: Some("from-file".into()),
@@ -205,6 +193,17 @@ mod tests {
         assert_eq!(
             cfg.test_titles,
             vec![PathBuf::from("first"), PathBuf::from("second")]
+        );
+    }
+
+    #[test]
+    fn empty_config_env_is_ignored() {
+        let empty = |k: &str| (k == "VICTORY_CONFIG").then(OsString::new);
+        assert_eq!(explicit_config_path(empty), None);
+        let set = |k: &str| (k == "VICTORY_CONFIG").then(|| OsString::from("custom.toml"));
+        assert_eq!(
+            explicit_config_path(set),
+            Some(PathBuf::from("custom.toml"))
         );
     }
 

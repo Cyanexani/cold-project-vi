@@ -1,0 +1,12 @@
+# The public, write-only Worker (POST /v1/hw). See README.md.
+name = "vi-hardware"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vi-hardware"
+database_id = "f5666469-a523-4611-a529-36d95f9ca3cc"
+
+# RATE_SALT is a secret: wrangler secret put RATE_SALT
