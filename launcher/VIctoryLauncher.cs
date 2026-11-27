@@ -1,6 +1,6 @@
-// edu launcher: one window to set up and play the edupode build of VIctory.
+// VI Launcher (edupode): one window to set up and play the edupode build of VIctory.
 // Built with the C# compiler that ships with Windows (.NET Framework 4.x):
-//   launcher\build-launcher.cmd   ->   "Edu's Remake.exe" in the repository's root.
+//   launcher\build-launcher.cmd   ->   "VI Launcher.exe" in the repository's root.
 // No game files are included or downloaded; the player points it at their own dump.
 // English by default; the button in the side bar switches to Portuguese (saved in launcher.ini).
 using System;
@@ -22,6 +22,10 @@ namespace VIctoryLauncher
         [STAThread]
         static void Main()
         {
+            // What ends the launcher is written down (%TEMP%i-launcher-error.txt) for a bug report.
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => {
+                try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "vi-launcher-error.txt"), DateTime.Now + "  " + e.ExceptionObject + Environment.NewLine); } catch (Exception) { }
+            };
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new LauncherForm());
@@ -52,7 +56,7 @@ namespace VIctoryLauncher
         public string Note = "";
     }
 
-    class LauncherForm : Form
+    partial class LauncherForm : Form
     {
         static bool Pt;
         static string L(string en, string pt) { return Pt ? pt : en; }
@@ -115,7 +119,7 @@ namespace VIctoryLauncher
                     null, false, false),
             };
 
-            Text = "Edu's Remake  —  edu launcher";
+            Text = "VI Launcher";
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
             ClientSize = new Size(1120, 940);
             MinimumSize = new Size(1000, 700);
@@ -128,6 +132,7 @@ namespace VIctoryLauncher
             var content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Back };
             Controls.Add(content);
             pages.Add(PlayPage());
+            pages.Add(SetupPage());
             pages.Add(MemoryPage());
             pages.Add(ControlsPage());
             pages.Add(HelpPage());
@@ -138,9 +143,25 @@ namespace VIctoryLauncher
             DetectSystem();
             Show(0);
             Refresh2();
+            // A first run (nothing built or no game yet): the Setup page, checked.
+            if (VictoryExe == null || !File.Exists(GameExe)) Show(1);
+            // `--page N` opens on that page (0 Play, 1 Setup, 2 Performance, 3 Controls, 4 Help).
+            var argv = Environment.GetCommandLineArgs();
+            int page;
+            for (int a = 1; a + 1 < argv.Length; a++)
+                if (argv[a] == "--page" && int.TryParse(argv[a + 1], out page) && page >= 0 && page < pages.Count) Show(page);
+        }
+
+        // Work on other threads that reports back to the window starts once the window exists.
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            // No game folder yet: look for the game on its own.
+            if (!File.Exists(GameExe)) RunSteps(steps.Where(st => st.Fix == (Func<bool>)FindGame).ToArray());
+            else CheckAll();
             new Thread(() => {
                 var s = SmoothMotion.Status();
-                BeginInvoke(new Action(() => { smoothState = s; UpdateBanner(); UpdateSmooth(); }));
+                try { BeginInvoke(new Action(() => { smoothState = s; UpdateBanner(); UpdateSmooth(); })); } catch (Exception) { }
             }) { IsBackground = true }.Start();
         }
 
@@ -155,12 +176,13 @@ namespace VIctoryLauncher
         Control SideBar()
         {
             var side = new Panel { Dock = DockStyle.Left, Width = 216, BackColor = Theme.Side };
-            var logo = new Label { Text = "edu", Font = new Font("Segoe UI Black", 26f), ForeColor = Theme.Pink, AutoSize = true, Location = new Point(20, 18), BackColor = Theme.Side };
-            var logo2 = new Label { Text = "launcher", Font = new Font("Segoe UI Light", 16f), ForeColor = Theme.Text, AutoSize = true, Location = new Point(22, 64), BackColor = Theme.Side };
-            var by = new Label { Text = "VIctory  ·  by edupode", Font = new Font("Segoe UI", 8.5f), ForeColor = Theme.Dim, AutoSize = true, Location = new Point(24, 96), BackColor = Theme.Side };
+            var logo = new Label { Text = "VI", Font = new Font("Segoe UI Black", 28f), ForeColor = Theme.Pink, AutoSize = true, Location = new Point(18, 12), BackColor = Theme.Side };
+            var logo2 = new Label { Text = "Launcher", Font = new Font("Segoe UI Light", 16f), ForeColor = Theme.Text, AutoSize = true, Location = new Point(22, 62), BackColor = Theme.Side };
+            var by = new Label { Text = "by edupode", Font = new Font("Segoe UI", 8.5f), ForeColor = Theme.Dim, AutoSize = true, Location = new Point(24, 94), BackColor = Theme.Side };
             side.Controls.Add(logo); side.Controls.Add(logo2); side.Controls.Add(by);
             string[][] items = {
                 new[] { "", L("Play", "Jogar") },
+                new[] { "\uE713", L("Setup", "Preparar") },
                 new[] { "", L("Performance", "Desempenho") },
                 new[] { "", L("Controls", "Controlos") },
                 new[] { "", L("Help", "Ajuda") },
@@ -168,8 +190,8 @@ namespace VIctoryLauncher
             for (int i = 0; i < items.Length; i++)
             {
                 int k = i;
-                var b = new NavButton { Glyph = items[i][0], Text = items[i][1], Location = new Point(4, 140 + i * 50) };
-                b.Click += (s, e) => { Show(k); if (k == 1) ScanMemory(); };
+                var b = new NavButton { Glyph = items[i][0], Text = items[i][1], Location = new Point(4, 132 + i * 46) };
+                b.Click += (s, e) => { Show(k); if (k == 1) CheckAll(); if (k == 2) ScanMemory(); };
                 nav.Add(b);
                 side.Controls.Add(b);
             }
@@ -205,15 +227,21 @@ namespace VIctoryLauncher
             const int X = 24, W = 852;
             int y = 20;
             banner = new Banner { Location = new Point(X, y), Size = new Size(W, 128), Title = "GTA VI  ·  VIctory",
-                Subtitle = L("Play your own Xbox Series dump on PC  —  Cold Project VI remake by edupode", "Joga o teu dump de Xbox Series no PC  —  remake Cold Project VI por edupode") };
+                Subtitle = "VIctory + cgbj + AnyXboxSeries + Leonidas + VIctory-NVIDIA + fxceless + VIctory-7900XTX  —  " + L("remake by edupode", "remake por edupode") };
             page.Controls.Add(banner);
             y += 146;
 
-            page.Controls.Add(new Heading(L("Game folder", "Pasta do jogo")) { Location = new Point(X, y), Width = W });
-            y += 32;
-            gameBox = new TextBox { Location = new Point(X, y + 3), Width = W - 156, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.5f) };
+            page.Controls.Add(new Heading(L("Game folder", "Pasta do jogo")) { Location = new Point(X, y), Width = W - 250 });
+            var auto = new Pill { Main = true, Text = L("⚡  First-time auto-setup", "⚡  Preparar tudo (1a vez)"), Location = new Point(X + W - 240, y - 6), Size = new Size(240, 34) };
+            auto.Click += (s, e) => { Show(1); DoEverything(); };
+            page.Controls.Add(auto);
+            y += 34;
+            gameBox = new TextBox { Location = new Point(X, y + 3), Width = W - 312, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.5f) };
             gameBox.TextChanged += (s, e) => Refresh2();
             page.Controls.Add(gameBox);
+            var detect = new Pill { Text = L("Auto-detect", "Detetar"), Location = new Point(X + W - 300, y), Width = 144 };
+            detect.Click += (s, e) => RunSteps(steps.Where(st => st.Fix == (Func<bool>)FindGame).ToArray());
+            page.Controls.Add(detect);
             var browse = new Pill { Text = L("Browse...", "Procurar..."), Location = new Point(X + W - 144, y), Width = 144 };
             browse.Click += (s, e) => {
                 using (var d = new FolderBrowserDialog { Description = L("Choose the folder that holds game_scarlett_master.exe", "Escolhe a pasta que tem o game_scarlett_master.exe") })
@@ -439,7 +467,7 @@ namespace VIctoryLauncher
             "dwm", "csrss", "explorer", "System", "Idle", "svchost", "winlogon", "services", "lsass", "smss", "wininit",
             "fontdrvhost", "sihost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "TextInputHost",
             "ctfmon", "RuntimeBroker", "audiodg", "Memory Compression", "Registry", "victory", "victory-ferramenta",
-            "edu-launcher", "Edu's Remake", "MsMpEng", "NVDisplay.Container", "nvcontainer", "claude", "msedgewebview2", "conhost",
+            "edu-launcher", "Edu's Remake", "VI Launcher", "MsMpEng", "NVDisplay.Container", "nvcontainer", "claude", "msedgewebview2", "conhost",
             "powershell", "pwsh", "cmd", "WindowsTerminal", "OpenConsole", "ApplicationFrameHost", "LockApp",
             "SecurityHealthSystray", "Taskmgr", "PredatorSense", "Secure System", "LsaIso", "spoolsv", "dllhost",
         };
@@ -660,7 +688,7 @@ namespace VIctoryLauncher
             page.Controls.Add(new Heading(L("Help", "Ajuda")) { Location = new Point(24, 20), Width = 852 });
             var text = new Label { Location = new Point(24, 56), Size = new Size(852, 640), ForeColor = Theme.Text, BackColor = Theme.Back, Font = new Font("Segoe UI", 10.5f) };
             text.Text = string.Join("\r\n", Pt ? new[] {
-                "Primeira vez",
+                "Primeira vez: a pagina Preparar faz tudo isto por ti ('Fazer tudo por mim'). A mao:",
                 "   1.  Instala o Rust (https://rustup.rs) e o Visual Studio Build Tools com C++ e um Windows SDK.",
                 "   2.  Carrega em 'Compilar VIctory' (alguns minutos, uma vez).",
                 "   3.  Se o Windows disser 'Acesso negado', a regra anti-ransomware do Defender bloqueou o exe novo. Numa PowerShell",
@@ -681,8 +709,10 @@ namespace VIctoryLauncher
                 "",
                 "Logs: " + Path.Combine(dataRoot, "logs"),
                 "Guia: docs\\LUZ-24FPS.md   ·   Projeto: github.com/edupode/cold-project-vi (ramo edupode)",
-            } : new[] {
-                "First time",
+                "",
+                "Sobre: o VI Launcher e o remake do edupode, feito com o trabalho de:",
+            }.Concat(Credits()).ToArray() : new[] {
+                "First time: the Setup page does all of this for you ('Do everything for me'). By hand:",
                 "   1.  Install Rust (https://rustup.rs) and Visual Studio Build Tools with the C++ workload and a Windows SDK.",
                 "   2.  Press 'Build VIctory' (several minutes, once).",
                 "   3.  If Windows says 'Access denied' when playing, Defender's ransomware rule blocked the new exe. In an",
@@ -703,9 +733,26 @@ namespace VIctoryLauncher
                 "",
                 "Logs: " + Path.Combine(dataRoot, "logs"),
                 "Guide: docs\\GUIDE-30FPS.md   ·   Project: github.com/edupode/cold-project-vi (edupode branch)",
-            });
+                "",
+                "About: VI Launcher is edupode's remake, built on the work of:",
+            }.Concat(Credits()).ToArray());
             page.Controls.Add(text);
             return page;
+        }
+
+        // The projects inside this build, for the Help page.
+        static IEnumerable<string> Credits()
+        {
+            return new[] {
+                "   •  VIctory (Marvisak) — the Xbox Series emulator: github.com/Marvisak/VIctory",
+                "   •  cgbj (cputroll/cgbj-reupload) — the performance build this one starts from",
+                "   •  AnyXboxSeries — Xbox Series runtime work",
+                "   •  Leonidas — fixes and research",
+                "   •  VIctory-NVIDIA (trustno1-coder) — the lighting for NVIDIA cards",
+                "   •  fxceless — rendering and performance fixes",
+                "   •  VIctory-7900XTX (avatarmanz) — adaptations from the AMD fork",
+                "   •  Cold Project VI (felicienradio) — the project page this remake follows",
+            };
         }
 
         // ---------------------------------------------------------------- state
@@ -987,35 +1034,12 @@ namespace VIctoryLauncher
 
         void Prepare()
         {
-            SaveSettings();
-            var log = Path.Combine(dataRoot, "logs", "prepare.log");
-            Log(L("Translating the game's shaders and preparing pipelines (about 5 minutes)... Log: ", "A traduzir os shaders do jogo e a preparar pipelines (cerca de 5 minutos)... Log: ") + log);
-            Busy(true);
-            var dir = gameBox.Text.Trim();
-            new Thread(() => {
-                try
-                {
-                    var p = Start("shaders \"" + dir + "\"", log);
-                    p.WaitForExit();
-                    var w = Start("warm --used", log);
-                    w.WaitForExit();
-                    Log(L("Shaders ready. You can press PLAY.", "Shaders prontos. Podes carregar em JOGAR."));
-                }
-                catch (Exception ex) { Log(L("Failed: ", "Falhou: ") + ex.Message); }
-                Busy(false);
-            }) { IsBackground = true }.Start();
+            RunSteps(steps.Where(st => st.Fix == (Func<bool>)PrepareBlocking).ToArray());
         }
 
         void Build()
         {
-            Log(L("Building VIctory (cargo build --locked --profile diag -p victory --features diagnostics); a console window shows the progress.",
-                  "A compilar o VIctory (cargo build --locked --profile diag -p victory --features diagnostics); uma consola mostra o progresso."));
-            try
-            {
-                var psi = new ProcessStartInfo("cmd.exe", "/k cargo build --locked --profile diag -p victory --features diagnostics && echo. && echo " + L("Build finished: close this window and return to the launcher.", "Compilacao terminada: fecha esta janela e volta ao launcher.")) { WorkingDirectory = root, UseShellExecute = true };
-                Process.Start(psi);
-            }
-            catch (Exception ex) { Log(L("Could not start cargo: ", "Nao deu para iniciar o cargo: ") + ex.Message + L(". Install Rust from https://rustup.rs", ". Instala o Rust de https://rustup.rs")); }
+            RunSteps(steps.Where(st => st.Fix == (Func<bool>)BuildBlocking).ToArray());
         }
 
         // ---------------------------------------------------------------- settings

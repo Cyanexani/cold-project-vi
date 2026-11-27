@@ -90,6 +90,15 @@ fn record_on_f9() {
     if process != std::process::id() {
         return;
     }
+    // One capture a run: a second F9 says so with a low beep instead of leaving a trigger
+    // behind for the next run.
+    static ASKED: AtomicBool = AtomicBool::new(false);
+    if ASKED.swap(true, Ordering::Relaxed) {
+        tracing::warn!("F9: this run has asked for its capture already (one a run); start the game again for another");
+        // SAFETY: a plain call.
+        unsafe { windows_sys::Win32::System::Diagnostics::Debug::Beep(400, 300) };
+        return;
+    }
     let _ = std::fs::create_dir_all(folder);
     match std::fs::write(folder.join("go"), b"F9") {
         Ok(()) => {

@@ -29,9 +29,9 @@ doubled: 15 real FPS look like ~30.
 - Visual Studio Build Tools with the C++ workload and a Windows SDK.
 - Your own game dump: the folder that contains `game_scarlett_master.exe`.
 
-## 1b. Easiest: the edu launcher
+## 1b. Easiest: the VI Launcher
 
-`launcher/build-launcher.cmd` builds `Edu's Remake.exe` (with the C# compiler that ships with Windows). It
+`launcher/build-launcher.cmd` builds `VI Launcher.exe` (with the C# compiler that ships with Windows). It
 builds VIctory, finds your game, checks the GPU, video memory and Resizable BAR, prepares the shaders, offers
 the modes below with check boxes, and shows the controls. The steps after this are the same by hand.
 
@@ -202,7 +202,7 @@ Maintained by **@edupode** on GitHub: <https://github.com/edupode>
   by default, a number of MB, or `0`), so other apps are moved out first. Copies of textures whose memory the
   game has already unmapped are let go after 3 s (`VICTORY_TEXTURE_DEAD=0` turns this off); about 1 GB sat in
   them in a 720p session. The memory line in the log counts them.
-- **edu launcher**: new design; a Performance page that lists the apps holding video memory and RAM and closes
+- **VI Launcher**: new design; a Performance page that lists the apps holding video memory and RAM and closes
   the ones you tick; NVIDIA Smooth Motion written into the driver's profile for `victory.exe` (no NVIDIA App
   needed); a loading bar that makes the pipelines of earlier sessions before the game opens; an explanation
   for each option, ★ marking what was tested on the author's PC; English by default, Portuguese in the side bar.

@@ -3,7 +3,7 @@
 <img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5fa2,50:ffc371,100:5f6dff&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=remake%20edupode%20%E2%80%94%20GTA%20VI%20(Xbox%20Series)%20num%20port%C3%A1til%20RTX&descAlignY=58&animation=fadeIn" alt="Cold Project VI - remake edupode" width="100%"/>
 
 <p>
-  <a href="#come%C3%A7ar-edu-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20edu%20launcher-come%C3%A7a%20aqui-ff5fa2?style=for-the-badge" alt="edu launcher"/></a>
+  <a href="#come%C3%A7ar-vi-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20VI%20Launcher-come%C3%A7a%20aqui-ff5fa2?style=for-the-badge" alt="VI Launcher"/></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Read%20in-English-C8102E?style=for-the-badge" alt="English"/></a>
   <a href="docs/LUZ-24FPS.md"><img src="https://img.shields.io/badge/Notas-Portugu%C3%AAs-006600?style=for-the-badge" alt="Notas"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/por-%40edupode-222?style=for-the-badge&logo=github" alt="por edupode"/></a>
@@ -22,7 +22,7 @@
 > [!NOTE]
 > **Isto é um remake de [@edupode](https://github.com/edupode)** da ideia do Cold Project VI, com o nome interno
 > **"luz"**. Junta o [VIctory](https://github.com/Marvisak/VIctory), a build do cgbj (cputroll/cgbj-reupload), o
-> trabalho do Leonidas e do AnyXboxSeries, o fork VIctory-NVIDIA (trustno1-coder) e adaptações de um fork AMD
+> trabalho do Leonidas e do AnyXboxSeries, o fork VIctory-NVIDIA (trustno1-coder), as correções de renderização do fxceless e adaptações de um fork AMD
 > (avatarmanz/VIctory-7900XTX), afinados e alargados para um portátil NVIDIA. Não é o Cold Project VI original
 > (felicienradio/cold-project-vi), cuja página inspirou esta.
 
@@ -34,16 +34,19 @@ GTA VI a partir do **teu próprio dump de Xbox Series**, no Windows com uma plac
 [VIctory](https://github.com/Marvisak/VIctory). Este ramo é a build do cgbj com a iluminação do VIctory-NVIDIA
 e muitas mudanças nossas. **Não inclui ficheiros do jogo.**
 
-## Começar: edu launcher
+## Começar: VI Launcher
 
-1. Instala o [Rust](https://rustup.rs) e o Visual Studio Build Tools (C++ e um Windows SDK).
-2. Clona este ramo e compila o launcher (não precisa de mais nada):
+1. Descarrega este ramo (`git clone`, ou **Code → Download ZIP** no GitHub) e compila o launcher; só precisa do
+   Windows:
    ```powershell
    git clone -b edupode https://github.com/edupode/cold-project-vi.git
    cd cold-project-vi
    launcher\build-launcher.cmd
    ```
-3. Abre o **`Edu's Remake.exe`** (o edu launcher) e carrega em **Português** na barra lateral. Depois:
+2. Abre o **`VI Launcher.exe`**, carrega em **Português** na barra lateral e em **⚡ Preparar tudo (1a vez)** (ou na página
+   **Preparar**). Instala o Rust e o C++ Build Tools com o winget, compila o VIctory com barra de progresso, junta a exceção do
+   Defender (o Windows pergunta), encontra a pasta do jogo sozinho, prepara os shaders, põe o Windows em melhor desempenho e a
+   memória virtual gerida pelo sistema, e liga o Smooth Motion. À mão, os passos são:
    - **Compilar VIctory** (uma vez, alguns minutos);
    - escolhe a **pasta do jogo** (a que tem o `game_scarlett_master.exe`);
    - **Preparar shaders** (cerca de 5 minutos; de novo depois de cada compilação);
@@ -52,7 +55,7 @@ e muitas mudanças nossas. **Não inclui ficheiros do jogo.**
 Se o Windows disser "Acesso negado", a regra anti-ransomware do Defender bloqueou o exe novo. Numa PowerShell de
 administrador: `Add-MpPreference -AttackSurfaceReductionOnlyExclusions "<pasta do repositório>\target"`.
 
-<p align="center"><img src="launcher/screenshot.png" alt="edu launcher" width="760"/></p>
+<p align="center"><img src="launcher/screenshot.png" alt="VI Launcher" width="760"/></p>
 
 O launcher vê a tua placa, a VRAM, a RAM, o Resizable BAR e o suporte do Smooth Motion, e configura o resto.
 Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado no PC do autor. Em placas com menos de
@@ -66,6 +69,7 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
 | **NVIDIA Smooth Motion** | Escrito no perfil do próprio driver para o `victory.exe` (como o NVIDIA Profile Inspector faz): **não precisa da NVIDIA App**. RTX 40/50, driver 571.86 ou mais recente. A placa mostra um frame gerado entre dois do jogo. |
 | **Página Desempenho** | Mostra as apps que ocupam a VRAM e a RAM (NVIDIA Overlay, Discord, Wallpaper Engine, browsers...) e fecha as que marcares. O Windows só dá ao jogo o que as outras apps deixam livre. |
 | **Reserva de VRAM** | O VIctory pede ao Windows uma reserva de VRAM: quando falta memória, as outras apps saem primeiro. |
+| **Página Preparar** | Cada passo da primeira vez verificado (✓/✗) com um botão que o faz, e **Fazer tudo por mim**. O Resizable BAR está na BIOS/UEFI: o guia verifica o arranque UEFI, mostra onde estão as opções e pode reiniciar para a BIOS (depois de um sim). |
 | **Overlay de FPS (F3)** | FPS agora, média do último minuto (AVG 1M), média desde o início (ALL) e o pior meio segundo (LOW), tempo por frame, draws, VRAM e RAM. |
 
 ## Modos
@@ -87,7 +91,7 @@ página Controlos do launcher ou [docs/LUZ-24FPS.md](docs/LUZ-24FPS.md).
 
 ## Antes e depois
 
-| | Antes (cgbj neste portátil) | Agora (edu launcher, Recomendado) |
+| | Antes (cgbj neste portátil) | Agora (VI Launcher, Recomendado) |
 |---|---|---|
 | Menus e mapa | 30-33 FPS | **60 FPS** |
 | Mundo aberto | 10-15 FPS | **22-26 FPS** |

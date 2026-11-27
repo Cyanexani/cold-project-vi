@@ -34,6 +34,9 @@ namespace VIctoryLauncher
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int CreateApp(IntPtr session, IntPtr profile, IntPtr app);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int SetSettingFn(IntPtr session, IntPtr profile, IntPtr setting);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int GetSettingFn(IntPtr session, IntPtr profile, uint id, IntPtr setting);
+        // The newer calls take two more words (SetSetting: two zeros; GetSetting: a word it fills).
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int SetSettingEx(IntPtr session, IntPtr profile, IntPtr setting, uint a, uint b);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int GetSettingEx(IntPtr session, IntPtr profile, uint id, IntPtr setting, out uint extra);
 
         static QueryInterface query;
 
@@ -42,6 +45,29 @@ namespace VIctoryLauncher
             var p = query(id);
             if (p == IntPtr.Zero) throw new Exception("NVAPI function 0x" + id.ToString("X8") + " is missing");
             return Marshal.GetDelegateForFunctionPointer(p, typeof(T)) as T;
+        }
+
+        // Recent drivers know some settings (Smooth Motion's among them) only through the newer
+        // SetSetting/GetSetting (0x8A2CF5F5 / 0xEA99498D, five arguments); the older ones
+        // (0x577DD202 / 0x73BF8338) answer -160, setting not found. The newer first, as AnyXboxX's
+        // launcher does, the older where a driver lacks it.
+        static int SetSettingAny(IntPtr session, IntPtr profile, IntPtr setting)
+        {
+            var p = query(0x8A2CF5F5);
+            if (p != IntPtr.Zero)
+                return ((SetSettingEx)Marshal.GetDelegateForFunctionPointer(p, typeof(SetSettingEx)))(session, profile, setting, 0, 0);
+            return Fn<SetSettingFn>(0x577DD202)(session, profile, setting);
+        }
+
+        static int GetSettingAny(IntPtr session, IntPtr profile, uint id, IntPtr setting)
+        {
+            var p = query(0xEA99498D);
+            if (p != IntPtr.Zero)
+            {
+                uint extra;
+                return ((GetSettingEx)Marshal.GetDelegateForFunctionPointer(p, typeof(GetSettingEx)))(session, profile, id, setting, out extra);
+            }
+            return Fn<GetSettingFn>(0x73BF8338)(session, profile, id, setting);
         }
 
         static bool Load()
@@ -93,7 +119,7 @@ namespace VIctoryLauncher
                     var setting = Buffer(SettingSize, 1);
                     try
                     {
-                        if (Fn<GetSettingFn>(0x73BF8338)(session, profile, EnableId, setting) != 0) return "not set";
+                        if (GetSettingAny(session, profile, EnableId, setting) != 0) return "not set";
                         // currentValue (u32) at 4 + Str + 20 + 4100
                         return Marshal.ReadInt32(setting, 4 + Str + 20 + 4100) == 1 ? "on" : "off";
                     }
@@ -126,7 +152,7 @@ namespace VIctoryLauncher
                 Marshal.WriteInt32(s, 4 + Str, unchecked((int)id));        // settingId
                 Marshal.WriteInt32(s, 4 + Str + 4, 0);                     // NVDRS_DWORD_TYPE
                 Marshal.WriteInt32(s, 4 + Str + 20 + 4100, unchecked((int)value)); // currentValue
-                return Fn<SetSettingFn>(0x577DD202)(session, profile, s);
+                return SetSettingAny(session, profile, s);
             }
             finally { Marshal.FreeHGlobal(s); }
         }

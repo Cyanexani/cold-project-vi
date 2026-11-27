@@ -406,6 +406,9 @@ fn ours() -> bool {
 impl Recorder {
     fn new(settings: Settings) -> std::io::Result<Recorder> {
         std::fs::create_dir_all(&settings.folder)?;
+        // A trigger left by an earlier run (one capture each, so a second F9 stayed there)
+        // would capture this run's first frame, the loading screen (2026-11-27).
+        let _ = std::fs::remove_file(settings.folder.join("go"));
         let mut n = 1;
         let folder = loop {
             let folder = settings.folder.join(format!("capture-{n}"));
