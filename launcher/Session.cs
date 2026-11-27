@@ -54,6 +54,68 @@ namespace VIctoryLauncher
             return state;
         }
 
+        // Tool processes (shader translation, pipelines) this window started: stopped if it closes mid-way,
+        // and never taken for someone else's.
+        readonly List<Process> tools = new List<Process>();
+
+        bool Ours(int id)
+        {
+            Func<Process, bool> same = p => { try { return p != null && !p.HasExited && p.Id == id; } catch (Exception) { return false; } };
+            if (same(gameProc) || same(afterWarm)) return true;
+            lock (tools) return tools.Any(same);
+        }
+
+        // VIctory preparations (shaders, warm, precompile) this window did not start: most often one a launcher
+        // window left running when it closed. Read from each process's command line.
+        List<int> OtherPreparations()
+        {
+            var ids = new List<int>();
+            try
+            {
+                using (var q = new System.Management.ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'victory.exe'"))
+                    foreach (System.Management.ManagementObject o in q.Get())
+                    {
+                        int id = Convert.ToInt32(o["ProcessId"]);
+                        var cmd = o["CommandLine"] as string ?? "";
+                        if (!Ours(id) && System.Text.RegularExpressions.Regex.IsMatch(cmd, @"\s(shaders|warm|precompile)(\s|$)")) ids.Add(id);
+                    }
+            }
+            catch (Exception) { }
+            return ids;
+        }
+
+        // Before PLAY or a preparation: two VIctory processes on one cache run slowly and can leave it half written
+        // (an AMD player's game ended at start that way, 27/11/2026). Asks to stop the other one; false to wait.
+        bool ClearOtherPreparations()
+        {
+            var others = OtherPreparations();
+            if (others.Count == 0) return true;
+            var text = L("Shaders are still being prepared by another launcher window (or one that was closed). Two at once run slowly and can damage the cache.\r\n\r\nStop it and go on? Nothing is lost: what is already translated stays in the cache.",
+                         "Os shaders ainda estao a ser preparados por outra janela do launcher (ou uma que foi fechada). Dois ao mesmo tempo correm devagar e podem estragar a cache.\r\n\r\nParar e continuar? Nada se perde: o que ja foi traduzido fica na cache.",
+                         "Les shaders sont encore en préparation par une autre fenêtre du launcher (ou une fenêtre fermée). Deux à la fois sont lents et peuvent abîmer le cache.\r\n\r\nL'arrêter et continuer ? Rien n'est perdu : ce qui est déjà traduit reste dans le cache.");
+            if (MessageBox.Show(this, text, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return false;
+            foreach (var id in others) try { RunWait("taskkill", "/PID " + id + " /T /F", false); } catch (Exception) { }
+            Log(L("Stopped a preparation left running by another launcher window.", "Parada uma preparacao deixada a correr por outra janela do launcher."));
+            return true;
+        }
+
+        // Closing in the middle of a preparation: asked, and the preparation stopped with the window, so it is not
+        // left running for the next window to trip over. The game itself is never closed here.
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            if (e.Cancel) return;
+            List<Process> running;
+            lock (tools) running = tools.Where(t => { try { return !t.HasExited; } catch (Exception) { return false; } }).ToList();
+            if (running.Count == 0) return;
+            if (e.CloseReason == CloseReason.UserClosing &&
+                MessageBox.Show(this, L("Shaders or pipelines are still being prepared. Stop and close? It carries on where it stopped next time.",
+                                        "Os shaders ou as pipelines ainda estao a ser preparados. Parar e fechar? Continua onde parou da proxima vez.",
+                                        "Les shaders ou les pipelines sont encore en préparation. Arrêter et fermer ? Ça reprend là où ça s'est arrêté la prochaine fois."),
+                    "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) { e.Cancel = true; return; }
+            foreach (var t in running) try { RunWait("taskkill", "/PID " + t.Id + " /T /F", false); } catch (Exception) { }
+        }
+
         // Ends every game (and what it started) and the pipelines being made after a session.
         void CloseGames()
         {

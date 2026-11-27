@@ -452,6 +452,10 @@ namespace VIctoryLauncher
             Invoke(new Action(() => { SaveSettings(); dir = gameBox.Text.Trim(); game = GameExe; }));
             if (VictoryExe == null || !File.Exists(game)) { Log(L("Build VIctory and choose the game folder first.", "Compila o VIctory e escolhe a pasta do jogo primeiro.")); return false; }
             if (!RoomForCache()) return false;
+            // Another preparation (left by a launcher window that closed) on the same cache: stopped first, if the player says so.
+            bool go = true;
+            Invoke(new Action(() => { go = ClearOtherPreparations(); }));
+            if (!go) return false;
             var log = Path.Combine(dataRoot, "logs", "prepare.log");
             long mark = 0;
             try { if (File.Exists(log)) mark = new FileInfo(log).Length; } catch (Exception) { }

@@ -548,7 +548,7 @@ namespace VIctoryLauncher
                 page.Controls.Add(new Label { Text = groups[c].ToUpperInvariant(), Location = new Point(X + c * (third + 10) + 2, y), Size = new Size(third, 18), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.UiBold(8f) });
             y += 22;
             Func<string, string, int, int, bool, CheckBox> T = (title, line, col, row, on) => {
-                var t = new OptionCard { Text = title, Line = line, Checked = on, Location = new Point(X + col * (third + 10), y + row * 74), Size = new Size(third, 66) };
+                var t = new OptionCard { Text = title, Line = line, Checked = on, Location = new Point(X + col * (third + 10), y + row * 78), Size = new Size(third, 70) };
                 t.CheckedChanged += (s, e) => Refresh2();
                 page.Controls.Add(t);
                 return t;
@@ -564,7 +564,7 @@ namespace VIctoryLauncher
             qualityBox = T(L("Anti-stretch", "Anti-esticados"), L("Fewer stretched bodies; several FPS slower", "Menos corpos esticados; varios FPS mais lento"), 2, 0, false);
             facesBox = T(L("Rainbow-face fix", "Correcao das caras arco-iris"), L("Textures finish uploading first; costs FPS", "Texturas acabam de subir primeiro; custa FPS"), 2, 1, false);
             loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), L("Shorter loading pauses; untested", "Pausas de carregamento mais curtas; nao testado"), 2, 2, false);
-            y += 4 * 74 + 2;
+            y += 4 * 78 + 2;
             explain = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.Ui(9f),
                 Text = L("Point at an option for the details. Tested: tried on edupode's PC (RTX 5070 Ti laptop).", "Passa o rato por uma opcao para ver os detalhes. Testado: experimentado no PC do edupode (portatil RTX 5070 Ti).", "Survole une option pour les détails. Testé : essayé sur le PC d'edupode (portable RTX 5070 Ti).") };
             page.Controls.Add(explain);
@@ -1635,6 +1635,7 @@ namespace VIctoryLauncher
         }
 
 
+
         Process Start(string args, string logFile) { return Start(args, logFile, null); }
 
         Process Start(string args, string logFile, Action<string> onLine)
@@ -1655,6 +1656,7 @@ namespace VIctoryLauncher
             p.Start();
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();
+            if (!args.StartsWith("run ")) lock (tools) { tools.RemoveAll(t => { try { return t.HasExited; } catch (Exception) { return true; } }); tools.Add(p); }
             return p;
         }
 
@@ -1689,6 +1691,7 @@ namespace VIctoryLauncher
                                         "O Preparar ainda esta a trabalhar (a compilar o VIctory ou a preparar shaders). O JOGAR abre quando acabar."), "Julia's Launcher");
                 return;
             }
+            if (!ClearOtherPreparations()) return;
             SaveSettings();
             var state = State();
             if (state == GameState.Running)
