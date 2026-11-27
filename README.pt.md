@@ -68,7 +68,7 @@ pontos. Os pontos acima de 50 são a nossa estimativa (o PortWatch só os conta 
 
 > Este ramo segue o **Julia's Launcher 0.3.1** do felicienradio (nomes de utilizador com acentos, francês) com as correções do edupode por cima: **0.3.2-edupode**.
 
-**[Versões](https://github.com/edupode/cold-project-vi/releases/latest)**: descarrega o `VI-Setup-<versão>.exe` e corre-o.
+**[Versões](https://github.com/felicienradio/cold-project-vi/releases/latest)**: descarrega o `VI-Setup-<versão>.exe` e corre-o.
 
 - **Um pedido de administrador no início.** Depois o instalador faz o resto em segundo plano:
   - modo de energia;
@@ -88,7 +88,7 @@ Todos os programas de uma versão são compilados pelo GitHub Actions a partir d
 
 1. **O download saiu deste código:**
    ```powershell
-   gh attestation verify "Julias-Launcher.exe" -R edupode/cold-project-vi
+   gh attestation verify "Julias-Launcher.exe" -R felicienradio/cold-project-vi
    ```
 2. **O SHA-256 de cada ficheiro** bate com o `SHA256SUMS.txt` da versão.
 3. **O código do launcher vem incluído:** o `launcher-source.zip` fica ao lado de cada instalação. O `launcher\build-launcher.cmd` compila-o com o compilador de C# que vem com o Windows.

@@ -71,7 +71,7 @@ une preuve, une vidéo).
 
 > Cette branche suit le **Julia's Launcher 0.3.1** de felicienradio (noms d'utilisateur accentués, français) avec les corrections d'edupode par-dessus : **0.3.2-edupode**.
 
-**[Releases](https://github.com/edupode/cold-project-vi/releases/latest)** : prenez `VI-Setup-<version>.exe` et lancez-le.
+**[Releases](https://github.com/felicienradio/cold-project-vi/releases/latest)** : prenez `VI-Setup-<version>.exe` et lancez-le.
 
 - **Une seule demande administrateur au début.** Ensuite l'installateur fait le reste en arrière-plan :
   - le mode d'alimentation ;
@@ -94,7 +94,7 @@ Chaque programme d'une release est compilé par GitHub Actions à partir du code
 
 1. **Le téléchargement vient de ce code :**
    ```powershell
-   gh attestation verify "Julias-Launcher.exe" -R edupode/cold-project-vi
+   gh attestation verify "Julias-Launcher.exe" -R felicienradio/cold-project-vi
    ```
 2. **Le SHA-256 de chaque fichier** correspond à `SHA256SUMS.txt` dans la release.
 3. **Le code du launcher est inclus :** `launcher-source.zip` est à côté de chaque installation.

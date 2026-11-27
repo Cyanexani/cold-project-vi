@@ -14,7 +14,7 @@
 AppId=VI-Launcher-edupode
 AppName=Julia's Launcher
 AppVersion={#AppVersion}
-AppPublisher=edupode
+AppPublisher=edupode and felicienradio (open source)
 AppPublisherURL=https://github.com/felicienradio/cold-project-vi/tree/main
 AppSupportURL=https://discord.gg/648WEXCAsZ
 DefaultDirName={sd}\Games\VI
@@ -50,12 +50,16 @@ Source: "..\LICENSE"; DestDir: "{app}"
 Source: "..\README.md"; DestDir: "{app}"
 Source: "..\README.pt.md"; DestDir: "{app}"
 
+[Tasks]
+; Shown and asked before anything in Windows changes (each can be undone in Windows' settings).
+Name: "windows"; Description: "Set up Windows for the game: Best performance power mode, virtual memory managed by Windows, the high-performance graphics card for VIctory, and the NVIDIA driver profile (Smooth Motion, Resizable BAR) on NVIDIA cards"
+
 [Icons]
 Name: "{autodesktop}\Julia's Launcher"; Filename: "{app}\Julia's Launcher.exe"
 Name: "{autoprograms}\Julia's Launcher"; Filename: "{app}\Julia's Launcher.exe"
 
 [Run]
-Filename: "{app}\Julia's Launcher.exe"; Parameters: "--admin-setup ""{app}"""; StatusMsg: "Setting up Windows for the game (power, virtual memory, graphics card)..."; Flags: waituntilterminated runhidden
+Filename: "{app}\Julia's Launcher.exe"; Parameters: "--admin-setup ""{app}"""; StatusMsg: "Setting up Windows for the game (power, virtual memory, graphics card)..."; Tasks: windows; Flags: waituntilterminated runhidden
 Filename: "{app}\Julia's Launcher.exe"; Description: "Open Julia's Launcher"; Flags: postinstall nowait runasoriginaluser
 
 [UninstallDelete]
