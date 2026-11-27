@@ -170,14 +170,18 @@ fn place(
     let top_level = parent.is_null() && style & wm::WS_CHILD == 0 && style & wm::WS_CAPTION != 0;
     if top_level && std::env::var_os("VICTORY_BORDERLESS").is_some_and(|v| v == "1") {
         static AWARE: std::sync::Once = std::sync::Once::new();
-        AWARE.call_once(|| {
+        // (`VICTORY_BORDERLESS_DPI=0`: the window stays unaware of the screen's
+        // scaling, as large as the screen in its scaled pixels; to tell the two
+        // changes apart.)
+        let dpi = std::env::var_os("VICTORY_BORDERLESS_DPI").is_none_or(|v| v != "0");
+        if dpi { AWARE.call_once(|| {
             use windows_sys::Win32::UI::HiDpi::{
                 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
             };
             // SAFETY: plain call; refused if the awareness was set already.
             let ok = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
             tracing::info!(ok, "aware of the screen's scaling (borderless window)");
-        });
+        }); }
         // SAFETY: plain queries.
         let (w, h) = unsafe { (wm::GetSystemMetrics(wm::SM_CXSCREEN), wm::GetSystemMetrics(wm::SM_CYSCREEN)) };
         if w > 0 && h > 0 {

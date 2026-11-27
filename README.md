@@ -39,7 +39,8 @@ on menus it goes from 30-32/33fps
 >   CPU-bound (~20-26 in the open world). The `qualidade` switch (relay 1, no card steps) did not stop characters'
 >   black flickers and cost a lot (8-14 FPS in a cutscene, ~35-41 ms a frame waiting for the card).
 > - Borderless window for NVIDIA Smooth Motion exists (`VICTORY_BORDERLESS=1`) but is off: it dropped the game
->   to 1-2 FPS on a 2560x1600 screen at 150 %.
+>   to 1-2 FPS on a 2560x1600 screen at 150 %. Being tested: `VICTORY_BORDERLESS_DPI=0` keeps the window unaware
+>   of the screen's scaling, to tell whether the scaling or the borderless flip is the cause.
 > - Keyboard/mouse: click to capture the mouse (Alt/F1 releases), F enters vehicles and switches W/S to the
 >   triggers (beep), full table in the guide.
 
