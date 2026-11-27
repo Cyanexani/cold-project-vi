@@ -108,7 +108,13 @@ export default {
     if (!text || text.length > MAX_ANNOUNCEMENT || !text.includes(tag)) return deny(400, 'the announcement is empty, too long, or not about this tag');
     if (!env.DISCORD_WEBHOOK) return deny(500, 'no webhook set');
     const hook = env.DISCORD_WEBHOOK.trim();
-    const message = { content: text, username: "Julia's Launcher", allowed_mentions: { parse: ['everyone'] } };
+    // Who the post may ping: nobody unless ANNOUNCE_MENTION says (a variable, wrangler.toml [vars] or the dashboard):
+    // "everyone", or a role's id for the opt-in role players pick with a reaction. @everyone in the text no
+    // longer pings anyone by itself (27/11/2026: too many pings for every release).
+    const mention = String(env.ANNOUNCE_MENTION || '').trim();
+    const allowed = mention === 'everyone' ? { parse: ['everyone'] } : /^\d{5,25}$/.test(mention) ? { parse: [], roles: [mention] } : { parse: [] };
+    if (/^\d{5,25}$/.test(mention)) text = text + '\n\n<@&' + mention + '>';
+    const message = { content: text, username: "Julia's Launcher", allowed_mentions: allowed };
     // Link buttons from a channel webhook need ?with_components=true.
     if (buttons.length) message.components = [{ type: 1, components: buttons }];
     const r = await fetch(buttons.length ? hook + (hook.includes('?') ? '&' : '?') + 'with_components=true' : hook, {

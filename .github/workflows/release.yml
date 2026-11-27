@@ -124,6 +124,9 @@ jobs:
             # Discord keeps the preview of a link it has seen: /releases/latest showed the version before (0.3.7's post
             # carried 0.3.6's card). The release's own page is a new link each time.
             $text = $text.Replace("https://github.com/$repo/releases/latest", "https://github.com/$repo/releases/tag/$tag")
+            # No @everyone for now (it pinged every member at each release): the signer pings only what its
+            # ANNOUNCE_MENTION allows (later, the role players pick with a reaction).
+            $text = ($text -replace '(?m)^\s*@everyone\s*$', '').TrimEnd()
             # Every announcement ends with docs/ANNOUNCEMENT-FOOTER.md, before the @everyone line.
             if (Test-Path docs/ANNOUNCEMENT-FOOTER.md) {
               $footer = [IO.File]::ReadAllText('docs/ANNOUNCEMENT-FOOTER.md').Trim()

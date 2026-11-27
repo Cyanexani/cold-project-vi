@@ -142,6 +142,30 @@ const clean = (s, max) => {
   return t.length <= max ? t : null;
 };
 
+// The zip's entries, from its central directory: every name must be a save file (or the export's hash list),
+// at most 400 of them, none larger than 32 MB once unpacked.
+const SAVE_PATH = /^[0-9A-Fa-f]{16}\/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\/[A-Za-z0-9_]{1,64}~[0-9A-Fa-f]{16}\/v[0-9]{1,5}\/([0-9]{1,4}|manifest)$/;
+function onlySaveFiles(zip) {
+  const v = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  let end = -1;
+  for (let i = zip.length - 22; i >= Math.max(0, zip.length - 22 - 65535); i--) if (v.getUint32(i, true) === 0x06054b50) { end = i; break; }
+  if (end < 0) return false;
+  const count = v.getUint16(end + 10, true), size = v.getUint32(end + 12, true), at0 = v.getUint32(end + 16, true);
+  if (count === 0 || count > 401 || at0 + size > end) return false;
+  let at = at0, files = 0;
+  for (let k = 0; k < count; k++) {
+    if (at + 46 > end || v.getUint32(at, true) !== 0x02014b50) return false;
+    const unpacked = v.getUint32(at + 24, true), nameLen = v.getUint16(at + 28, true), extra = v.getUint16(at + 30, true), comment = v.getUint16(at + 32, true);
+    const name = new TextDecoder().decode(zip.subarray(at + 46, at + 46 + nameLen)).replace(/\\/g, '/');
+    at += 46 + nameLen + extra + comment;
+    if (name.endsWith('/')) continue;
+    if (name !== 'vi-save.sha256' && !SAVE_PATH.test(name)) return false;
+    if (unpacked > 32 * 1024 * 1024) return false;
+    files++;
+  }
+  return files > 0;
+}
+
 async function shareSave(request, env) {
   const id = request.headers.get('X-VI-Id') || '';
   const title = clean(request.headers.get('X-VI-Title'), 80);
@@ -157,6 +181,9 @@ async function shareSave(request, env) {
   const zip = new Uint8Array(await request.arrayBuffer());
   if (zip.length < 22 || zip.length > MAX_SAVE || zip[0] !== 0x50 || zip[1] !== 0x4b || zip[2] !== 3 || zip[3] !== 4)
     return new Response(null, { status: 400 });
+  // Only the save module's files, as the launcher's import takes them (launcher\Saves.cs, SavePath): nothing else
+  // reaches the gallery, so a shared save cannot carry a program along.
+  if (!onlySaveFiles(zip)) return new Response(null, { status: 422 });
   const n = await env.DB.prepare(
     "INSERT INTO saves (created, vi_id, title, note, bytes, zip) VALUES (datetime('now'), ?, ?, ?, ?, ?) RETURNING n"
   ).bind(id, title, note, zip.length, zip).first('n');

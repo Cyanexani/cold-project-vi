@@ -9,5 +9,3 @@
 📥 New here or on an older launcher: download **VI-Setup-{version}.exe** from https://github.com/felicienradio/cold-project-vi/releases/latest and run it.
 
 Still stuck? Use **Help > Send errors** in the launcher and post your hardware ID here 💙
-
-@everyone
