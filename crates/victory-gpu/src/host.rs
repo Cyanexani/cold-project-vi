@@ -4008,6 +4008,37 @@ impl Host {
         })
     }
 
+    /// Whether the host device is backed by a software adapter (WARP /
+    /// Microsoft Basic Render Driver), either via `VICTORY_D3D12_WARP` or
+    /// because the host has no hardware GPU (such as hosted CI runners).
+    #[cfg(test)]
+    pub(crate) fn on_warp(&self) -> bool {
+        if cfg!(feature = "diagnostics") && crate::switch::on("VICTORY_D3D12_WARP") {
+            return true;
+        }
+        let is_software = |desc: &DXGI_ADAPTER_DESC1| {
+            desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 || desc.VendorId == 0x1414
+        };
+        if let Some(adapter) = &self.adapter
+            // SAFETY: plain DXGI adapter descriptor query.
+            && let Ok(desc) = unsafe { adapter.GetDesc1() }
+        {
+            return is_software(&desc);
+        }
+        // Fallback when `EnumAdapterByLuid` did not match (for example on
+        // headless CI runners): inspect the default DXGI adapter 0.
+        // SAFETY: plain DXGI enumeration.
+        unsafe {
+            let Ok(factory) = CreateDXGIFactory2::<IDXGIFactory4>(DXGI_CREATE_FACTORY_FLAGS(0)) else {
+                return true;
+            };
+            let Ok(adapter) = factory.EnumAdapters1(0) else {
+                return true;
+            };
+            adapter.GetDesc1().map_or(true, |desc| is_software(&desc))
+        }
+    }
+
     /// A new list, open for recording.
     pub(crate) fn new_list(&self) -> windows::core::Result<HostList> {
         #[cfg(feature = "diagnostics")]
