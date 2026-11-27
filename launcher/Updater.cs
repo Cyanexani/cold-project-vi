@@ -239,17 +239,22 @@ namespace VIctoryLauncher
             return false;
         }
 
+        // Signed with one of the release keys (edupode's or felicienradio's, ReleaseKey.All).
         static bool SignedByEdupode(byte[] data, byte[] signature)
         {
-            try
+            foreach (var key in ReleaseKey.All)
             {
-                using (var rsa = new RSACryptoServiceProvider())
+                try
                 {
-                    rsa.FromXmlString(ReleaseKey.PublicXml);
-                    return rsa.VerifyData(data, "SHA256", signature);
+                    using (var rsa = new RSACryptoServiceProvider())
+                    {
+                        rsa.FromXmlString(key);
+                        if (rsa.VerifyData(data, "SHA256", signature)) return true;
+                    }
                 }
+                catch (Exception) { }
             }
-            catch (Exception) { return false; }
+            return false;
         }
 
         static string Sha256(string file)
