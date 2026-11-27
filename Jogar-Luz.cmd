@@ -6,7 +6,8 @@ rem
 rem   set VICTORY_GAME_DIR=D:\Jogos\MeuDump          (pasta com game_scarlett_master.exe)
 rem   Jogar-Luz.cmd preparar                         (1.a vez e depois de cada recompilacao: traduz shaders)
 rem   Jogar-Luz.cmd                                  (jogar a 1080p)
-rem   Jogar-Luz.cmd 720p texturas cpu 60             (o mais rapido; modos: 720p/540p, texturas, cpu, 60, qualidade)
+rem   Jogar-Luz.cmd tudo                             (todas as otimizacoes: 720p, texturas leves, 60 FPS, blocos cheios)
+rem   modos soltos: 720p/540p, texturas, cpu, 60, caras, qualidade
 setlocal
 if not defined VICTORY_GAME_DIR (
   echo Define VICTORY_GAME_DIR com a pasta do teu dump ^(onde esta game_scarlett_master.exe^).
@@ -84,6 +85,8 @@ for %%m in ("%~1" "%~2" "%~3" "%~4") do (
   if /i %%m=="texturas" (set "VICTORY_TEXTURE_MAX=2048" & set "VICTORY_LEVELS_ON_DEMAND=0" & set "VICTORY_CARD_BUFFERS_MB=1536" & set "VICTORY_WINDOWS_BAR_MB=1024")
   if /i %%m=="cpu" (set "VICTORY_ASK_EARLY=2" & set "VICTORY_WIDE_THREADS=10")
   if /i %%m=="60" set "VICTORY_FPS_MAX=60"
+  if /i %%m=="caras" set "VICTORY_TEXTURE_NO_WAIT=0"
+  if /i %%m=="tudo" (set "VICTORY_RENDER_SCALE=0.6666667" & set "VICTORY_OWN_UPSCALER=1" & set "VICTORY_TEXTURE_MAX=2048" & set "VICTORY_LEVELS_ON_DEMAND=0" & set "VICTORY_CARD_BUFFERS_MB=1536" & set "VICTORY_WINDOWS_BAR_MB=1024" & set "VICTORY_FPS_MAX=60" & set "VICTORY_POOL_FULLEST=1")
 )
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (
   echo Ja ha um VIctory a correr. Fecha-o primeiro.
