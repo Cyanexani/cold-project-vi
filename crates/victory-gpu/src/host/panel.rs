@@ -65,7 +65,17 @@ fn pressed() -> bool {
 fn record_on_f9() {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_F9;
     static FOLDER: OnceLock<Option<std::path::PathBuf>> = OnceLock::new();
-    let Some(folder) = FOLDER.get_or_init(|| std::env::var_os("VICTORY_RECORD").map(Into::into)) else {
+    let Some(folder) = FOLDER.get_or_init(|| {
+        let folder = std::env::var_os("VICTORY_RECORD").map(Into::into);
+        if folder.is_some() {
+            // The capture holds the game still for a minute or so while it writes ~9 GB: without
+            // this Windows shows the window as not responding and offers to close it, which
+            // ended the first capture half written (2026-11-27).
+            // SAFETY: a plain call.
+            unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DisableProcessWindowsGhosting() };
+        }
+        folder
+    }) else {
         return;
     };
     static DOWN: AtomicBool = AtomicBool::new(false);
@@ -83,7 +93,10 @@ fn record_on_f9() {
     let _ = std::fs::create_dir_all(folder);
     match std::fs::write(folder.join("go"), b"F9") {
         Ok(()) => {
-            tracing::info!("F9: the frame recorder was asked for the next frame ({})", folder.display());
+            tracing::info!(
+                "F9: the frame recorder was asked for the next frame ({}); the game stands still for a minute or so while ~9 GB are written, until two high beeps",
+                folder.display()
+            );
             // SAFETY: a plain call.
             unsafe { windows_sys::Win32::System::Diagnostics::Debug::Beep(1500, 150) };
         }

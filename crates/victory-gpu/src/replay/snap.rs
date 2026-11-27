@@ -112,6 +112,9 @@ pub(super) fn submit(
 fn stop(r: &Recorder, phase: &mut Phase, e: &(dyn std::error::Error + Send + Sync)) {
     tracing::error!("frame recorder: the capture failed: {e}");
     let _ = std::fs::write(r.folder.join("failed.txt"), e.to_string());
+    // A long low beep: it failed (failed.txt says why).
+    // SAFETY: a plain call.
+    unsafe { windows_sys::Win32::System::Diagnostics::Debug::Beep(300, 600) };
     phase.stage = Stage::Done;
     r.watching.store(false, Ordering::SeqCst);
     r.arm(false);
@@ -1080,6 +1083,11 @@ impl Capture {
         frame.write(&r.folder.join("frame.bin"))?;
         std::fs::write(r.folder.join("notes.txt"), notes.join("\n"))?;
         tracing::info!(folder = %r.folder.display(), "frame recorder: the frame is captured");
+        // Two high beeps: the game moves again and the capture is complete.
+        for _ in 0..2 {
+            // SAFETY: a plain call.
+            unsafe { windows_sys::Win32::System::Diagnostics::Debug::Beep(1800, 120) };
+        }
         Ok(())
     }
 }

@@ -43,7 +43,7 @@ e muitas mudanças nossas. **Não inclui ficheiros do jogo.**
    cd cold-project-vi
    launcher\build-launcher.cmd
    ```
-3. Abre o **`edu-launcher.exe`** e carrega em **Português** na barra lateral. Depois:
+3. Abre o **`Edu's Remake.exe`** (o edu launcher) e carrega em **Português** na barra lateral. Depois:
    - **Compilar VIctory** (uma vez, alguns minutos);
    - escolhe a **pasta do jogo** (a que tem o `game_scarlett_master.exe`);
    - **Preparar shaders** (cerca de 5 minutos; de novo depois de cada compilação);

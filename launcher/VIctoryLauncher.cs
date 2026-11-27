@@ -1,6 +1,6 @@
 // edu launcher: one window to set up and play the edupode build of VIctory.
 // Built with the C# compiler that ships with Windows (.NET Framework 4.x):
-//   launcher\build-launcher.cmd   ->   edu-launcher.exe in the repository's root.
+//   launcher\build-launcher.cmd   ->   "Edu's Remake.exe" in the repository's root.
 // No game files are included or downloaded; the player points it at their own dump.
 // English by default; the button in the side bar switches to Portuguese (saved in launcher.ini).
 using System;
@@ -115,7 +115,8 @@ namespace VIctoryLauncher
                     null, false, false),
             };
 
-            Text = "edu launcher";
+            Text = "Edu's Remake  —  edu launcher";
+            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
             ClientSize = new Size(1120, 940);
             MinimumSize = new Size(1000, 700);
             BackColor = Theme.Back;
@@ -438,7 +439,7 @@ namespace VIctoryLauncher
             "dwm", "csrss", "explorer", "System", "Idle", "svchost", "winlogon", "services", "lsass", "smss", "wininit",
             "fontdrvhost", "sihost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "TextInputHost",
             "ctfmon", "RuntimeBroker", "audiodg", "Memory Compression", "Registry", "victory", "victory-ferramenta",
-            "edu-launcher", "MsMpEng", "NVDisplay.Container", "nvcontainer", "claude", "msedgewebview2", "conhost",
+            "edu-launcher", "Edu's Remake", "MsMpEng", "NVDisplay.Container", "nvcontainer", "claude", "msedgewebview2", "conhost",
             "powershell", "pwsh", "cmd", "WindowsTerminal", "OpenConsole", "ApplicationFrameHost", "LockApp",
             "SecurityHealthSystray", "Taskmgr", "PredatorSense", "Secure System", "LsaIso", "spoolsv", "dllhost",
         };

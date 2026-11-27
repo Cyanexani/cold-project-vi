@@ -68,7 +68,7 @@ lighting and many changes of our own). **No game files are included.**
    cd cold-project-vi
    launcher\build-launcher.cmd
    ```
-3. Open **`edu-launcher.exe`**:
+3. Open **`Edu's Remake.exe`** (the edu launcher):
    - **Build VIctory** (once, several minutes);
    - choose your **game folder** (the one with `game_scarlett_master.exe`);
    - **Prepare shaders** (about 5 minutes; again after each rebuild);

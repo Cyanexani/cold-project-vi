@@ -31,7 +31,7 @@ doubled: 15 real FPS look like ~30.
 
 ## 1b. Easiest: the edu launcher
 
-`launcheruild-launcher.cmd` builds `edu-launcher.exe` (with the C# compiler that ships with Windows). It
+`launcher/build-launcher.cmd` builds `Edu's Remake.exe` (with the C# compiler that ships with Windows). It
 builds VIctory, finds your game, checks the GPU, video memory and Resizable BAR, prepares the shaders, offers
 the modes below with check boxes, and shows the controls. The steps after this are the same by hand.
 
