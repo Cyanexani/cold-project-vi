@@ -2,7 +2,7 @@ name: Hardware averages
 
 # Every 6 hours: the averages of the players' hardware (never a row, never an ID) are read from the
 # hardware database's protected endpoint (server/hardware-worker, GET /v1/stats) and published as
-# docs/hardware-stats.json and docs/HARDWARE-STATS.md on the edupode branch.
+# docs/hardware-stats.json and docs/HARDWARE-STATS.md on main (the launcher's Hardware & ID page reads the JSON).
 # Needs two repository secrets: VI_STATS_URL (https://<worker>/v1/stats) and VI_STATS_TOKEN (the
 # Worker's STATS_TOKEN). Without them it does nothing. GitHub runs scheduled workflows from the
 # repository's default branch: keep this file there too, or run it by hand (Actions > Run workflow).
@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: edupode
+          ref: main
       - name: Read the averages
         id: read
         env:
@@ -44,5 +44,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/hardware-stats.json docs/HARDWARE-STATS.md
           if git diff --cached --quiet; then echo "No change."; exit 0; fi
-          git commit -m "Hardware averages: $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push origin HEAD:edupode
+          git commit -m "Hardware averages: $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push origin HEAD:main

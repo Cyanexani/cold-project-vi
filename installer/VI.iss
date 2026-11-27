@@ -2,8 +2,8 @@
 ;   iscc /DAppVersion=0.3.2 installer\VI.iss
 ; Asks for administrator rights once, installs outside Windows' protected folders (C:\Games\VI by
 ; default, writable by the player so updates install themselves), runs the Windows settings in the
-; background (Julia's Launcher.exe --admin-setup: power, virtual memory, Defender's ransomware rule for this
-; folder, the high-performance graphics card, Smooth Motion), then opens the launcher without
+; background (Julia's Launcher.exe --admin-setup: power, virtual memory (no antivirus
+; changes), the high-performance graphics card, Smooth Motion), then opens the launcher without
 ; administrator rights, which finds the game and prepares the shaders.
 
 #ifndef AppVersion

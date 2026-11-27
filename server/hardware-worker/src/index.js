@@ -101,19 +101,23 @@ async function stats(env) {
 // (game or launcher); the body is the zip itself, at most MAX_REPORT bytes (a D1 row holds 2 MB).
 const MAX_REPORT = 1800 * 1024;
 const REPORTS_PER_HOUR = 5;
+const MAX_SESSION = 400 * 1024;
+const SESSIONS_PER_HOUR = 12;
 
 async function report(request, env) {
   const id = request.headers.get('X-VI-Id') || '';
   const kind = request.headers.get('X-VI-Kind') || '';
-  if (!ID.test(id) || !['game', 'launcher'].includes(kind)) return new Response(null, { status: 400 });
+  if (!ID.test(id) || !['game', 'launcher', 'session'].includes(kind)) return new Response(null, { status: 400 });
   const length = Number(request.headers.get('content-length') || '0');
-  if (length > MAX_REPORT) return new Response(null, { status: 413 });
+  // A game's log (kind session, sent when each game closes for players who said yes) is smaller and counted apart.
+  const session = kind === 'session';
+  if (length > (session ? MAX_SESSION : MAX_REPORT)) return new Response(null, { status: 413 });
   const hour = Math.floor(Date.now() / 3600000);
-  const who = await sha256(`${env.RATE_SALT}|report|${request.headers.get('CF-Connecting-IP') || ''}|${hour}`);
+  const who = await sha256(`${env.RATE_SALT}|${session ? 'session' : 'report'}|${request.headers.get('CF-Connecting-IP') || ''}|${hour}`);
   await env.DB.prepare('DELETE FROM rate WHERE hour < ?').bind(hour).run();
   const seen = await env.DB.prepare('INSERT INTO rate (who, hour, n) VALUES (?, ?, 1) ON CONFLICT(who) DO UPDATE SET n = n + 1 RETURNING n')
     .bind(who, hour).first('n');
-  if (seen > REPORTS_PER_HOUR) return new Response(null, { status: 429 });
+  if (seen > (session ? SESSIONS_PER_HOUR : REPORTS_PER_HOUR)) return new Response(null, { status: 429 });
   const zip = new Uint8Array(await request.arrayBuffer());
   // A zip and nothing else: its first bytes are PK\x03\x04.
   if (zip.length < 22 || zip.length > MAX_REPORT || zip[0] !== 0x50 || zip[1] !== 0x4b || zip[2] !== 3 || zip[3] !== 4)

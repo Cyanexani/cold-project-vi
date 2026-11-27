@@ -126,17 +126,13 @@ namespace VIctoryLauncher
                 Fix = BuildAmdEngine,
             });
             steps.Add(new Step {
-                Title = L("Windows Defender exception", "Excecao do Windows Defender"),
-                Why = L("Defender's ransomware rule blocks freshly built programs ('Access denied'). Adds this folder's 'target' to its exceptions; Windows asks for permission.",
-                        "A regra anti-ransomware do Defender bloqueia programas acabados de compilar ('Acesso negado'). Junta a pasta 'target' desta pasta as excecoes; o Windows pede autorizacao."),
-                FixText = L("Add it", "Adicionar"),
-                Check = () => ReadSetting("defender") == "1" ? 1 : -1,
-                Fix = () => {
-                    var target = Path.Combine(SourceDir ?? root, "target");
-                    bool ok = Elevated("powershell", "-NoProfile -ExecutionPolicy Bypass -Command \"Add-MpPreference -AttackSurfaceReductionOnlyExclusions '" + target.Replace("'", "''") + "'\"");
-                    if (ok) WriteSetting("defender", "1");
-                    return ok;
-                },
+                Title = L("Windows Security: 'Access denied' when building", "Seguranca do Windows: 'Acesso negado' ao compilar"),
+                Why = L("Only if a build from source ends with 'Access denied': Controlled folder access blocks freshly built programs. Opens Windows Security; allow victory.exe there yourself. The launcher never changes antivirus settings.",
+                        "So se uma compilacao acabar com 'Acesso negado': o Acesso controlado a pastas bloqueia programas acabados de compilar. Abre a Seguranca do Windows; permite la o victory.exe tu mesmo. O launcher nunca muda definicoes do antivirus."),
+                FixText = L("Open it", "Abrir"),
+                Check = () => -1,
+                Auto = false,
+                Fix = () => { OpenUrl("windowsdefender://ransomwareprotection"); return false; },
             });
             steps.Add(new Step {
                 Title = L("Your game folder", "A pasta do jogo"),
@@ -189,7 +185,7 @@ namespace VIctoryLauncher
                 Why = L("Lets the CPU write straight into all of the video memory (faster copies). It is switched on in the PC's BIOS/UEFI: the guide shows how.",
                         "Deixa o processador escrever diretamente em toda a VRAM (copias mais rapidas). Liga-se na BIOS/UEFI do PC: o guia mostra como."),
                 FixText = L("Show me how", "Mostra-me como"),
-                Check = () => rebar ? 1 : ReadSetting("rebar_ack") == "1" ? -1 : 0,
+                Check = () => rebar ? 1 : RebarMissing() ? 0 : -1,
                 Fix = () => { BeginInvoke(new Action(ShowRebarGuide)); return false; },
                 Auto = false,
             });
@@ -546,16 +542,25 @@ namespace VIctoryLauncher
         // whose cache is still there, or a cache as large as one (made by another way of starting VIctory).
         bool ShadersReady()
         {
-            try
+            // The game has ~25,000 shaders: a handful means the preparation saw almost nothing (a folder
+            // with only the executable showed 12 as "ready", 27/11/2026). Counted folder by folder: one walk of
+            // the whole tree ended at the first entry the game or the warm-up was writing or renaming, and the
+            // step showed "not prepared" (and Fix it) on PCs with 25,000+ shaders.
+            return CountUpTo(Path.Combine(ActiveCacheDir, "shaders"), 1000) >= 1000;
+        }
+
+        static int CountUpTo(string dir, int most)
+        {
+            int n = 0;
+            var pending = new Stack<string>();
+            pending.Push(dir);
+            while (pending.Count > 0 && n < most)
             {
-                var dir = Path.Combine(ActiveCacheDir, "shaders");
-                if (!Directory.Exists(dir)) return false;
-                var some = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Take(1000).Count();
-                // The game has ~25,000 shaders: a handful means the preparation saw almost nothing (a folder
-                // with only the executable showed 12 as "ready", 27/11/2026).
-                return some >= 1000;
+                var d = pending.Pop();
+                try { foreach (var f in Directory.EnumerateFiles(d)) if (++n >= most) break; } catch (Exception) { }
+                try { foreach (var s in Directory.EnumerateDirectories(d)) pending.Push(s); } catch (Exception) { }
             }
-            catch (Exception) { return false; }
+            return n;
         }
 
         bool FindGame()
@@ -684,16 +689,36 @@ namespace VIctoryLauncher
         // The script both the Setup step and the installer run as administrator: Windows manages the
         // page file on every drive. Set-CimInstance fails on some PCs ("Generic failure"), so the
         // registry value it stands for is written too.
-        public const string PagefileScript =
-            "try { $cs = Get-CimInstance Win32_ComputerSystem; Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction Stop } catch { }\n" +
-            "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' -Name PagingFiles -Type MultiString -Value @('?:\\pagefile.sys')\n" +
-            "exit 0\n";
-
-        public static string Encoded(string script) { return Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script)); }
+        // Done by the launcher itself, run as administrator (`--pagefile`), with no PowerShell: an encoded
+        // PowerShell command run hidden is what antivirus programs look for in malware, and Windows flagged
+        // the launcher for it (27/11/2026). Set through WMI, and the registry value it stands for is written
+        // too (WMI fails on some PCs with "Generic failure").
+        public static bool SetManagedPagefile()
+        {
+            bool done = false;
+            try
+            {
+                using (var s = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_ComputerSystem"))
+                    foreach (System.Management.ManagementObject o in s.Get())
+                    {
+                        o["AutomaticManagedPagefile"] = true;
+                        o.Put();
+                        done = true;
+                    }
+            }
+            catch (Exception) { }
+            try
+            {
+                using (var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", true))
+                    if (k != null) { k.SetValue("PagingFiles", new[] { @"?:\pagefile.sys" }, RegistryValueKind.MultiString); done = true; }
+            }
+            catch (Exception) { }
+            return done;
+        }
 
         bool FixPagefile()
         {
-            bool ok = Elevated("powershell", "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + Encoded(PagefileScript));
+            bool ok = Elevated(Application.ExecutablePath, "--pagefile");
             if (ok && PagefileOk())
             {
                 Log(L("Virtual memory is now managed by Windows. Restart Windows for it to count.", "A memoria virtual passou a ser gerida pelo Windows. Reinicia o Windows para contar."));
@@ -750,9 +775,25 @@ namespace VIctoryLauncher
         // cards need NVIDIA's firmware update first.
         int RebarCardSupport()
         {
-            if (Regex.IsMatch(gpuName, @"GTX\s*(9|10|16)\d\d|RTX\s*20\d\d|TITAN\s*(X|V|RTX)", RegexOptions.IgnoreCase)) return 0;
-            if (Regex.IsMatch(gpuName, @"RTX\s*30\d\d", RegexOptions.IgnoreCase)) return 2;
+            // GTX of any series, RTX 2050-2080 (not the "RTX 2000 Ada" pro card), the TITANs before Ampere, Quadro
+            // before RTX, MX laptop chips; Radeon RX 400/500 (Polaris), Vega and older.
+            var n = probeAdapter.Length > 0 ? probeAdapter : gpuName;
+            if (Regex.IsMatch(n, @"\bGTX\b|RTX\s*20[5-8]0|TITAN\s*(X|V|RTX)|\bMX\s*\d|Quadro\s+[KMP]\d|\bRX\s*[45][5-9]0\b|\bVega\b|\bR[79]\s", RegexOptions.IgnoreCase)) return 0;
+            if (Regex.IsMatch(n, @"RTX\s*30\d\d", RegexOptions.IgnoreCase)) return 2;
             return 1;
+        }
+
+        // Resizable BAR as a warning ("Running without", the Fix it button): only when the player can switch it on.
+        // Not on cards that cannot have it (a GTX 1650 was told to fix it on every start), not when the BIOS has it on
+        // and only Windows' D3D12 does not offer it to games (Windows 10, older Windows 11: nothing to switch), and not
+        // before anything was read (a Radeon showed "ReBAR Off" until `victory gpu` answered, then the warning went).
+        bool RebarMissing()
+        {
+            if (rebar || rebarBios || ReadSetting("rebar_ack") == "1" || integratedOnly || RebarCardSupport() == 0) return false;
+            // NVIDIA: nvidia-smi's BAR1 was read and says 256 MB, and D3D12 does not offer it either.
+            if (hasNvidia && barRead) return rebarHeap != 1;
+            // Other cards: D3D12 knows GPU upload heaps (a Windows new enough to say) and says no.
+            return rebarHeap == 0 && probeOptions16;
         }
 
         // The menus by motherboard maker (from the board's own name in Windows).
@@ -844,21 +885,17 @@ namespace VIctoryLauncher
         {
             var dir = args.SkipWhile(a => a != "--admin-setup").Skip(1).FirstOrDefault() ?? AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
             var log = new List<string>();
-            Action<string, string> ps = (what, script) => {
-                try
-                {
-                    var p = Process.Start(new ProcessStartInfo("powershell", "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + LauncherForm.Encoded(script)) { UseShellExecute = false, CreateNoWindow = true });
-                    p.WaitForExit(120000);
-                    log.Add(what + ": " + (p.ExitCode == 0 ? "ok" : "code " + p.ExitCode));
-                }
-                catch (Exception e) { log.Add(what + ": " + e.Message); }
-            };
             // Best performance power mode.
-            ps("power", "powercfg /overlaysetactive ded574b5-45a0-4f42-8737-46345c09c238; exit 0");
+            try
+            {
+                var p = Process.Start(new ProcessStartInfo("powercfg", "/overlaysetactive ded574b5-45a0-4f42-8737-46345c09c238") { UseShellExecute = false, CreateNoWindow = true });
+                p.WaitForExit(60000);
+                log.Add("power: " + (p.ExitCode == 0 ? "ok" : "code " + p.ExitCode));
+            }
+            catch (Exception e) { log.Add("power: " + e.Message); }
             // Virtual memory managed by Windows (counts after a restart).
-            if (!LauncherForm.PagefileOk()) ps("virtual memory", LauncherForm.PagefileScript);
-            // Defender's ransomware rule: the programs in the install folder may run (that rule only).
-            ps("defender", "Add-MpPreference -AttackSurfaceReductionOnlyExclusions '" + dir.Replace("'", "''") + "'; exit 0");
+            if (!LauncherForm.PagefileOk()) log.Add("virtual memory: " + (LauncherForm.SetManagedPagefile() ? "ok" : "failed"));
+            // (No Defender exception any more: the launcher never changes antivirus settings.)
             // The high-performance graphics card for victory.exe.
             try
             {

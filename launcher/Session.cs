@@ -101,14 +101,8 @@ namespace VIctoryLauncher
             string game = null;
             Invoke(new Action(() => game = GameExe));
             exeProblem = ExeProblem(game);
-            int n = 0;
-            try
-            {
-                var dir = Path.Combine(ActiveCacheDir, "shaders");
-                if (Directory.Exists(dir)) n = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Count();
-            }
-            catch (Exception) { }
-            shaderFiles = n;
+            // Folder by folder (Setup.cs, CountUpTo): one entry renamed mid-walk no longer makes it 0.
+            shaderFiles = CountUpTo(Path.Combine(ActiveCacheDir, "shaders"), int.MaxValue);
             shadersOk = ShadersReady();
             pagefileOk = PagefileOk();
             powerOk = BestPower() && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Offline;
@@ -159,7 +153,7 @@ namespace VIctoryLauncher
             if (integratedOnly) m.Add(L("a graphics card with 4 GB or more (only integrated graphics found)", "uma placa grafica com 4 GB ou mais (so ha grafica integrada)", "une carte graphique de 4 Go ou plus (seulement un graphique intégré)"));
             if (!pagefileOk) m.Add(L("virtual memory managed by Windows", "memoria virtual gerida pelo Windows"));
             if (!powerOk) m.Add(L("best performance power (plugged in)", "energia em melhor desempenho (ligado a corrente)"));
-            if (!rebar && ReadSetting("rebar_ack") != "1") m.Add("Resizable BAR");
+            if (RebarMissing()) m.Add("Resizable BAR");
             if (!gpuPrefOk) m.Add(L("the dedicated graphics card for VIctory", "a placa grafica dedicada para o VIctory"));
             if (!shadersOk) m.Add(L("prepared shaders", "shaders preparados"));
             return m;

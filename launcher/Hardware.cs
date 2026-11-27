@@ -95,6 +95,8 @@ namespace VIctoryLauncher
                 {
                     BeginInvoke(new Action(() => {
                         rebarHeap = v == "true" ? 1 : 0;
+                        string known;
+                        probeOptions16 = kv.TryGetValue("options16_known", out known) && known == "true";
                         kv.TryGetValue("adapter", out probeAdapter);
                         kv.TryGetValue("vendor", out probeVendor);
                         probeAdapter = probeAdapter ?? ""; probeVendor = probeVendor ?? "";
@@ -178,8 +180,8 @@ namespace VIctoryLauncher
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
             var m = Selected;
-            var scale = m.Custom ? custom.Scale : m.Scale;
-            if (scale != null) { set("VICTORY_RENDER_SCALE", scale); set("VICTORY_OWN_UPSCALER", "1"); }
+            var scale = EffectiveScale(m.Custom ? custom.Scale : m.Scale);
+            if (scale != null && scale != "1.0") { set("VICTORY_RENDER_SCALE", scale); set("VICTORY_OWN_UPSCALER", "1"); }
             return e;
         }
 
@@ -710,6 +712,8 @@ namespace VIctoryLauncher
             y += 48;
 
             y = SavesSection(page, X, y, W);
+            y = ReferencePcSection(page, X, y, W);
+            y = PlayersPcsSection(page, X, y, W);
             page.Controls.Add(new Heading(L("Hardware sharing (only hardware)", "Partilha de hardware (so hardware)")) { Location = new Point(X, y), Width = W });
             y += 32;
             shareBox = new OptionCard { Text = L("Share my hardware with edupode", "Partilhar o meu hardware com o edupode"), Line = L("Off by default. Only the list below; never logs, options, paths, names or your IP.", "Desligado por defeito. So a lista em baixo; nunca logs, opcoes, caminhos, nomes nem o teu IP."),
@@ -721,6 +725,7 @@ namespace VIctoryLauncher
             };
             page.Controls.Add(shareBox);
             y += 66;
+            y = SessionLogsSection(page, X, y, W);
             shareStatus = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.Ui(9f) };
             page.Controls.Add(shareStatus);
             y += 44;

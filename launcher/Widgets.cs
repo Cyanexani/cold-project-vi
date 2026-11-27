@@ -2,6 +2,7 @@
 // shade up with a 1 px border, small corners, one cyan accent, monospaced labels and numbers.
 // Plain GDI+, .NET Framework 4, C# 5.
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -209,13 +210,79 @@ namespace VIctoryLauncher
                 var fill = down ? Theme.Violet : hover ? Color.FromArgb(110, 207, 250) : Theme.Cyan;
                 Theme.Panel(g, r, fill, fill);
             }
-            else Theme.Panel(g, r, hover ? Theme.CardHover : Theme.Card, hover ? Theme.Cyan : Theme.Line);
+            else Theme.Panel(g, r, down ? Theme.Back : hover ? Theme.CardHover : Theme.Card, hover || down ? Theme.Cyan : Theme.Line);
+            // Keyboard focus (Tab): a ring inside the edge.
+            if (Focused && ShowFocusCues && Enabled)
+                using (var p = new Pen(Main ? Color.FromArgb(8, 20, 30) : Theme.Cyan, 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot })
+                using (var path = Theme.Round(new RectangleF(3.5f, 3.5f, Width - 7.5f, Height - 7.5f), 4)) g.DrawPath(p, path);
             using (var b = new SolidBrush(Enabled ? (Main ? Color.FromArgb(8, 20, 30) : ForeColor) : Theme.Dim))
             using (var f = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, HotkeyPrefix = HotkeyPrefix.None })
-                g.DrawString(Text, Font, b, r, f);
+            {
+                // A label longer than the button (Portuguese and French ones often are) gets a smaller font
+                // before it is cut with "...".
+                var font = Font;
+                Font smaller = null;
+                for (float size = Font.Size; size > 7.5f && g.MeasureString(Text, font).Width > r.Width - 12; size -= 0.5f)
+                {
+                    if (smaller != null) smaller.Dispose();
+                    font = smaller = new Font(Font.FontFamily, size - 0.5f, Font.Style);
+                }
+                g.DrawString(Text, font, b, r, f);
+                if (smaller != null) smaller.Dispose();
+            }
         }
+        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
     }
 
+    // A key (or a controller button) drawn as a key cap: "Left Ctrl / C" becomes two caps with a slash between.
+    class KeyCap : Control
+    {
+        public bool Pad;
+        public KeyCap()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            Font = Theme.Mono(8.75f);
+        }
+        protected override void OnTextChanged(EventArgs e) { Invalidate(); base.OnTextChanged(e); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
+            Theme.Smooth(g);
+            var text = Text ?? "";
+            if (text == "-" || text.Length == 0)
+            {
+                using (var b = new SolidBrush(Theme.Dim)) g.DrawString("—", Font, b, 4, 5);
+                return;
+            }
+            float x = 0;
+            var parts = text.Split(new[] { " / ", " + " }, StringSplitOptions.None);
+            var joins = new List<string>();
+            for (int i = 0, at = 0; i < parts.Length - 1; i++)
+            {
+                at = text.IndexOf(parts[i], at, StringComparison.Ordinal) + parts[i].Length;
+                joins.Add(text.Substring(at, 3).Trim());
+            }
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var w = g.MeasureString(parts[i], Font).Width + 14;
+                if (x + w > Width) w = Math.Max(20, Width - x - 1);
+                var r = new RectangleF(x + 0.5f, 1.5f, w, Height - 4f);
+                Theme.Panel(g, r, Pad ? Theme.Back : Theme.Card, Pad ? Theme.Line : Theme.Cyan);
+                using (var b = new SolidBrush(Pad ? Theme.Dim : Theme.Text))
+                using (var f = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    g.DrawString(parts[i], Font, b, r, f);
+                x += w + 4;
+                if (i < joins.Count)
+                {
+                    using (var b = new SolidBrush(Theme.Dim)) g.DrawString(joins[i], Font, b, x, 6);
+                    x += g.MeasureString(joins[i], Font).Width + 2;
+                }
+                if (x >= Width) break;
+            }
+        }
+    }
     // A button of the side bar: icon and name; the active one has a lighter fill and a cyan bar.
     class NavButton : Control
     {

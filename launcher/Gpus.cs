@@ -56,6 +56,9 @@ namespace VIctoryLauncher
         public static List<GpuAdapter> List()
         {
             var list = new List<GpuAdapter>();
+            // One entry per adapter: DXGI lists a card again for each output a capture tool or virtual display hangs
+            // on it (an RTX 4080 SUPER showed four times, 27/11/2026).
+            var seen = new HashSet<long>();
             try
             {
                 var iid = typeof(IDXGIFactory1).GUID;
@@ -71,6 +74,10 @@ namespace VIctoryLauncher
                         {
                             AdapterDesc1 d;
                             if (a.GetDesc1(out d) != 0 || (d.Flags & SoftwareAdapter) != 0 || d.VendorId == 0x1414) continue;
+                            if (!seen.Add(((long)d.LuidHigh << 32) | d.LuidLow)) continue;
+                            if (list.Exists(o => o.Name == (d.Description ?? "").Trim() && o.DedicatedMb == (long)(d.DedicatedVideoMemory.ToUInt64() >> 20))) continue;
+                            // Virtual displays (Parsec, emulators' adapters) are not graphics cards.
+                            if (d.VendorId != 0x10DE && d.VendorId != 0x1002 && d.VendorId != 0x8086) continue;
                             var g = new GpuAdapter
                             {
                                 Name = (d.Description ?? "").Trim(),

@@ -34,6 +34,8 @@ namespace VIctoryLauncher
             };
             // The installer's one administrator step (installer\VI.iss): Windows settings, then out.
             if (args.Contains("--admin-setup")) return AdminTasks.Run(args);
+            // The Setup page's virtual memory step, run as administrator (no PowerShell).
+            if (args.Contains("--pagefile")) return LauncherForm.SetManagedPagefile() ? 0 : 1;
             // After an update: the launcher it replaced ends first (it still holds the one-launcher lock).
             int wait = Array.IndexOf(args, "--wait-pid");
             int pid;
@@ -132,6 +134,8 @@ namespace VIctoryLauncher
         // Resizable BAR as the card reports it (nvidia-smi's BAR1 of 1 GB and more) and as D3D12
         // offers it to a run (`victory gpu`: GPU upload heaps; -1 not asked yet).
         bool rebarBios;
+        // nvidia-smi's BAR1 was read at all; D3D12 knows GPU upload heaps (Windows 11 24H2 and newer).
+        bool barRead, probeOptions16;
         int rebarHeap = -1;
         string probeAdapter = "", probeVendor = "";
         double vramGb, ramGb;
@@ -251,7 +255,8 @@ namespace VIctoryLauncher
             StartChecks();
             // Once the window is up: the notices of new things to try (Hardware.cs).
             var later = new System.Windows.Forms.Timer { Interval = 1500 };
-            later.Tick += (s, a) => { later.Stop(); later.Dispose(); if (!setupBusy) ShowNotices(); };
+            // First what changed in this version (once), then older copies of the launcher to remove, then the notices.
+            later.Tick += (s, a) => { later.Stop(); later.Dispose(); ShowWhatsNewOnce(); CleanupOldLaunchers(); if (!setupBusy) ShowNotices(); };
             later.Start();
             StartUpdates();
             StartHardwareShare();
@@ -458,6 +463,7 @@ namespace VIctoryLauncher
                 L("Output 1080p (Full HD)", "Saida 1080p (Full HD)"),
                 L("Output 1440p (2K)", "Saida 1440p (2K)"),
                 L("Output 2160p (4K)", "Saida 2160p (4K)"),
+                L("Output 720p (HD)", "Saida 720p (HD)"),
             });
             outputBox.SelectedIndex = 0;
             outputBox.SelectedIndexChanged += (s, e) => { SaveSettings(); Refresh2(); };
@@ -839,89 +845,84 @@ namespace VIctoryLauncher
         }
 
         // ---------------------------------------------------------------- Controls and Help
+        // The controls grouped by what the player is doing (on foot, talking, fighting, driving, flying, menus),
+        // each line: what it does, the key, the pad. Keys are drawn as key caps.
         Panel ControlsPage()
         {
             var page = Page();
-            page.Controls.Add(new Heading(L("Keyboard and mouse", "Teclado e rato")) { Location = new Point(24, 20), Width = 852 });
-            var grid = new ListView { Location = new Point(24, 54), Size = new Size(852, 620), View = View.Details, FullRowSelect = true, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 10f), HeaderStyle = ColumnHeaderStyle.Nonclickable, OwnerDraw = true };
-            grid.Columns.Add(L("Key", "Tecla"), 190);
-            grid.Columns.Add(L("Pad", "Comando"), 120);
-            grid.Columns.Add(L("On foot", "A pe"), 240);
-            grid.Columns.Add(L("In a vehicle (after F, high beep)", "Num veiculo (depois do F, apito agudo)"), 300);
-            DarkHeader(grid);
-            string[][] rows = Pt ? new[] {
-                new[] { "W / A / S / D", "Analogico esq.", "Andar", "W acelerar, S travar/marcha-atras, A/D virar" },
-                new[] { "I / K", "Analogico esq. cima/baixo", "(camara)", "Aviao: nariz baixo (I) / cima (K); levantar: W + K" },
-                new[] { "Rato", "Analogico dir.", "Olhar (clica para capturar)", "Olhar" },
-                new[] { "Botao esquerdo", "RT / RB", "Disparar", "Disparar" },
-                new[] { "Botao direito", "LT", "Mirar / interagir", "" },
-                new[] { "Shift esq.", "L3", "Correr", "Buzina / nitro" },
-                new[] { "F", "Y + modo veiculo", "Entrar no veiculo", "Sair do veiculo" },
-                new[] { "E ou Y", "Y", "Interagir, falar", "" },
-                new[] { "Espaco / Enter", "A", "Saltar / escalar; luta: bloquear", "Travao de mao" },
-                new[] { "Ctrl esq. / C / Backspace", "B", "Agachar / descansar", "Farois; aviao: direita" },
-                new[] { "R ou X", "X", "Luta: soco/pontape", "Aviao: esquerda" },
-                new[] { "Q", "RB", "Proteger-se", "" },
-                new[] { "Tab (manter)", "LB", "Inventario / roda de armas", "Sacar arma" },
-                new[] { "M", "View", "Mapa", "Mapa" },
-                new[] { "V", "R3", "Olhar para tras", "Olhar para tras" },
-                new[] { "Setas ou 1-4", "D-pad", "Telemovel, radio, parceiro", "" },
-                new[] { "Esc", "Menu", "Pausa", "Pausa" },
-                new[] { "Caps Lock", "-", "Acertar o modo veiculo", "" },
-                new[] { "Alt ou F1", "-", "Soltar o rato", "" },
-                new[] { "F3", "-", "Mostrar/esconder o overlay", "" },
-                new[] { "F9", "-", "Gravar um frame (modo de gravacao)", "" },
-            } : Fr ? new[] {
-                new[] { "W / A / S / D", "Stick gauche", "Se déplacer", "W accélérer, S freiner/reculer, A/D tourner" },
-                new[] { "I / K", "Stick gauche haut/bas", "(caméra)", "Avion : piquer (I) / cabrer (K) ; décoller : W + K" },
-                new[] { "Souris", "Stick droit", "Regarder (clic pour capturer)", "Regarder" },
-                new[] { "Clic gauche", "RT / RB", "Tirer", "Tirer" },
-                new[] { "Clic droit", "LT", "Viser / interagir", "" },
-                new[] { "Maj gauche", "L3", "Courir", "Klaxon / nitro" },
-                new[] { "F", "Y + mode véhicule", "Monter dans le véhicule", "Sortir du véhicule" },
-                new[] { "E ou Y", "Y", "Interagir, parler", "" },
-                new[] { "Espace / Entrée", "A", "Sauter / grimper ; combat : bloquer", "Frein à main" },
-                new[] { "Ctrl gauche / C / Retour arrière", "B", "S'accroupir / se reposer", "Phares ; avion : droite" },
-                new[] { "R ou X", "X", "Combat : coup de poing/pied", "Avion : gauche" },
-                new[] { "Q", "RB", "Se mettre à couvert", "" },
-                new[] { "Tab (maintenir)", "LB", "Inventaire / roue des armes", "Sortir une arme" },
-                new[] { "M", "View", "Carte", "Carte" },
-                new[] { "V", "R3", "Regarder derrière", "Regarder derrière" },
-                new[] { "Flèches ou 1-4", "Croix", "Téléphone, radio, partenaire", "" },
-                new[] { "Échap", "Menu", "Pause", "Pause" },
-                new[] { "Verr. Maj", "-", "Recaler le mode véhicule s'il est désynchronisé", "" },
-                new[] { "Alt ou F1", "-", "Libérer la souris", "" },
-                new[] { "F3", "-", "Afficher/masquer l'overlay", "" },
-                new[] { "F9", "-", "Enregistrer une image (mode enregistrement)", "" },
-            } : new[] {
-                new[] { "W / A / S / D", "Left stick", "Move", "W accelerate, S brake/reverse, A/D steer" },
-                new[] { "I / K", "Left stick up/down", "(camera)", "Aircraft nose down (I) / up (K); take off: W + K" },
-                new[] { "Mouse", "Right stick", "Look (click to capture)", "Look" },
-                new[] { "Left mouse button", "RT / RB", "Shoot", "Shoot" },
-                new[] { "Right mouse button", "LT", "Aim / interact", "" },
-                new[] { "Left Shift", "L3", "Run", "Horn / nitro" },
-                new[] { "F", "Y + vehicle mode", "Enter vehicle", "Leave vehicle" },
-                new[] { "E or Y", "Y", "Interact, talk", "" },
-                new[] { "Space / Enter", "A", "Jump / climb; melee: block", "Handbrake" },
-                new[] { "Left Ctrl / C / Backspace", "B", "Crouch / rest", "Headlights; aircraft: right" },
-                new[] { "R or X", "X", "Melee: punch/kick", "Aircraft: left" },
-                new[] { "Q", "RB", "Take cover", "" },
-                new[] { "Tab (hold)", "LB", "Inventory / weapon wheel", "Draw weapon" },
-                new[] { "M", "View", "Map", "Map" },
-                new[] { "V", "R3", "Look back", "Look back" },
-                new[] { "Arrows or 1-4", "D-pad", "Phone, radio, partner", "" },
-                new[] { "Esc", "Menu", "Pause", "Pause" },
-                new[] { "Caps Lock", "-", "Fix vehicle mode if out of sync", "" },
-                new[] { "Alt or F1", "-", "Release the mouse", "" },
-                new[] { "F3", "-", "Show/hide the overlay", "" },
-                new[] { "F9", "-", "Record a frame (recording mode)", "" },
+            const int X = 24, W = 852;
+            int y = 20;
+            page.Controls.Add(new Heading(L("Controls, by what you are doing", "Controlos, pelo que estas a fazer", "Commandes, selon ce que tu fais")) { Location = new Point(X, y), Width = W });
+            y += 30;
+            page.Controls.Add(Small(L("Keyboard and mouse, and the Xbox controller button for each. A controller connected to the PC replaces all of this.",
+                                      "Teclado e rato, e o botao do comando Xbox de cada um. Um comando ligado ao PC substitui tudo isto.",
+                                      "Clavier et souris, et le bouton de la manette Xbox pour chacun. Une manette branchée au PC remplace tout cela."), X, y, W));
+            y += 30;
+            Func<string, string, string, string[]> row = (what, key, pad) => new[] { what, key, pad };
+            var groups = new List<Tuple<string, string[][]>> {
+                Tuple.Create(L("On foot", "A pe", "À pied"), new[] {
+                    row(L("Move", "Andar", "Se déplacer"), "W A S D", L("Left stick", "Analogico esq.", "Stick gauche")),
+                    row(L("Look around (click the game to capture the mouse)", "Olhar (clica no jogo para capturar o rato)", "Regarder (clique dans le jeu pour capturer la souris)"), L("Mouse", "Rato", "Souris"), L("Right stick", "Analogico dir.", "Stick droit")),
+                    row(L("Run", "Correr", "Courir"), L("Left Shift", "Shift esq.", "Maj gauche"), "L3"),
+                    row(L("Jump, climb", "Saltar, escalar", "Sauter, grimper"), L("Space / Enter", "Espaco / Enter", "Espace / Entrée"), "A"),
+                    row(L("Crouch, rest", "Agachar, descansar", "S'accroupir, se reposer"), L("Left Ctrl / C / Backspace", "Ctrl esq. / C / Backspace", "Ctrl gauche / C / Retour"), "B"),
+                    row(L("Take cover", "Proteger-se", "Se mettre à couvert"), "Q", "RB"),
+                    row(L("Look back", "Olhar para tras", "Regarder derrière"), "V", "R3"),
+                }),
+                Tuple.Create(L("Talking and using things", "Falar e usar coisas", "Parler et utiliser"), new[] {
+                    row(L("Interact, talk", "Interagir, falar", "Interagir, parler"), "E / Y", "Y"),
+                    row(L("Aim, interact", "Mirar, interagir", "Viser, interagir"), L("Right mouse button", "Botao direito", "Clic droit"), "LT"),
+                }),
+                Tuple.Create(L("Fighting", "Lutar", "Combat"), new[] {
+                    row(L("Shoot", "Disparar", "Tirer"), L("Left mouse button", "Botao esquerdo", "Clic gauche"), "RT / RB"),
+                    row(L("Punch, kick", "Soco, pontape", "Coup de poing, de pied"), "R / X", "X"),
+                    row(L("Block", "Bloquear", "Bloquer"), L("Space", "Espaco", "Espace"), "A"),
+                    row(L("Inventory, weapon wheel (hold)", "Inventario, roda de armas (manter)", "Inventaire, roue des armes (maintenir)"), "Tab", "LB"),
+                }),
+                Tuple.Create(L("Driving (press F: a high beep means vehicle mode)", "Conduzir (carrega no F: um apito agudo e o modo veiculo)", "Conduire (appuie sur F : un bip aigu = mode véhicule)"), new[] {
+                    row(L("Get in, get out", "Entrar, sair", "Monter, descendre"), "F", L("Y + vehicle mode", "Y + modo veiculo", "Y + mode véhicule")),
+                    row(L("Accelerate", "Acelerar", "Accélérer"), "W", "RT"),
+                    row(L("Brake, reverse", "Travar, marcha-atras", "Freiner, reculer"), "S", "LT"),
+                    row(L("Steer", "Virar", "Tourner"), "A / D", L("Left stick", "Analogico esq.", "Stick gauche")),
+                    row(L("Handbrake", "Travao de mao", "Frein à main"), L("Space", "Espaco", "Espace"), "A"),
+                    row(L("Horn, nitro", "Buzina, nitro", "Klaxon, nitro"), L("Left Shift", "Shift esq.", "Maj gauche"), "L3"),
+                    row(L("Headlights", "Farois", "Phares"), L("Left Ctrl / C", "Ctrl esq. / C", "Ctrl gauche / C"), "B"),
+                    row(L("Draw a weapon", "Sacar arma", "Sortir une arme"), "Tab", "LB"),
+                    row(L("Vehicle mode out of sync? Set it right", "Modo veiculo trocado? Acerta-o", "Mode véhicule décalé ? Le recaler"), "Caps Lock", "-"),
+                }),
+                Tuple.Create(L("Flying", "Voar", "Voler"), new[] {
+                    row(L("Take off", "Levantar voo", "Décoller"), "W + K", "-"),
+                    row(L("Nose down, nose up", "Nariz baixo, nariz cima", "Piquer, cabrer"), "I / K", L("Left stick up/down", "Analogico esq. cima/baixo", "Stick gauche haut/bas")),
+                    row(L("Turn left", "Virar a esquerda", "Tourner à gauche"), "R / X", "X"),
+                    row(L("Turn right", "Virar a direita", "Tourner à droite"), L("Left Ctrl / C", "Ctrl esq. / C", "Ctrl gauche / C"), "B"),
+                }),
+                Tuple.Create(L("Map, phone and menus", "Mapa, telemovel e menus", "Carte, téléphone et menus"), new[] {
+                    row(L("Map", "Mapa", "Carte"), "M", "View"),
+                    row(L("Phone, radio, partner", "Telemovel, radio, parceiro", "Téléphone, radio, partenaire"), L("Arrows / 1-4", "Setas / 1-4", "Flèches / 1-4"), L("D-pad", "D-pad", "Croix")),
+                    row(L("Pause", "Pausa", "Pause"), "Esc", "Menu"),
+                }),
+                Tuple.Create(L("VIctory's own keys", "Teclas do VIctory", "Touches de VIctory"), new[] {
+                    row(L("Release the mouse", "Soltar o rato", "Libérer la souris"), "Alt / F1", "-"),
+                    row(L("Show or hide the overlay (FPS, memory)", "Mostrar ou esconder o overlay (FPS, memoria)", "Afficher ou masquer l'overlay (FPS, mémoire)"), "F3", "-"),
+                    row(L("Record a frame (recording mode)", "Gravar um frame (modo de gravacao)", "Enregistrer une image (mode enregistrement)"), "F9", "-"),
+                }),
             };
-            foreach (var r in rows) grid.Items.Add(new ListViewItem(r));
-            page.Controls.Add(grid);
-            page.Controls.Add(Small(L("An Xbox controller connected to the PC replaces all of this.", "Um comando de Xbox ligado ao PC substitui tudo isto."), 24, 684, 852));
+            foreach (var g in groups)
+            {
+                page.Controls.Add(new Heading(g.Item1) { Location = new Point(X, y), Width = W });
+                y += 30;
+                foreach (var r in g.Item2)
+                {
+                    page.Controls.Add(new Label { Text = r[0], Location = new Point(X + 8, y + 6), Size = new Size(470, 22), ForeColor = Theme.Text, BackColor = Theme.Back, Font = Theme.Ui(9.75f), AutoEllipsis = true });
+                    page.Controls.Add(new KeyCap { Text = r[1], Location = new Point(X + 490, y + 2), Size = new Size(210, 28) });
+                    page.Controls.Add(new KeyCap { Text = r[2], Pad = true, Location = new Point(X + 712, y + 2), Size = new Size(140, 28) });
+                    y += 34;
+                }
+                y += 10;
+            }
+            page.Controls.Add(new Label { Location = new Point(X, y), Size = new Size(10, 10), BackColor = Theme.Back });
             return page;
         }
-
         Panel HelpPage()
         {
             var page = Page();
@@ -938,6 +939,12 @@ namespace VIctoryLauncher
             var logs = new Pill { Text = L("Open the logs folder", "Abrir a pasta dos logs"), Location = new Point(X + 410, y), Size = new Size(190, 38) };
             logs.Click += (s, e) => { Directory.CreateDirectory(Path.Combine(dataRoot, "logs")); OpenUrl(Path.Combine(dataRoot, "logs")); };
             page.Controls.Add(logs);
+            var news = new Pill { Text = L("What's new", "Novidades", "Nouveautés"), Location = new Point(X + 610, y), Size = new Size(130, 38) };
+            news.Click += (s, e) => ShowWhatsNew();
+            page.Controls.Add(news);
+            var safe = new Pill { Text = L("Is it safe?", "E seguro?", "Est-ce sûr ?"), Location = new Point(X + 750, y), Size = new Size(130, 38) };
+            safe.Click += (s, e) => OpenUrl(SafetyUrl);
+            page.Controls.Add(safe);
             y += 52;
             var text = new TextBox { Location = new Point(X, y), Size = new Size(W, 1180), Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.None, ForeColor = Theme.Text, BackColor = Theme.Back, Font = Theme.Ui(10f), ScrollBars = ScrollBars.None, TabStop = false };
             text.Text = string.Join("\r\n", FunctionList().Concat(new[] { "", L("ABOUT", "SOBRE"), L("Julia's Launcher is edupode's remake, built on the work of:", "O Julia's Launcher e o remake do edupode, feito com o trabalho de:") }).Concat(Credits()).ToArray());
@@ -959,7 +966,7 @@ namespace VIctoryLauncher
                 "   •  Se faltar alguma coisa (memoria virtual, energia, Resizable BAR, shaders), um aviso amarelo diz o que e e leva-te a corrigir.",
                 "",
                 "PREPARAR",
-                "   •  'Fazer tudo por mim' corre os passos que faltam: motor, excecao do Defender, pasta do jogo, shaders, energia,",
+                "   •  'Fazer tudo por mim' corre os passos que faltam: motor, pasta do jogo, shaders, energia,",
                 "      memoria virtual, placa grafica certa para o VIctory e geracao de frames. O Windows pede administrador quando e preciso.",
                 "   •  Resizable BAR: o launcher ve o que o D3D12 da ao jogo (nao so a BIOS) e mostra o guia da tua placa-mae.",
                 "",
@@ -973,7 +980,7 @@ namespace VIctoryLauncher
                 "HARDWARE E ID",
                 "   •  O teu ID permanente (VI-XXXX-XXXX), com botao de copiar. Vem de pecas do PC e nao muda ao reinstalar o Windows.",
                 "   •  Partilha de hardware (desligada por defeito): envia SO o hardware (placa, processador, RAM, placa-mae, Windows,",
-                "      tipo de disco). Nunca envia logs, opcoes, caminhos, nomes nem o IP. A pagina mostra exatamente o que e enviado.",
+                "      tipo de disco). Nunca envia logs (essas tem uma escolha propria), opcoes, caminhos, nomes nem o IP. A pagina mostra exatamente o que e enviado.",
                 "",
                 "ATUALIZACOES",
                 "   •  O launcher verifica o GitHub ao abrir e de 5 em 5 minutos. Um update so e instalado se a assinatura e o SHA-256",
@@ -1008,7 +1015,7 @@ namespace VIctoryLauncher
                 "   •  Quand il manque quelque chose (mémoire virtuelle, alimentation, Resizable BAR, shaders), un avis jaune dit quoi et t'emmène corriger.",
                 "",
                 "INSTALLATION",
-                "   •  'Tout faire pour moi' lance les étapes manquantes : moteur, exclusion Defender, dossier du jeu, shaders, alimentation,",
+                "   •  'Tout faire pour moi' lance les étapes manquantes : moteur, dossier du jeu, shaders, alimentation,",
                 "      mémoire virtuelle, bonne carte graphique pour VIctory et génération d'images. Windows demande les droits administrateur si besoin.",
                 "   •  Resizable BAR : le launcher vérifie ce que D3D12 donne au jeu (pas seulement le BIOS) et montre le guide de ta carte mère.",
                 "",
@@ -1022,7 +1029,7 @@ namespace VIctoryLauncher
                 "MATÉRIEL ET ID",
                 "   •  Ton ID permanent (VI-XXXX-XXXX), avec un bouton copier. Il vient des composants du PC et reste après une réinstallation de Windows.",
                 "   •  Partage du matériel (désactivé par défaut) : envoie UNIQUEMENT le matériel (carte graphique, processeur, RAM, carte mère, Windows,",
-                "      type de disque). Jamais de logs, d'options, de chemins, de noms ni ton IP. La page montre exactement ce qui est envoyé.",
+                "      type de disque). Jamais de logs (ceux-ci ont leur propre choix), d'options, de chemins, de noms ni ton IP. La page montre exactement ce qui est envoyé.",
                 "",
                 "MISES À JOUR",
                 "   •  Le launcher vérifie GitHub à l'ouverture et toutes les 5 minutes. Une mise à jour n'est installée que si sa signature et",
@@ -1057,7 +1064,7 @@ namespace VIctoryLauncher
                 "   •  When something is missing (virtual memory, power, Resizable BAR, shaders), a yellow notice says what and takes you to fix it.",
                 "",
                 "SETUP",
-                "   •  'Do everything for me' runs the missing steps: engine, Defender exception, game folder, shaders, power, virtual",
+                "   •  'Do everything for me' runs the missing steps: engine, game folder, shaders, power, virtual",
                 "      memory, the right graphics card for VIctory and frame generation. Windows asks for administrator rights when needed.",
                 "   •  Resizable BAR: the launcher checks what D3D12 gives the game (not only the BIOS) and shows your motherboard's guide.",
                 "",
@@ -1071,7 +1078,7 @@ namespace VIctoryLauncher
                 "HARDWARE & ID",
                 "   •  Your permanent ID (VI-XXXX-XXXX), with a copy button. It comes from PC parts and stays after a Windows reinstall.",
                 "   •  Hardware sharing (off by default): sends ONLY hardware (graphics card, CPU, RAM, motherboard, Windows, disk type).",
-                "      It never sends logs, options, paths, names or your IP. The page shows exactly what is sent.",
+                "      It never sends logs (those have a choice of their own), options, paths, names or your IP. The page shows exactly what is sent.",
                 "",
                 "UPDATES",
                 "   •  The launcher checks GitHub when it opens and every 5 minutes. An update is installed only when its signature and",
@@ -1244,9 +1251,23 @@ namespace VIctoryLauncher
 
         ComboBox outputBox;
 
-        // The output size picked: 1080p, 1440p or 2160p.
-        int OutputHeight { get { return outputBox == null ? 1080 : outputBox.SelectedIndex == 2 ? 2160 : outputBox.SelectedIndex == 1 ? 1440 : 1080; } }
+        // The output size picked: 1080p, 1440p, 2160p or 720p (launcher.ini keeps the box's index: 3 is 720p).
+        int OutputHeight { get { return outputBox == null ? 1080 : outputBox.SelectedIndex == 3 ? 720 : outputBox.SelectedIndex == 2 ? 2160 : outputBox.SelectedIndex == 1 ? 1440 : 1080; } }
         int OutputWidth { get { return OutputHeight * 16 / 9; } }
+
+        // A preset's scale is for 1080p and up (the scale applies on top of the output). At 720p output the world
+        // is drawn at the preset's 1080p size or 720p, whichever is smaller: Recommended (720p) becomes native 720p,
+        // the 540p presets 960x540 upscaled to 720p. Never less than at 1080p, and the screen's images are smaller
+        // (less video memory). null: native.
+        string EffectiveScale(string scale)
+        {
+            if (OutputHeight != 720) return scale;
+            double s = 1.0;
+            if (scale != null) double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out s);
+            if (s <= 0) s = 1.0;
+            var at720 = Math.Min(1.0, s * 1080.0 / 720.0);
+            return at720 >= 0.999 ? null : at720.ToString("0.#######", System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         // The edupode engine is the default on every card. On a Radeon, when it ends with an error in the first
         // three minutes twice in a row, the launcher moves to Belobug's AMD engine on its own (built once by
@@ -1290,7 +1311,7 @@ namespace VIctoryLauncher
         {
             if (modeIndex < 0) return "";
             var m = Selected;
-            string scale = m.Custom ? custom.Scale : m.Scale;
+            string scale = EffectiveScale(m.Custom ? custom.Scale : m.Scale);
             string pic;
             double sc;
             if (scale != null && double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out sc) && sc < 0.999)
@@ -1323,8 +1344,10 @@ namespace VIctoryLauncher
         {
             if (rebarHeap == 1) return L("ReBAR On", "ReBAR ligado");
             if (rebarHeap == 0 && rebarBios) return L("ReBAR On (not used by Windows)", "ReBAR ligado (o Windows nao o usa)");
-            if (rebarHeap == 0) return L("ReBAR Off", "ReBAR desligado");
-            return rebarBios ? L("ReBAR On", "ReBAR ligado") : L("ReBAR Off?", "ReBAR desligado?");
+            if (rebarBios) return L("ReBAR On", "ReBAR ligado");
+            if (!integratedOnly && RebarCardSupport() == 0) return L("ReBAR n/a (card)", "ReBAR n/d (placa)");
+            if (RebarMissing()) return L("ReBAR Off", "ReBAR desligado");
+            return rebarHeap == 0 ? L("ReBAR not offered by Windows", "ReBAR nao oferecido pelo Windows") : L("ReBAR ?", "ReBAR ?");
         }
 
         static string NvidiaSmi
@@ -1365,7 +1388,9 @@ namespace VIctoryLauncher
                     foreach (Match m in Regex.Matches(q, @"BAR1 Memory Usage\s+Total\s*:\s*(\d+)\s*MiB", RegexOptions.IgnoreCase))
                     {
                         double bar;
-                        if (double.TryParse(m.Groups[1].Value, out bar) && bar >= 1024) rebarBios = true;
+                        if (!double.TryParse(m.Groups[1].Value, out bar)) continue;
+                        barRead = true;
+                        if (bar >= 1024) rebarBios = true;
                     }
                     rtxFrameGen = Regex.IsMatch(gpuName, @"RTX\s*(40|50)\d\d");
                 }
@@ -1516,6 +1541,13 @@ namespace VIctoryLauncher
             if (smoothBox.Checked && OwnFrameGen) set("VICTORY_FRAMEGEN", "1");
             // Advanced Tweaks: the player's values over the preset they start from (Custom.cs).
             if (m.Custom) ApplyCustom(e);
+            if (OutputHeight == 720)
+            {
+                string given;
+                var s = EffectiveScale(e.TryGetValue("VICTORY_RENDER_SCALE", out given) ? given : null);
+                if (s == null) { e.Remove("VICTORY_RENDER_SCALE"); e.Remove("VICTORY_OWN_UPSCALER"); }
+                else { set("VICTORY_RENDER_SCALE", s); set("VICTORY_OWN_UPSCALER", "1"); }
+            }
             set("VICTORY_VRAM_RESERVE", reserveBox.Checked ? "max" : "0");
             if (cpuBox.Checked)
             {
@@ -1621,6 +1653,8 @@ namespace VIctoryLauncher
             if (!EnoughMemory()) { Show(PagePerf); return; }
             // Asked on every PLAY until the player shares or says not to ask again (Hardware.cs).
             AskToShare();
+            // Once: a log of each game sent when it closes (SessionLogs.cs).
+            AskSessionLogs();
             long cardUsed;
             GpuUsers(out cardUsed);
             if (cardUsed > (2L << 30))
@@ -1648,6 +1682,7 @@ namespace VIctoryLauncher
                     RemoveNvSmooth();
                     int code = 0;
                     try { code = p.ExitCode; } catch (Exception) { }
+                    SendSessionLog(log, code, started, DateTime.Now);
                     if (gameProc != p) return; // closed from the launcher (Close game, or PLAY again)
                     gameProc = null;
                     if (code != 0)
@@ -1777,7 +1812,7 @@ namespace VIctoryLauncher
                         case "fights": fightsBox.Checked = v == "1"; break;
                         case "warm": warmBox.Checked = v == "1"; break;
                         case "cpu": cpuBox.Checked = v == "1"; break;
-                        case "output": { int o; if (outputBox != null && int.TryParse(v, out o) && o >= 0 && o <= 2) outputBox.SelectedIndex = o; } break;
+                        case "output": { int o; if (outputBox != null && int.TryParse(v, out o) && o >= 0 && o <= 3) outputBox.SelectedIndex = o; } break;
                     }
                 }
             }
