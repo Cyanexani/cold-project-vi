@@ -226,7 +226,7 @@ namespace VIctoryLauncher
             var page = Page();
             const int X = 24, W = 852;
             int y = 20;
-            banner = new Banner { Location = new Point(X, y), Size = new Size(W, 128), Title = "GTA VI  ·  VIctory",
+            banner = new Banner { Location = new Point(X, y), Size = new Size(W, 128), Title = "VI Launcher",
                 Subtitle = "VIctory + cgbj + AnyXboxSeries + Leonidas + VIctory-NVIDIA + fxceless + VIctory-7900XTX  —  " + L("remake by edupode", "remake por edupode") };
             page.Controls.Add(banner);
             y += 146;
