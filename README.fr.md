@@ -53,7 +53,7 @@ Le moteur avec lequel toutes les cartes jouent par défaut. Mesuré sur le porta
 
 ## Progression sur l'échelle de PortWatch VI
 
-**Environ 77 % ou plus** (mesuré sur le portable de l'auteur, RTX 5070 Ti, 27/11/2026). L'échelle de PortWatch :
+**Environ 79 %** (27/11/2026 : le portable de l'auteur, RTX 5070 Ti, et des joueurs à 30 fps stables). L'échelle de PortWatch :
 jusqu'à 50 %, chaque étape demande la précédente ; au-delà, l'histoire, l'image, la vitesse et la stabilité se
 partagent les 50 derniers points. Les points au-dessus de 50 sont notre estimation (PortWatch ne les compte qu'avec
 une preuve, une vidéo).
@@ -62,9 +62,9 @@ une preuve, une vidéo).
 |---|---|---|
 | Bases, exécutable, première image, menu, dans le monde | 0-40 | ✅ |
 | Jouable (vous contrôlez un personnage) | 50 | ✅ missions jouables |
-| Histoire (17,5 points) | 3 ou plus | ✅ prologue terminé, missions jouées ; davantage à mesure que l'histoire avance |
+| Histoire (17,5 points) | environ 3 | ✅ l'ouverture et ses missions se jouent jusqu'au bout ; le reste de l'histoire pas encore joué |
 | Image (12,5 points) | environ 8 | ✅ éclairage NVIDIA, eau correcte, scènes de nuit éclairées ; ⏳ ray tracing et volumétrie `_Tiled` encore désactivés |
-| Vitesse (10 points : fps ÷ 30) | environ 8 | ✅ 22-26 fps en monde ouvert, 35-38 en cinématiques, 60 dans les menus |
+| Vitesse (10 points : fps ÷ 30) | environ 10 | ✅ des joueurs à 30 fps stables ; 22-26 fps en monde ouvert sur le portable de l'auteur, 35-38 en cinématiques, 60 dans les menus |
 | Stabilité (10 points) | environ 8 | ✅ longues sessions et missions sans plantage |
 
 ## Téléchargement
@@ -177,7 +177,8 @@ Le launcher est en anglais par défaut, avec le **portugais** dans la barre lat�
   2. Cochez ce qui s'est passé et écrivez une ligne.
   3. Le launcher met les bons fichiers dans un zip sur votre Bureau, sans votre nom d'utilisateur dans les chemins. Il
      ouvre le dossier et copie un court résumé.
-  4. Envoyez-le de l'une de deux façons :
+  4. Envoyez-le :
+     - **Send to edupode :** un clic. Une copie compacte (résumé, réglages, la fin de chaque log, sans votre nom d'utilisateur) part vers une boîte privée sur Cloudflare que seul edupode peut lire ; vous recevez le numéro du rapport.
      - **Ouvrir une issue GitHub :** une nouvelle [issue](https://github.com/edupode/cold-project-vi/issues) s'ouvre dans
        votre navigateur, déjà remplie (matériel, ce que vous avez coché, vos mots). Glissez-y le zip et appuyez sur
        **Submit new issue** (un compte GitHub gratuit est nécessaire).

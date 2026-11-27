@@ -76,7 +76,7 @@ The engine every card plays with by default. Measured on the author's RTX 5070 T
 
 ## Progress on PortWatch VI's scale
 
-**About 77 % or more** (measured on the author's RTX 5070 Ti laptop, 27/11/2026). PortWatch's scale: up to 50 %,
+**About 79 %** (27/11/2026: the author's RTX 5070 Ti laptop, and players reporting a steady 30 fps). PortWatch's scale: up to 50 %,
 each step needs the one before; beyond that, story, picture, speed and stability share the last 50 points.
 Points past 50 are our estimate (PortWatch counts them only with proof, a video).
 
@@ -84,9 +84,9 @@ Points past 50 are our estimate (PortWatch counts them only with proof, a video)
 |---|---|---|
 | Groundwork, executable, first picture, main menu, in the world | 0-40 | ✅ |
 | Playable (you control a character) | 50 | ✅ missions playable |
-| Story (17.5 points) | 3 or more | ✅ prologue done, missions played; more as the story goes on |
+| Story (17.5 points) | about 3 | ✅ the opening and its missions play through; the rest of the story not played yet |
 | Picture (12.5 points) | about 8 | ✅ NVIDIA lighting, water right, night scenes lit; ⏳ ray tracing and the `_Tiled` volumetrics still off |
-| Speed (10 points: fps ÷ 30) | about 8 | ✅ 22-26 fps in the open world, 35-38 in cutscenes, 60 in menus |
+| Speed (10 points: fps ÷ 30) | about 10 | ✅ players at a steady 30 fps; 22-26 fps in the open world on the author's laptop, 35-38 in cutscenes, 60 in menus |
 | Stability (10 points) | about 8 | ✅ long sessions and missions without crashes |
 
 ## Download
@@ -192,7 +192,8 @@ English by default, **Português** in the side bar; this page also in [Portuguê
   1. Choose **launcher errors** or **game errors**.
   2. Tick what happened (shaders not rendering, virtual memory not turning on, ...) and write a line.
   3. The launcher puts the right files in a zip on your Desktop, with your user name taken out of every path. It opens the folder and copies a short summary.
-  4. Send it one of two ways:
+  4. Send it:
+     - **Send to edupode:** one click. A compact copy (summary, settings, the end of each log, your user name taken out) goes to a private report box on Cloudflare that only edupode can read; you get the report's number.
      - **Open a GitHub issue:** a new [issue](https://github.com/edupode/cold-project-vi/issues) opens in your browser already filled in (hardware, what you ticked, your words). Drag the zip into it and press **Submit new issue** (a free GitHub account is needed).
      - **Discord:** send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ).
 

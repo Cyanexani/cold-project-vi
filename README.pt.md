@@ -51,7 +51,7 @@ O motor com que todas as placas jogam por defeito. Medido no portátil do autor 
 
 ## Progresso na escala do PortWatch VI
 
-**Cerca de 77 % ou mais** (medido no portátil do autor, RTX 5070 Ti, 27/11/2026). A escala do PortWatch: até 50 %,
+**Cerca de 79 %** (27/11/2026: o portátil do autor, RTX 5070 Ti, e jogadores com 30 fps estáveis). A escala do PortWatch: até 50 %,
 cada passo precisa do anterior; depois disso, história, imagem, velocidade e estabilidade dividem os últimos 50
 pontos. Os pontos acima de 50 são a nossa estimativa (o PortWatch só os conta com prova, um vídeo).
 
@@ -59,9 +59,9 @@ pontos. Os pontos acima de 50 são a nossa estimativa (o PortWatch só os conta 
 |---|---|---|
 | Base, executável, primeira imagem, menu, no mundo | 0-40 | ✅ |
 | Jogável (controlas uma personagem) | 50 | ✅ missões jogáveis |
-| História (17,5 pontos) | 3 ou mais | ✅ prólogo feito, missões jogadas; mais à medida que a história avança |
+| História (17,5 pontos) | cerca de 3 | ✅ a abertura e as suas missões jogam-se até ao fim; o resto da história ainda não foi jogado |
 | Imagem (12,5 pontos) | cerca de 8 | ✅ iluminação NVIDIA, água certa, cenas noturnas iluminadas; ⏳ ray tracing e a volumetria `_Tiled` ainda desligados |
-| Velocidade (10 pontos: fps ÷ 30) | cerca de 8 | ✅ 22-26 fps no mundo aberto, 35-38 nas cutscenes, 60 nos menus |
+| Velocidade (10 pontos: fps ÷ 30) | cerca de 10 | ✅ jogadores a 30 fps estáveis; 22-26 fps no mundo aberto no portátil do autor, 35-38 nas cutscenes, 60 nos menus |
 | Estabilidade (10 pontos) | cerca de 8 | ✅ sessões longas e missões sem crashes |
 
 ## Download

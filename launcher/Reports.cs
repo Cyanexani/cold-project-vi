@@ -1,8 +1,8 @@
 // Julia's Launcher: "Send errors". The player picks launcher errors or game errors, ticks what happened
 // and writes a line; the launcher puts the right files in a zip on the Desktop (user name taken out of
-// every path), opens the folder and offers two ways to send it: a GitHub issue on edupode's repository,
-// opened in the browser already filled in (the player attaches the zip and submits it), or the Discord
-// channel. Nothing is sent by the launcher itself.
+// every path), opens the folder and offers the ways to send it: straight to edupode (a compact copy of the
+// package to the Cloudflare Worker, POST /v1/report, which only takes it in), a GitHub issue opened in the
+// browser already filled in, or the Discord channel. Nothing is sent unless the player presses a button.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,6 +10,7 @@ using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -78,15 +79,17 @@ namespace VIctoryLauncher
                             if (zip == null) { MessageBox.Show(this, L("The package could not be made: ", "Nao deu para criar o pacote: ") + error, "Julia's Launcher"); return; }
                             try { Clipboard.SetText(summary); } catch (Exception) { }
                             try { Process.Start("explorer.exe", "/select,\"" + zip + "\""); } catch (Exception) { }
-                            var body = string.Format(L("Done: {0} is on your Desktop.\r\n\r\nSend it to edupode one of two ways:\r\n\r\n" +
+                            var body = string.Format(L("Done: {0} is on your Desktop.\r\n\r\nSend it to edupode:\r\n\r\n" +
+                                                       "•  Send to edupode: one click. A compact copy (summary, settings, the end of each log; your user name taken out) goes to edupode's private report box. Only edupode can read it.\r\n" +
                                                        "•  GitHub issue: the page opens already filled in. Drag the zip into the text box, then press 'Submit new issue' (a free GitHub account is needed).\r\n" +
                                                        "•  Discord: send the zip in the channel \"{1}\" and paste the summary (already copied).",
-                                                       "Feito: {0} esta no Ambiente de trabalho.\r\n\r\nEnvia-o ao edupode de uma de duas formas:\r\n\r\n" +
+                                                       "Feito: {0} esta no Ambiente de trabalho.\r\n\r\nEnvia-o ao edupode:\r\n\r\n" +
+                                                       "•  Enviar ao edupode: um clique. Uma copia compacta (resumo, definicoes, o fim de cada log; sem o teu nome de utilizador) vai para a caixa privada de relatorios do edupode. So o edupode a pode ler.\r\n" +
                                                        "•  Issue no GitHub: a pagina abre ja preenchida. Arrasta o zip para a caixa de texto e carrega em 'Submit new issue' (precisa de uma conta GitHub gratuita).\r\n" +
                                                        "•  Discord: envia o zip no canal \"{1}\" e cola o resumo (ja copiado)."), Path.GetFileName(zip), DiscordChannel);
-                            var answer = Notice(L("Send the report", "Enviar o relatorio"), body, L("Open a GitHub issue", "Abrir uma issue no GitHub"), L("Open Discord", "Abrir o Discord"));
-                            if (answer == 1) OpenUrl(IssueUrl(game, ticked, said, summary, Path.GetFileName(zip)));
-                            if (answer == 2) OpenUrl(DiscordInvite);
+                            var answer = Notice(L("Send the report", "Enviar o relatorio"), body, L("Send to edupode", "Enviar ao edupode"), L("Open a GitHub issue", "Abrir uma issue no GitHub"));
+                            if (answer == 1) SendReport(zip, game);
+                            if (answer == 2) OpenUrl(IssueUrl(game, ticked, said, summary, Path.GetFileName(zip)));
                         }));
                     }
                     catch (Exception) { }
@@ -157,6 +160,72 @@ namespace VIctoryLauncher
             if (File.Exists(zip)) File.Delete(zip);
             ZipFile.CreateFromDirectory(dir, zip, CompressionLevel.Optimal, false);
             return zip;
+        }
+
+        public const string ReportEndpoint = "https://vi-hardware.edupodept.workers.dev/v1/report";
+        const int MaxUpload = 1800 * 1024;
+
+        // A compact copy of the package (text files whole, the last part of each log) sent to the
+        // Worker, which keeps it for edupode only. Says the report's number, or why it failed.
+        void SendReport(string zip, bool game)
+        {
+            var dir = zip.Substring(0, zip.Length - 4);
+            new Thread(() => {
+                string said;
+                try
+                {
+                    byte[] data = null;
+                    foreach (var tail in new[] { 400 * 1024, 150 * 1024, 40 * 1024 })
+                    {
+                        data = CompactZip(dir, tail);
+                        if (data.Length <= MaxUpload) break;
+                    }
+                    if (data.Length > MaxUpload) throw new Exception(L("the package is too big to send; use the GitHub issue", "o pacote e grande demais; usa a issue do GitHub"));
+                    ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                    var req = (HttpWebRequest)WebRequest.Create(ReportEndpoint);
+                    req.Method = "POST";
+                    req.ContentType = "application/zip";
+                    req.UserAgent = "Julias-Launcher";
+                    req.Timeout = 60000;
+                    req.Headers["X-VI-Id"] = (hw ?? ReadHardware()).Id;
+                    req.Headers["X-VI-Kind"] = game ? "game" : "launcher";
+                    req.ContentLength = data.Length;
+                    using (var s = req.GetRequestStream()) s.Write(data, 0, data.Length);
+                    string answer;
+                    using (var r = (HttpWebResponse)req.GetResponse())
+                    using (var rd = new StreamReader(r.GetResponseStream())) answer = rd.ReadToEnd();
+                    var n = System.Text.RegularExpressions.Regex.Match(answer, @"\d+").Value;
+                    said = string.Format(L("Sent to edupode: report #{0}. Mention the number on Discord if you talk about it.", "Enviado ao edupode: relatorio n.o {0}. Diz o numero no Discord se falares dele."), n);
+                }
+                catch (WebException e)
+                {
+                    var r = e.Response as HttpWebResponse;
+                    said = r != null && (int)r.StatusCode == 429
+                        ? L("Too many reports this hour: try again later, or use the GitHub issue.", "Demasiados relatorios nesta hora: tenta mais tarde, ou usa a issue do GitHub.")
+                        : L("Could not send the report: ", "Nao deu para enviar o relatorio: ") + e.Message;
+                }
+                catch (Exception e) { said = L("Could not send the report: ", "Nao deu para enviar o relatorio: ") + e.Message; }
+                Log(said);
+                try { BeginInvoke(new Action(() => MessageBox.Show(this, said, "Julia's Launcher"))); } catch (Exception) { }
+            }) { IsBackground = true }.Start();
+        }
+
+        // The package's text files whole and the last `tail` bytes of each log, zipped in memory.
+        static byte[] CompactZip(string dir, int tail)
+        {
+            using (var mem = new MemoryStream())
+            {
+                using (var z = new ZipArchive(mem, ZipArchiveMode.Create, true))
+                    foreach (var f in Directory.GetFiles(dir))
+                    {
+                        var bytes = File.ReadAllBytes(f);
+                        if (f.EndsWith(".log", StringComparison.OrdinalIgnoreCase) && bytes.Length > tail)
+                            bytes = bytes.Skip(bytes.Length - tail).ToArray();
+                        var e = z.CreateEntry(Path.GetFileName(f), CompressionLevel.Optimal);
+                        using (var s = e.Open()) s.Write(bytes, 0, bytes.Length);
+                    }
+                return mem.ToArray();
+            }
         }
 
         // A new issue on edupode's repository, filled in through the address (title, body, label): GitHub
