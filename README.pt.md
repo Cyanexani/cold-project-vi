@@ -182,6 +182,34 @@ o Lossless Scaling fazem 3x-4x de qualquer janela, mas a partir de ~22 FPS isso 
 
 ## Onde está
 
+### Progresso: cerca de 76 %
+
+`███████████████░░░░░` **cerca de 76 %: jogável, missões a funcionar**
+
+Medido na escala do [PortWatch VI](https://portwatch-vi.xyz/#method), a mesma para todos os projetos. Até 50 %, cada
+passo precisa do anterior; depois de Jogável, quatro trilhas dividem os últimos 50 pontos. As quatro trilhas são uma
+estimativa nossa (o PortWatch só as conta com prova, como um vídeo), no PC do edupode: portátil RTX 5070 Ti (12 GB,
+145 W), Intel Core Ultra 9 275HX, 32 GB de DDR5.
+
+| Passo | % | Estado |
+|---|---|---|
+| Base (loader, bibliotecas do sistema, tradução de shaders, camada D3D12) | 0-10 | ✅ |
+| O executável corre (mapeado, imports resolvidos, o código a correr) | 10 | ✅ |
+| Primeiro frame (logótipos, ecrã de carregamento, intro) | 20 | ✅ |
+| Menu principal (chega lá, responde) | 30 | ✅ 60 FPS |
+| No mundo (o modo história carrega e desenha-o) | 40 | ✅ |
+| Jogável (controlas uma personagem, HUD e menu de pausa funcionam) | 50 | ✅ |
+
+| Trilha | Pontos | Nós | Porquê |
+|---|---|---|---|
+| História | 17,5 | **cerca de 6** | ⚠️ *Primeiras missões*: intro, prisão e as primeiras missões jogam-se até ao fim. Próximo degrau: o primeiro ato |
+| Imagem | 12,5 | **cerca de 6,5** | ⚠️ *Iluminada, mas faltam efeitos grandes*: sem ray tracing, volumetria da água (`_Tiled`) desligada, corpos esticados e caras arco-íris de vez em quando |
+| Desempenho | 10 | **cerca de 8** | ⚠️ 22-26 FPS no mundo aberto (≈ 24 ÷ 30), 35+ nas cutscenes, 60 nos menus. Multidões e lutas: 14-17 |
+| Estabilidade | 10 | **cerca de 6** | ⚠️ sessões longas sem crash no PC acima; PCs mais fracos ainda crasham (gráficas integradas ficam sem memória) |
+
+50 + 6 + 6,5 + 8 + 6 = **cerca de 76 %**. Estes números foram medidos num PC forte: num PC de 16 GB com uma placa
+média os FPS são bem mais baixos, e as gráficas integradas (Intel Iris Xe) ainda não correm o jogo.
+
 - Funciona: intro, prisão, missões, mundo aberto, barcos; sessões longas sem crashes.
 - VRAM dentro do limite do sistema (6-8 GB numa placa de 12 GB), ~20 GB de RAM.
 - O limite é o processador: multidões e lutas a 14-17 FPS (eram 10-15).

@@ -217,6 +217,34 @@ video memory reserve help), and the `_Tiled` volumetrics shader, still being fix
 
 ## Where it stands
 
+### Progress: about 76 %
+
+`███████████████░░░░░` **about 76 %: playable, missions working**
+
+Measured on [PortWatch VI](https://portwatch-vi.xyz/#method)'s scale, the same for every project. Up to 50 %, each
+step needs the one before it; past Playable, four tracks share the last 50 points. The four tracks are our own
+estimate (PortWatch counts them only with proof, such as a video), on edupode's PC: RTX 5070 Ti laptop (12 GB,
+145 W), Intel Core Ultra 9 275HX, 32 GB of DDR5.
+
+| Step | % | State |
+|---|---|---|
+| Groundwork (loader, system libraries, shader translation, D3D12 layer) | 0-10 | ✅ |
+| Exe runs (mapped, imports resolved, its code running) | 10 | ✅ |
+| First frame (logos, loading screen, intro) | 20 | ✅ |
+| Main menu (reached, answers input) | 30 | ✅ 60 FPS |
+| In the world (story mode loads and draws it) | 40 | ✅ |
+| Playable (you control a character, HUD and pause menu work) | 50 | ✅ |
+
+| Track | Points | Ours | Why |
+|---|---|---|---|
+| Story | 17.5 | **about 6** | ⚠️ *First missions*: intro, prison and the first missions play through. Next rung: the first act |
+| Rendering | 12.5 | **about 6.5** | ⚠️ *Lit, but major effects missing*: no ray tracing, water volumetrics (`_Tiled`) off, stretched bodies and rainbow faces now and then |
+| Performance | 10 | **about 8** | ⚠️ 22-26 FPS in the open world (≈ 24 ÷ 30), 35+ in cutscenes, 60 in menus. Crowds and fights: 14-17 |
+| Stability | 10 | **about 6** | ⚠️ long sessions without a crash on the PC above; weaker PCs still crash (integrated graphics run out of memory) |
+
+50 + 6 + 6.5 + 8 + 6 = **about 76 %**. The figures above were measured on a strong PC: on a 16 GB PC with a
+mid-range card the frame rate is much lower, and integrated graphics (Intel Iris Xe) do not run the game yet.
+
 - Works: intro, prison, missions, open world, boats; long sessions without crashes.
 - Video memory under the system's budget (6-8 GB used on a 12 GB card), ~20 GB of RAM.
 - The CPU is the limit: crowds and fights now run at 14-17 FPS (were 10-15), with 6,000-8,000 draws a frame,
