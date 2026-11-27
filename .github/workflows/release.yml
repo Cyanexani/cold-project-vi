@@ -124,12 +124,29 @@ jobs:
             # Discord keeps the preview of a link it has seen: /releases/latest showed the version before (0.3.7's post
             # carried 0.3.6's card). The release's own page is a new link each time.
             $text = $text.Replace("https://github.com/$repo/releases/latest", "https://github.com/$repo/releases/tag/$tag")
+            # No @everyone for now (it pinged every member at each release): the signer pings only what its
+            # ANNOUNCE_MENTION allows (later, the role players pick with a reaction).
+            $text = ($text -replace '(?m)^\s*@everyone\s*$', '').TrimEnd()
             # Every announcement ends with docs/ANNOUNCEMENT-FOOTER.md, before the @everyone line.
             if (Test-Path docs/ANNOUNCEMENT-FOOTER.md) {
               $footer = [IO.File]::ReadAllText('docs/ANNOUNCEMENT-FOOTER.md').Trim()
               if ($text.EndsWith('@everyone')) { $text = $text.Substring(0, $text.Length - 9).TrimEnd() + "`n`n" + $footer + "`n`n@everyone" } else { $text = $text + "`n`n" + $footer }
             }
             $token = (Invoke-RestMethod -Headers @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=vi-release-signer").value
-            $r = Invoke-RestMethod -Method Post -Uri "$signer/v1/announce" -Headers @{ Authorization = "Bearer $token" } -ContentType 'text/plain; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($text))
-            "Announcement posted: $($r.posted)"
+            # Translations as link buttons under the message: docs/ANNOUNCEMENT.<lang>.md of this tag, on GitHub.
+            # Only once the signer that takes buttons is deployed (repository variable ANNOUNCE_BUTTONS = 1): an
+            # older signer would post the JSON as the message's text.
+            $buttons = @()
+            if ('${{ vars.ANNOUNCE_BUTTONS }}' -eq '1') {
+              foreach ($b in @(@{ file = 'docs/ANNOUNCEMENT.fr.md'; label = '🇫🇷 Français' }, @{ file = 'docs/ANNOUNCEMENT.pt.md'; label = '🇵🇹 Português' })) {
+                if (Test-Path $b.file) { $buttons += [ordered]@{ label = $b.label; url = "https://github.com/$repo/blob/$tag/$($b.file)" } }
+              }
+            }
+            if ($buttons.Count -gt 0) {
+              $body = [ordered]@{ text = $text; buttons = @($buttons) } | ConvertTo-Json -Depth 4
+              $r = Invoke-RestMethod -Method Post -Uri "$signer/v1/announce" -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
+            } else {
+              $r = Invoke-RestMethod -Method Post -Uri "$signer/v1/announce" -Headers @{ Authorization = "Bearer $token" } -ContentType 'text/plain; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($text))
+            }
+            "Announcement posted: $($r.posted) (buttons: $($buttons.Count))"
           }

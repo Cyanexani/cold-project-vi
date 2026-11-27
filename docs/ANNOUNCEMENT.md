@@ -1,13 +1,13 @@
 ## Julia's Launcher {tag} is out 🔧
 **Fix**
-🌈 **Rainbow textures, for real this time.** The fix announced in 0.3.7 was left out of that build by mistake, sorry! It is in this one.
-🖥️ **The game closed at start with "720p" picked.** Sorry, that one was ours: the game refuses a 720p screen. The option is now **World at 720p (lighter)** (1080p screen, world at 720p). If it crashed for you, just press PLAY again.
-🟢 **"Resizable BAR in the NVIDIA driver" stayed red.** The driver wants administrator rights for it: Windows now asks once, and it turns on.
+🧠 **Fewer crashes on 16 GB PCs.** When Windows is short of memory for a moment, VIctory now frees what it keeps in reserve and tries again instead of closing (it hit RX 9070 XT, RX 6600, RX 6700 XT and RTX 4070 players).
+🟥 Belobug's AMD engine: only on Radeon cards, and at most 1080p (it closed at start at 1440p/4K).
+
+**New**
+💾 **Save backups before every game.** Hardware & ID > Game saves > **Restore a backup...** brings any of the last 15 back.
 
 **Install**
 🔄 On 0.3.x: nothing to do, it installs itself within 5 minutes while the game is closed.
 📥 New here or on an older launcher: download **VI-Setup-{version}.exe** from https://github.com/felicienradio/cold-project-vi/releases/latest and run it.
 
 Still stuck? Use **Help > Send errors** in the launcher and post your hardware ID here 💙
-
-@everyone

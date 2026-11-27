@@ -4087,8 +4087,21 @@ impl Host {
         list
     }
 
-    /// An allocator and a closed list for a prelude.
+    /// An allocator and a closed list for a prelude; when the system refuses
+    /// them for want of memory, once more after the pools' empty blocks went
+    /// (`crate::pool::release_spares`): that refusal ended runs on 16 GB PCs.
     fn make_prelude(&self) -> Option<Prelude> {
+        if let Some(p) = self.make_prelude_once() {
+            return Some(p);
+        }
+        if crate::pool::release_spares() {
+            tracing::warn!("prelude list refused: empty pool blocks let go, asking again");
+            return self.make_prelude_once();
+        }
+        None
+    }
+
+    fn make_prelude_once(&self) -> Option<Prelude> {
         // SAFETY: plain object creation.
         let made: windows::core::Result<Prelude> = unsafe {
             (|| {
@@ -8632,6 +8645,18 @@ impl Host {
     }
 
     pub(crate) fn upload_buffer(&self, size: u64) -> Option<(ID3D12Resource, *mut u8)> {
+        if let Some(made) = self.upload_buffer_once(size) {
+            return Some(made);
+        }
+        // Refused: the pools' empty blocks go, then once more (`crate::pool::release_spares`).
+        if crate::pool::release_spares() {
+            tracing::warn!(size, "upload buffer refused: empty pool blocks let go, asking again");
+            return self.upload_buffer_once(size);
+        }
+        None
+    }
+
+    fn upload_buffer_once(&self, size: u64) -> Option<(ID3D12Resource, *mut u8)> {
         MADE[0].fetch_add(1, Ordering::Relaxed);
         MADE[1].fetch_add(size, Ordering::Relaxed);
         let heap = D3D12_HEAP_PROPERTIES {

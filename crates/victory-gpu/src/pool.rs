@@ -373,6 +373,29 @@ unsafe impl Send for Upload {}
 static TEXTURES: Mutex<Pool<ID3D12Heap>> = Mutex::new(Pool::new(SPARE_KEPT));
 static STAGING: Mutex<Pool<Upload>> = Mutex::new(Pool::new(STAGING_KEPT));
 
+/// Lets go of every empty block now (up to [`SPARE_KEPT`] of the card's and
+/// [`STAGING_KEPT`] of the PC's memory kept for later), for an allocation
+/// the system has just refused: on 16 GB PCs a 64 MB upload buffer was
+/// refused ("Not enough memory resources") while blocks sat empty, and the
+/// run ended ("no host list for a state prelude", RX 9070 XT, RTX 4070;
+/// players' logs, 27/11/2026). A pool another thread holds is left alone.
+/// Returns whether any block went.
+pub(crate) fn release_spares() -> bool {
+    let now = now();
+    let mut went = false;
+    if let Ok(mut pool) = TEXTURES.try_lock() {
+        let before = pool.blocks();
+        pool.reclaim(now, 0, true);
+        went |= pool.blocks() < before;
+    }
+    if let Ok(mut pool) = STAGING.try_lock() {
+        let before = pool.blocks();
+        pool.reclaim(now, 0, true);
+        went |= pool.blocks() < before;
+    }
+    went
+}
+
 fn lock<T>(m: &'static Mutex<T>) -> std::sync::MutexGuard<'static, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
