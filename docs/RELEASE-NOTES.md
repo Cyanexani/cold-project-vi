@@ -1,9 +1,5 @@
-Julia's Launcher 0.3.9: the rainbow-texture fix for real, the 720p option no longer closes the game, and Resizable BAR in the NVIDIA driver turns on.
+Julia's Launcher 0.3.10: a save gallery, and bug reports in one click.
 
-- **Rainbow textures, for real this time.** 0.3.7 announced the fix, but it was left out of that build by mistake: sorry. It is in 0.3.9. A texture's staging memory, reused from another texture, is now emptied before use, so a texture that is not read yet shows nothing for a moment instead of another texture's bytes.
-
-- **"720p" closed the game at start (0.3.6 and 0.3.7).** The game stops with its own fatal error when the console says the screen is 1280x720, and Belobug's AMD engine crashed with a 720p output. Every session at 720p ended that way. The option is now **World at 720p (lighter)**: the screen stays 1080p and the world is drawn at 720p at most. If you picked 720p, just press PLAY again.
-- **"Resizable BAR in the NVIDIA driver" stayed red.** NVIDIA's driver lets only administrators change its Resizable BAR settings, so "Turn on" was refused without a word. Windows now asks for administrator rights once, and the step turns green.
-- The Discord post links this release's own page (it showed the previous version's card).
-
-Is it safe? [docs/SAFETY.md](https://github.com/felicienradio/cold-project-vi/blob/main/docs/SAFETY.md) · [Code signing policy](https://github.com/felicienradio/cold-project-vi/blob/main/docs/CODE-SIGNING-POLICY.md)
+- Save gallery: share your save from Hardware & ID > Game saves > Share in the gallery (a title and a note). It shows on the public gallery page once the developers approve it; "Open the save gallery" lists everyone's. A downloaded save goes in with "Import a save..." (yours are backed up first). Only the game's save files are taken, checked at export and at import.
+- Send errors: two buttons, no account needed. "Send" keeps the logs private and opens a public bug report on GitHub with the summary only (your PC's parts, versions, settings and what you wrote), which you can follow; "Send privately" skips the public report.
+- Belobug's AMD engine: output at most 1080p (it ended with a fatal error at 1440p and 4K), and only offered on Radeon cards.

@@ -1,15 +1,12 @@
-## Julia's Launcher 0.3.8 já saiu 🔧
+## Julia's Launcher 0.3.10 já saiu 🎉
+
+**Novo**
+💾 **Galeria de saves**: partilha o teu save em **Hardware e ID > Saves do jogo > Partilhar na galeria**, e vai buscar os dos outros em **Abrir a galeria de saves**. Aparecem depois de aprovados; importar um guarda primeiro o teu.
+🐞 **Relatórios de erros num clique**: **Ajuda > Enviar erros > Enviar** guarda os logs em privado e abre um relatório público no GitHub só com o resumo, para o acompanhares. Sem conta. **Enviar em privado** não cria a parte pública.
 
 **Correção**
-🇫🇷 **O launcher está de novo todo em francês**: o passo da Segurança do Windows da 0.3.6 está traduzido.
-
-**Também desde a 0.3.7**
-🌈 Acabaram as texturas arco-íris nas caras, roupas e paredes.
-🪟 O Windows 10 arranca o jogo (D3D12 Agility SDK).
-💾 Os ficheiros do VIctory podem ir para o teu disco mais rápido.
+🎮 O motor AMD do Belobug fica em saída 1080p (fechava em 1440p/4K) e só é oferecido em placas Radeon.
 
 **Instalar**
 🔄 Na 0.3.x: nada a fazer, instala-se sozinha em 5 minutos com o jogo fechado.
-📥 Novo ou com um launcher antigo: descarrega o **VI-Setup-0.3.8.exe** em https://github.com/felicienradio/cold-project-vi/releases/latest e abre-o.
-
-Ainda com problemas? Usa **Ajuda > Enviar erros** no launcher e cola o teu ID de hardware no Discord 💙
+📥 Novo ou com um launcher antigo: descarrega o **VI-Setup-0.3.10.exe** em https://github.com/felicienradio/cold-project-vi/releases/latest e abre-o.
