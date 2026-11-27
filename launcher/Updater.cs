@@ -1,5 +1,5 @@
 // Julia's Launcher: updates from GitHub, the launcher's only way in. Every 5 minutes (and when it opens)
-// it reads manifest.json of the latest release of edupode/cold-project-vi and its signature
+// it reads manifest.json of the latest release of felicienradio/cold-project-vi and its signature
 // (manifest.sig, RSA-SHA256 by edupode's release key, which never leaves edupode's PC: the
 // public half is in ReleaseKey.cs). A file is installed only when the signature and its SHA-256
 // match, only names on the list below are taken, and only from that repository's releases.
@@ -21,10 +21,10 @@ namespace VIctoryLauncher
     static class Updater
     {
         // This launcher's version; a release with a higher one is an update.
-        public const string Version = "0.2.0-edupode";
-        public const string ManifestUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.json";
-        public const string SignatureUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.sig";
-        public const string DownloadPrefix = "https://github.com/edupode/cold-project-vi/releases/download/";
+        public const string Version = "0.3.0";
+        public const string ManifestUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.json";
+        public const string SignatureUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.sig";
+        public const string DownloadPrefix = "https://github.com/felicienradio/cold-project-vi/releases/download/";
         // What an update may bring, and where each goes (beside the launcher).
         public static readonly string[] Allowed = { "Julia's Launcher.exe", "victory.exe", "tools/nvsmooth30/version.dll" };
 
@@ -88,7 +88,7 @@ namespace VIctoryLauncher
                     }
                     sig = Convert.FromBase64String(Encoding.ASCII.GetString(web.DownloadData(Updater.SignatureUrl)).Trim());
                 }
-                if (!SignedByEdupode(manifestBytes, sig)) { SetUpdateState(L("An update was refused: its signature is not edupode's.", "Um update foi recusado: a assinatura nao e a do edupode.")); return; }
+                if (!SignedByEdupode(manifestBytes, sig)) { SetUpdateState(L("An update was refused: its signature is not the project's.", "Um update foi recusado: a assinatura nao e a do projeto.")); return; }
                 var m = ParseManifest(Encoding.UTF8.GetString(manifestBytes));
                 if (m == null) { SetUpdateState(L("An update was refused: its list could not be read.", "Um update foi recusado: a lista nao se le.")); return; }
                 if (Updater.Number(m.Version) <= Updater.Number(Updater.Version))
@@ -276,8 +276,8 @@ namespace VIctoryLauncher
             page.Controls.Add(updNotes);
             y += 232;
             page.Controls.Add(new Label { Location = new Point(X, y), Size = new Size(W, 80), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.Ui(9f),
-                Text = L("Updates come only from github.com/edupode/cold-project-vi releases. Each one is signed with edupode's release key; a file is installed only when the signature and its SHA-256 match. Anyone can check a release's files against the source code (README: 'Checking a release').",
-                         "Os updates so vem das versoes de github.com/edupode/cold-project-vi. Cada um e assinado com a chave de releases do edupode; um ficheiro so e instalado se a assinatura e o SHA-256 baterem certo. Qualquer pessoa pode comparar os ficheiros de uma versao com o codigo (README: 'Verificar uma versao').") });
+                Text = L("Updates come only from github.com/felicienradio/cold-project-vi releases. Each one is signed with the project's release key; a file is installed only when the signature and its SHA-256 match. Anyone can check a release's files against the source code (README: 'Checking a release').",
+                         "Os updates so vem das versoes de github.com/felicienradio/cold-project-vi. Cada um e assinado com a chave de releases do projeto; um ficheiro so e instalado se a assinatura e o SHA-256 baterem certo. Qualquer pessoa pode comparar os ficheiros de uma versao com o codigo (README: 'Verificar uma versao').") });
             return page;
         }
 

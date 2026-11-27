@@ -2,7 +2,7 @@ name: Release
 
 # A tag v* on the edupode branch builds everything a release holds from this repository's code, with a
 # provenance attestation for each program (anyone can check a download came from this code:
-# gh attestation verify "<file>" -R edupode/cold-project-vi), and leaves a DRAFT release.
+# gh attestation verify "<file>" -R felicienradio/cold-project-vi), and leaves a DRAFT release.
 # edupode then signs it on his own PC (scripts\sign-release.ps1 <tag>): the release key never
 # reaches GitHub, so the launchers out there only install what he signed.
 

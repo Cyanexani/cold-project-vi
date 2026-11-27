@@ -18,6 +18,6 @@ if "%OUT%"=="" set "OUT=%~dp0..\Julia's Launcher.exe"
   /reference:System.Core.dll /reference:System.Management.dll /reference:System.Web.Extensions.dll ^
   /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll ^
   "%~dp0VIctoryLauncher.cs" "%~dp0Widgets.cs" "%~dp0SmoothMotion.cs" "%~dp0Setup.cs" "%~dp0Session.cs" ^
-  "%~dp0Hardware.cs" "%~dp0Updater.cs" "%~dp0ReleaseKey.cs" "%~dp0Reports.cs" "%~dp0Custom.cs" "%~dp0ShadersPage.cs"
+  "%~dp0Hardware.cs" "%~dp0Updater.cs" "%~dp0ReleaseKey.cs" "%~dp0Reports.cs" "%~dp0Custom.cs" "%~dp0ShadersPage.cs" "%~dp0French.cs"
 if errorlevel 1 exit /b 1
 echo Built: "%OUT%"

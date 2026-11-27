@@ -6,7 +6,7 @@
 # 3. uploads both and publishes the release. Every launcher then installs it within 5 minutes.
 param([Parameter(Mandatory = $true)][string]$Tag, [switch]$Yes)
 $ErrorActionPreference = 'Stop'
-$repo = 'edupode/cold-project-vi'
+$repo = 'felicienradio/cold-project-vi'
 $key = Join-Path $env:USERPROFILE '.vi-release\release-key.xml'
 if (-not (Test-Path $key)) { throw "No release key at $key (scripts\new-release-key.ps1 makes it)." }
 $work = Join-Path $env:TEMP "vi-release-$Tag"

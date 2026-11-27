@@ -2,7 +2,7 @@
 // Built with the C# compiler that ships with Windows (.NET Framework 4.x):
 //   launcher\build-launcher.cmd   ->   "Julia's Launcher.exe" in the repository's root.
 // No game files are included or downloaded; the player points it at their own dump.
-// English by default; the button in the side bar switches to Portuguese (saved in launcher.ini).
+// English by default; the buttons in the side bar switch to Portuguese or French (saved in launcher.ini).
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -88,8 +88,9 @@ namespace VIctoryLauncher
 
     partial class LauncherForm : Form
     {
-        static bool Pt;
-        static string L(string en, string pt) { return Pt ? pt : en; }
+        static bool Pt, Fr;
+        // French comes from French.cs (looked up by the English text), or from fr when a call passes it.
+        static string L(string en, string pt, string fr = null) { return Fr ? (fr ?? Fr_(en)) : Pt ? pt : en; }
 
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
@@ -136,12 +137,13 @@ namespace VIctoryLauncher
 
         public const string DiscordInvite = "https://discord.gg/648WEXCAsZ";
         public const string DiscordChannel = "Send bugs here please";
-        public const string RepoUrl = "https://github.com/edupode/cold-project-vi/tree/edupode";
+        public const string RepoUrl = "https://github.com/felicienradio/cold-project-vi/tree/main";
 
         public LauncherForm()
         {
             settingsFile = Path.Combine(Path.GetDirectoryName(dataRoot), "launcher.ini");
             Pt = ReadSetting("lang") == "pt";
+            Fr = ReadSetting("lang") == "fr";
             cacheDir = ReadSetting("cache") ?? Path.Combine(dataRoot, "cache");
             dataDir = ReadSetting("data") ?? Path.Combine(dataRoot, "data");
             modes = new Mode[] {
@@ -313,16 +315,18 @@ namespace VIctoryLauncher
             var report = new Pill { Text = L("Send errors to Discord", "Enviar erros no Discord"), Size = new Size(184, 34), Location = new Point(16, 0), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
             report.Click += (s, e) => ReportErrors();
             side.Controls.Add(report);
-            var en = new Pill { Text = "EN", Size = new Size(90, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = !Pt };
-            var pt = new Pill { Text = "PT", Size = new Size(90, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = Pt };
-            en.Click += (s, e) => { if (Pt) { Pt = false; SaveSettings(); Application.Restart(); } };
-            pt.Click += (s, e) => { if (!Pt) { Pt = true; SaveSettings(); Application.Restart(); } };
-            side.Controls.Add(en); side.Controls.Add(pt);
+            var en = new Pill { Text = "EN", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = !Pt && !Fr };
+            var pt = new Pill { Text = "PT", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = Pt };
+            var fr = new Pill { Text = "FR", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = Fr };
+            en.Click += (s, e) => { if (Pt || Fr) { Pt = false; Fr = false; SaveSettings(); Application.Restart(); } };
+            pt.Click += (s, e) => { if (!Pt) { Pt = true; Fr = false; SaveSettings(); Application.Restart(); } };
+            fr.Click += (s, e) => { if (!Fr) { Fr = true; Pt = false; SaveSettings(); Application.Restart(); } };
+            side.Controls.Add(en); side.Controls.Add(pt); side.Controls.Add(fr);
             var tech = new Label { Text = "D3D12 · SM 6.6", Font = Theme.Mono(8f), ForeColor = Theme.Dim, AutoSize = true, BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
             side.Controls.Add(tech);
             side.Resize += (s, e) => {
                 report.Top = side.Height - 124;
-                en.Location = new Point(16, side.Height - 80); pt.Location = new Point(110, side.Height - 80);
+                en.Location = new Point(16, side.Height - 80); pt.Location = new Point(79, side.Height - 80); fr.Location = new Point(142, side.Height - 80);
                 tech.Location = new Point((side.Width - tech.Width) / 2, side.Height - 36);
             };
             return side;
@@ -539,7 +543,8 @@ namespace VIctoryLauncher
             smoothBox.Checked = rtxFrameGen;
             fightsBox.Checked = vramGb == 0 || vramGb >= 11; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
             Log(L("Recommended setup (= the TUDO + lutas shortcut): Recommended 720p, overlay, borderless, 60 FPS clock, 2 GB of buffers for crowds, video memory reserve" + (rtxFrameGen ? ", Smooth Motion." : "."),
-                  "Configuracao recomendada (= atalho TUDO + lutas): Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, 2 GB de buffers para multidoes, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
+                  "Configuracao recomendada (= atalho TUDO + lutas): Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, 2 GB de buffers para multidoes, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : "."),
+                  "Réglages recommandés (= raccourci TUDO + lutas) : Recommandé 720p, overlay, sans bordure, horloge à 60 FPS, 2 Go de buffers pour les foules, réserve de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
         }
 
         void SelectMode(int k)
@@ -608,6 +613,15 @@ namespace VIctoryLauncher
                 "   corre na grafica integrada e liberta normalmente 0,5-1,5 GB na NVIDIA.",
                 "•  'Guardar o maximo de VRAM' pede ao Windows uma reserva para o VIctory: quando outra app pede memoria, a dela sai primeiro.",
                 "•  O Smooth Motion e escrito no perfil do driver para victory.exe (como o NVIDIA Profile Inspector): nao precisa da NVIDIA App.",
+            } : Fr ? new[] {
+                "Plus de VRAM libre = plus de textures sur la carte = moins d'objets noirs, de textures plates et de rechargements.",
+                "•  NVIDIA App > Paramètres > Fonctionnalités : désactive Instant Replay et l'overlay ('NVIDIA Overlay' peut prendre 1-2 Go).",
+                "•  Discord : Paramètres > Avancés > Accélération matérielle : désactivée. Wallpaper Engine : mets-le en pause ou quitte-le.",
+                "•  Navigateurs, émulateurs et autres jeux : ferme-les pendant que tu joues.",
+                "•  Portables avec MUX (PredatorSense, Armoury Crate, Legion Vantage) : en mode Hybride/Optimus le bureau",
+                "   tourne sur la carte intégrée, ce qui libère en général 0,5-1,5 Go sur la carte NVIDIA.",
+                "•  'Garder le max de VRAM' demande à Windows une réserve pour VIctory : les autres applis sortent en premier.",
+                "•  Smooth Motion est écrit dans le profil du pilote pour victory.exe (comme NVIDIA Profile Inspector) : pas besoin de NVIDIA App.",
             } : new[] {
                 "More free video memory = more textures on the card = fewer black objects, flat textures and reloads.",
                 "•  NVIDIA App > Settings > Features: turn off Instant Replay and the overlay ('NVIDIA Overlay' can hold 1-2 GB).",
@@ -828,6 +842,28 @@ namespace VIctoryLauncher
                 new[] { "Alt ou F1", "-", "Soltar o rato", "" },
                 new[] { "F3", "-", "Mostrar/esconder o overlay", "" },
                 new[] { "F9", "-", "Gravar um frame (modo de gravacao)", "" },
+            } : Fr ? new[] {
+                new[] { "W / A / S / D", "Stick gauche", "Se déplacer", "W accélérer, S freiner/reculer, A/D tourner" },
+                new[] { "I / K", "Stick gauche haut/bas", "(caméra)", "Avion : piquer (I) / cabrer (K) ; décoller : W + K" },
+                new[] { "Souris", "Stick droit", "Regarder (clic pour capturer)", "Regarder" },
+                new[] { "Clic gauche", "RT / RB", "Tirer", "Tirer" },
+                new[] { "Clic droit", "LT", "Viser / interagir", "" },
+                new[] { "Maj gauche", "L3", "Courir", "Klaxon / nitro" },
+                new[] { "F", "Y + mode véhicule", "Monter dans le véhicule", "Sortir du véhicule" },
+                new[] { "E ou Y", "Y", "Interagir, parler", "" },
+                new[] { "Espace / Entrée", "A", "Sauter / grimper ; combat : bloquer", "Frein à main" },
+                new[] { "Ctrl gauche / C / Retour arrière", "B", "S'accroupir / se reposer", "Phares ; avion : droite" },
+                new[] { "R ou X", "X", "Combat : coup de poing/pied", "Avion : gauche" },
+                new[] { "Q", "RB", "Se mettre à couvert", "" },
+                new[] { "Tab (maintenir)", "LB", "Inventaire / roue des armes", "Sortir une arme" },
+                new[] { "M", "View", "Carte", "Carte" },
+                new[] { "V", "R3", "Regarder derrière", "Regarder derrière" },
+                new[] { "Flèches ou 1-4", "Croix", "Téléphone, radio, partenaire", "" },
+                new[] { "Échap", "Menu", "Pause", "Pause" },
+                new[] { "Verr. Maj", "-", "Recaler le mode véhicule s'il est désynchronisé", "" },
+                new[] { "Alt ou F1", "-", "Libérer la souris", "" },
+                new[] { "F3", "-", "Afficher/masquer l'overlay", "" },
+                new[] { "F9", "-", "Enregistrer une image (mode enregistrement)", "" },
             } : new[] {
                 new[] { "W / A / S / D", "Left stick", "Move", "W accelerate, S brake/reverse, A/D steer" },
                 new[] { "I / K", "Left stick up/down", "(camera)", "Aircraft nose down (I) / up (K); take off: W + K" },
@@ -933,6 +969,55 @@ namespace VIctoryLauncher
                 "TECLAS NO JOGO",
                 "   •  F3 mostra/esconde o overlay: FPS, media do ultimo minuto (AVG 1M), media total (ALL), pior meio segundo (LOW).",
                 "   •  Alt ou F1 solta o rato. A pagina Controlos tem o resto.",
+            } : Fr ? new[] {
+                "JOUER",
+                "   •  Préréglages : Recommandé (720p), Le plus rapide et PC modeste (540p), Ultra bas (PC avec très peu de mémoire), Net et",
+                "      cgbj classique (1080p), Personnalisé (tes valeurs). Le launcher en choisit un selon ton matériel la première fois.",
+                "   •  Options de lancement : survole chacune pour voir ce qu'elle fait. ★ marque ce qui a été testé.",
+                "   •  JOUER charge les pipelines, lance le jeu et, à sa fermeture, garde les pipelines de cette session pour la prochaine.",
+                "   •  Un jeu bloqué (une erreur, une fenêtre qui ne répond plus) ne bloque jamais JOUER : il devient 'FERMER ET JOUER'.",
+                "   •  Quand il manque quelque chose (mémoire virtuelle, alimentation, Resizable BAR, shaders), un avis jaune dit quoi et t'emmène corriger.",
+                "",
+                "INSTALLATION",
+                "   •  'Tout faire pour moi' lance les étapes manquantes : moteur, exclusion Defender, dossier du jeu, shaders, alimentation,",
+                "      mémoire virtuelle, bonne carte graphique pour VIctory et génération d'images. Windows demande les droits administrateur si besoin.",
+                "   •  Resizable BAR : le launcher vérifie ce que D3D12 donne au jeu (pas seulement le BIOS) et montre le guide de ta carte mère.",
+                "",
+                "SHADERS",
+                "   •  Affiche en direct les shaders traduits, les pipelines prêtes, celles en échec, l'espace disque et les erreurs.",
+                "   •  'Réparer' fait ce qui manque ; 'Tout refaire' vide le cache et prépare à nouveau.",
+                "",
+                "PERFORMANCES",
+                "   •  Ce qui occupe la VRAM et la RAM ; coche des applis et ferme-les avant de jouer. Génération d'images activée ou non.",
+                "",
+                "MATÉRIEL ET ID",
+                "   •  Ton ID permanent (VI-XXXX-XXXX), avec un bouton copier. Il vient des composants du PC et reste après une réinstallation de Windows.",
+                "   •  Partage du matériel (désactivé par défaut) : envoie UNIQUEMENT le matériel (carte graphique, processeur, RAM, carte mère, Windows,",
+                "      type de disque). Jamais de logs, d'options, de chemins, de noms ni ton IP. La page montre exactement ce qui est envoyé.",
+                "",
+                "MISES À JOUR",
+                "   •  Le launcher vérifie GitHub à l'ouverture et toutes les 5 minutes. Une mise à jour n'est installée que si sa signature et",
+                "      son SHA-256 correspondent ; elle s'installe seule quand le jeu ne tourne pas. C'est la seule chose que le launcher reçoit d'internet.",
+                "",
+                "RÉGLAGES AVANCÉS (PERSONNALISÉ)",
+                "   •  Résolution, textures, buffers, protections mémoire et horloge FPS. 'Copier mon profil' donne un code (VI1-...) à partager ;",
+                "      colle celui d'un ami dans la case et appuie sur 'Appliquer' (il montre d'abord ce qui change).",
+                "",
+                "LOGS ET ERREURS",
+                "   •  Logs du jeu : " + Path.Combine(dataRoot, "logs") + " (session-*.log, prepare.log).",
+                "   •  Erreurs du launcher : " + Program.ErrorFile,
+                "   •  'Envoyer les erreurs sur Discord' : choisis 'erreurs du launcher' ou 'erreurs du jeu' et écris ce qui s'est passé. Le launcher met",
+                "      les bons fichiers dans un zip sur ton Bureau, ouvre le dossier et te demande de l'envoyer dans le salon \"" + DiscordChannel + "\".",
+                "      Rien n'est envoyé tout seul : c'est toi qui l'envoies.",
+                "",
+                "CARTES GRAPHIQUES",
+                "   •  NVIDIA RTX 40/50 : Smooth Motion. RTX 30 : NVSmooth30 (expérimental). Autres cartes (GTX 10, RTX 20, AMD, Intel) : génération d'images VI",
+                "      (expérimental, désactivée par défaut) : une image entre chaque paire, faite à partir des images seules, avec une demi-image de retard.",
+                "   •  AMD : le launcher détecte la carte et utilise le moteur AMD de Belobug (VIctory-Belobug-AMD).",
+                "",
+                "TOUCHES EN JEU",
+                "   •  F3 affiche/masque l'overlay : FPS, moyenne de la dernière minute (AVG 1M), moyenne depuis le début (ALL), pire demi-seconde (LOW).",
+                "   •  Alt ou F1 libère la souris. La page Commandes a le reste.",
             } : new[] {
                 "PLAY",
                 "   •  Presets: Recommended (720p), Fastest and Modest PC (540p), Ultra Low (PCs with very little memory), Sharp and",
@@ -1573,7 +1658,7 @@ namespace VIctoryLauncher
                 Directory.CreateDirectory(Path.GetDirectoryName(settingsFile));
                 Func<CheckBox, string> b = c => c.Checked ? "1" : "0";
                 var mine = new[] {
-                    "lang=" + (Pt ? "pt" : "en"), "cache=" + cacheDir, "data=" + dataDir,
+                    "lang=" + (Pt ? "pt" : Fr ? "fr" : "en"), "cache=" + cacheDir, "data=" + dataDir,
                     "game=" + gameBox.Text.Trim(), "exe=" + (exeChoice ?? ""), "mode=" + modeIndex,
                     "panel=" + b(panelBox), "borderless=" + b(borderlessBox), "fps60=" + b(fps60Box), "reserve=" + b(reserveBox),
                     "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox),
