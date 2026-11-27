@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -112,6 +113,49 @@ namespace VIctoryLauncher
 
         static bool HasFiles(string dir) { return Directory.Exists(dir) && Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Any(); }
 
+        // ---------------------------------------------------------------- what a save may hold
+        // Exactly the layout the emulator's save module writes (crates\victory-hle\src\modules\xgamesave.rs):
+        //   <console user, 16 hex>/<title's GUID>/<container name~16 hex>/v<version>/<0, 1, 2...| manifest>
+        // Nothing else is exported or imported: no other name, extension or folder, nothing outside the
+        // saves folder, no program or script whatever its name, nothing large. A shared zip with anything
+        // more is refused whole, so a save from a stranger cannot bring a virus along (27/11/2026).
+        static readonly System.Text.RegularExpressions.Regex SavePath = new System.Text.RegularExpressions.Regex(
+            @"^[0-9A-Fa-f]{16}/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/[A-Za-z0-9_]{1,64}~[0-9A-Fa-f]{16}/v[0-9]{1,5}/([0-9]{1,4}|manifest)$");
+        const string SaveHashes = "vi-save.sha256";
+        const long MaxSaveFile = 32L << 20, MaxSaveTotal = 96L << 20;
+        const int MaxSaveFiles = 400;
+
+        // Why these bytes cannot be a save file, or null. Programs and scripts are refused by their content,
+        // whatever their name: Windows programs (MZ), zips (PK), Linux programs, shortcuts, scripts.
+        static string NotSaveBytes(string name, byte[] head, long length)
+        {
+            if (length > (name.EndsWith("manifest") ? 64 * 1024 : MaxSaveFile)) return "too large";
+            if (head.Length >= 2 && head[0] == (byte)'M' && head[1] == (byte)'Z') return "a Windows program";
+            if (head.Length >= 2 && head[0] == (byte)'P' && head[1] == (byte)'K') return "an archive";
+            if (head.Length >= 4 && head[0] == 0x7F && head[1] == (byte)'E' && head[2] == (byte)'L' && head[3] == (byte)'F') return "a program";
+            if (head.Length >= 4 && head[0] == 0x4C && head[1] == 0 && head[2] == 0 && head[3] == 0) return "a shortcut";
+            if (head.Length >= 2 && head[0] == (byte)'#' && head[1] == (byte)'!') return "a script";
+            var start = System.Text.Encoding.ASCII.GetString(head).TrimStart().ToLowerInvariant();
+            foreach (var s in new[] { "@echo", "<script", "<html", "powershell", "function ", "set ws", "createobject(" })
+                if (start.StartsWith(s)) return "a script";
+            return null;
+        }
+
+        static byte[] Head(Stream s, int n)
+        {
+            var b = new byte[n];
+            int got = 0, r;
+            while (got < n && (r = s.Read(b, got, n - got)) > 0) got += r;
+            Array.Resize(ref b, got);
+            return b;
+        }
+
+        static string Sha256Of(Stream s)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                return string.Concat(sha.ComputeHash(s).Select(x => x.ToString("x2")).ToArray());
+        }
+
         void ExportSave()
         {
             if (!HasFiles(SavesDir)) { MessageBox.Show(this, L("There is no save yet: play until the game saves once.", "Ainda nao ha save: joga ate o jogo gravar uma vez.", "Pas encore de sauvegarde : joue jusqu'à ce que le jeu sauvegarde une fois."), "Julia's Launcher"); return; }
@@ -119,7 +163,23 @@ namespace VIctoryLauncher
             try
             {
                 if (File.Exists(zip)) File.Delete(zip);
-                ZipFile.CreateFromDirectory(SavesDir, zip, CompressionLevel.Optimal, false);
+                var hashes = new System.Text.StringBuilder();
+                int n = 0;
+                using (var z = ZipFile.Open(zip, ZipArchiveMode.Create))
+                {
+                    foreach (var f in Directory.EnumerateFiles(SavesDir, "*", SearchOption.AllDirectories))
+                    {
+                        var rel = f.Substring(SavesDir.Length).TrimStart('\\').Replace('\\', '/');
+                        // Only the save module's own files go out (a stray file in the folder stays home).
+                        if (!SavePath.IsMatch(rel)) continue;
+                        z.CreateEntryFromFile(f, rel, CompressionLevel.Optimal);
+                        using (var s = File.OpenRead(f)) hashes.Append(Sha256Of(s)).Append("  ").Append(rel).Append('\n');
+                        n++;
+                    }
+                    var e = z.CreateEntry(SaveHashes);
+                    using (var w = new StreamWriter(e.Open())) w.Write(hashes.ToString());
+                }
+                if (n == 0) { File.Delete(zip); MessageBox.Show(this, L("There is no save yet: play until the game saves once.", "Ainda nao ha save: joga ate o jogo gravar uma vez.", "Pas encore de sauvegarde : joue jusqu'à ce que le jeu sauvegarde une fois."), "Julia's Launcher"); return; }
                 Log(L("Save exported: ", "Save exportado: ", "Sauvegarde exportée : ") + zip);
                 try { Process.Start("explorer.exe", "/select,\"" + zip + "\""); } catch (Exception) { }
             }
@@ -135,37 +195,79 @@ namespace VIctoryLauncher
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 zip = d.FileName;
             }
+            Directory.CreateDirectory(SaveBackups);
+            var incoming = Path.Combine(SaveBackups, "incoming-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             try
             {
-                // Only what a save folder holds: the console user's folder, the title's container, files under it.
+                // Every entry checked before anything is written where the game reads.
+                string refused = null;
                 using (var z = ZipFile.OpenRead(zip))
                 {
-                    var names = z.Entries.Select(e => e.FullName.Replace('\\', '/')).ToList();
-                    bool looksRight = names.Count > 0 && names.Count < 500 && z.Entries.Sum(e => e.Length) < (64L << 20)
-                        && names.All(n => !n.Contains("..") && !n.StartsWith("/") && n.IndexOf(':') < 0)
-                        && names.Any(n => n.IndexOf("7952987a", StringComparison.OrdinalIgnoreCase) >= 0);
-                    if (!looksRight)
+                    var files = z.Entries.Where(e => !e.FullName.EndsWith("/")).ToList();
+                    if (files.Count == 0 || files.Count > MaxSaveFiles + 1) refused = L("it holds no save, or far too many files", "nao tem save, ou tem ficheiros a mais", "il ne contient pas de sauvegarde, ou beaucoup trop de fichiers");
+                    else if (files.Sum(e => e.Length) > MaxSaveTotal) refused = L("it is far larger than a save", "e muito maior do que um save", "il est bien plus gros qu'une sauvegarde");
+                    Dictionary<string, string> listed = null;
+                    var hashEntry = files.FirstOrDefault(e => e.FullName == SaveHashes);
+                    if (refused == null && hashEntry != null)
                     {
-                        MessageBox.Show(this, L("This zip is not a save exported by the launcher.", "Este zip nao e um save exportado pelo launcher.", "Ce zip n'est pas une sauvegarde exportée par le launcher."), "Julia's Launcher");
-                        return;
+                        listed = new Dictionary<string, string>(StringComparer.Ordinal);
+                        using (var r = new StreamReader(hashEntry.Open()))
+                            foreach (var line in r.ReadToEnd().Split('\n'))
+                            {
+                                var parts = line.Trim().Split(new[] { "  " }, 2, StringSplitOptions.None);
+                                if (parts.Length == 2) listed[parts[1]] = parts[0];
+                            }
                     }
+                    var full = Path.GetFullPath(incoming) + Path.DirectorySeparatorChar;
+                    foreach (var e in files)
+                    {
+                        if (refused != null) break;
+                        if (e == hashEntry) continue;
+                        var rel = e.FullName.Replace('\\', '/');
+                        if (!SavePath.IsMatch(rel)) { refused = string.Format(L("\"{0}\" is not a save file", "\"{0}\" nao e um ficheiro de save", "\"{0}\" n'est pas un fichier de sauvegarde"), rel); break; }
+                        string why;
+                        using (var s = e.Open()) why = NotSaveBytes(rel, Head(s, 64), e.Length);
+                        if (why != null) { refused = string.Format(L("\"{0}\" is {1}", "\"{0}\" e {1}", "\"{0}\" est {1}"), rel, why); break; }
+                        var to = Path.GetFullPath(Path.Combine(incoming, rel.Replace('/', Path.DirectorySeparatorChar)));
+                        if (!to.StartsWith(full, StringComparison.OrdinalIgnoreCase)) { refused = rel; break; }
+                        Directory.CreateDirectory(Path.GetDirectoryName(to));
+                        e.ExtractToFile(to, false);
+                        if (listed != null)
+                        {
+                            string want, have;
+                            using (var s = File.OpenRead(to)) have = Sha256Of(s);
+                            if (!listed.TryGetValue(rel, out want) || want != have) { refused = string.Format(L("\"{0}\" was changed after it was exported", "\"{0}\" foi alterado depois de exportado", "\"{0}\" a été modifié après l'export"), rel); break; }
+                        }
+                    }
+                    if (refused == null && !Directory.Exists(incoming)) refused = L("it holds no save", "nao tem save", "il ne contient pas de sauvegarde");
+                }
+                if (refused != null)
+                {
+                    try { if (Directory.Exists(incoming)) Directory.Delete(incoming, true); } catch (Exception) { }
+                    Log(L("Save refused: ", "Save recusado: ", "Sauvegarde refusée : ") + refused);
+                    MessageBox.Show(this, L("This zip was refused, nothing was changed: ", "Este zip foi recusado, nada foi mudado: ", "Ce zip a été refusé, rien n'a changé : ") + refused + ".\r\n\r\n"
+                        + L("Only saves exported by Julia's Launcher are taken.", "So sao aceites saves exportados pelo Julia's Launcher.", "Seules les sauvegardes exportées par Julia's Launcher sont acceptées."), "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
                 var ask = L("Replace your saves with this one? Yours are kept in a backup first (", "Substituir os teus saves por este? Os teus ficam primeiro numa copia de seguranca (", "Remplacer tes sauvegardes par celle-ci ? Les tiennes sont d'abord gardées dans une copie de sécurité (") + SaveBackups + ").";
-                if (MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                if (MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) { Directory.Delete(incoming, true); return; }
                 if (HasFiles(SavesDir))
                 {
-                    Directory.CreateDirectory(SaveBackups);
                     var backup = Path.Combine(SaveBackups, "saves-before-import-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".zip");
                     ZipFile.CreateFromDirectory(SavesDir, backup, CompressionLevel.Optimal, false);
                     Directory.Delete(SavesDir, true);
                     Log(L("Your saves were kept in ", "Os teus saves ficaram em ", "Tes sauvegardes sont gardées dans ") + backup);
                 }
-                Directory.CreateDirectory(SavesDir);
-                ZipFile.ExtractToDirectory(zip, SavesDir);
+                Directory.CreateDirectory(Path.GetDirectoryName(SavesDir));
+                Directory.Move(incoming, SavesDir);
                 Log(L("Save imported. Press PLAY and load it from the game's menu.", "Save importado. Carrega em JOGAR e abre-o no menu do jogo.", "Sauvegarde importée. Appuie sur PLAY et charge-la depuis le menu du jeu."));
                 MessageBox.Show(this, L("Save imported. Press PLAY and load it from the game's menu.", "Save importado. Carrega em JOGAR e abre-o no menu do jogo.", "Sauvegarde importée. Appuie sur PLAY et charge-la depuis le menu du jeu."), "Julia's Launcher");
             }
-            catch (Exception ex) { MessageBox.Show(this, L("The save could not be imported: ", "Nao deu para importar o save: ", "Impossible d'importer la sauvegarde : ") + ex.Message, "Julia's Launcher"); }
+            catch (Exception ex)
+            {
+                try { if (Directory.Exists(incoming)) Directory.Delete(incoming, true); } catch (Exception) { }
+                MessageBox.Show(this, L("The save could not be imported: ", "Nao deu para importar o save: ", "Impossible d'importer la sauvegarde : ") + ex.Message, "Julia's Launcher");
+            }
         }
     }
 }
