@@ -1,10 +1,12 @@
 name: Release
 
-# A tag v* on the edupode branch builds everything a release holds from this repository's code, with a
-# provenance attestation for each program (anyone can check a download came from this code:
-# gh attestation verify "<file>" -R edupode/cold-project-vi), and leaves a DRAFT release.
-# edupode then signs it on his own PC (scripts\sign-release.ps1 <tag>): the release key never
-# reaches GitHub, so the launchers out there only install what he signed.
+# A pushed tag v* builds everything a release holds from this repository's code, with a provenance attestation
+# for each program (anyone can check a download came from this code: gh attestation verify "<file>" -R <repo>),
+# then publishes it: the release signer (server/release-signer, a Cloudflare Worker that holds the release key
+# and the Discord webhook as secrets) signs manifest.json for this run only, after checking GitHub's OIDC token
+# says it is this workflow, for this tag, in edupode/cold-project-vi or felicienradio/cold-project-vi. The key
+# and the webhook never reach GitHub. Every launcher installs the release within 5 minutes, and the
+# announcement (docs/ANNOUNCEMENT.md) goes to the Discord channel. scripts\sign-release.ps1 still signs by hand.
 
 # (felicienradio builds and signs his own releases on his PC with scripts\release-local.ps1; on the edupode
 # branch a pushed tag builds them here, and edupode signs them.)
@@ -72,4 +74,45 @@ jobs:
         run: |
           Copy-Item "dist/Julia's Launcher.exe" dist/Julias-Launcher.exe
           $files = Get-ChildItem dist -File | Where-Object { $_.Name -ne "Julia's Launcher.exe" } | ForEach-Object { $_.FullName }
-          gh release create "${{ github.ref_name }}" --draft --target edupode --title "Julia's Launcher ${{ github.ref_name }}" --notes-file docs/RELEASE-NOTES.md $files
+          gh release create "${{ github.ref_name }}" --draft --target "${{ github.sha }}" -R "${{ github.repository }}" --title "Julia's Launcher ${{ github.ref_name }}" --notes-file docs/RELEASE-NOTES.md $files
+      - name: Sign, publish and announce
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'; $repo = '${{ github.repository }}'
+          $signer = 'https://vi-release-signer.edupodept.workers.dev'
+          # Where each download goes beside the launcher (Updater.Allowed), as scripts\sign-release.ps1 writes it.
+          $map = [ordered]@{ 'Julias-Launcher.exe' = "Julia's Launcher.exe"; 'victory.exe' = 'victory.exe'; 'nvsmooth30-version.dll' = 'tools/nvsmooth30/version.dll' }
+          $files = foreach ($asset in $map.Keys) {
+            $f = Join-Path dist $asset
+            if (-not (Test-Path $f)) { continue }
+            [ordered]@{ name = $map[$asset]; url = "https://github.com/$repo/releases/download/$tag/$asset"; sha256 = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower(); size = (Get-Item $f).Length }
+          }
+          $notes = [IO.File]::ReadAllText('docs/RELEASE-NOTES.md'); $notesPt = [IO.File]::ReadAllText('docs/RELEASE-NOTES.pt.md')
+          $manifest = [ordered]@{ version = $tag.TrimStart('v'); notes = $notes; notes_pt = $notesPt; files = @($files) } | ConvertTo-Json -Depth 4
+          New-Item -ItemType Directory -Force signed | Out-Null
+          [IO.File]::WriteAllText("$PWD/signed/manifest.json", $manifest, (New-Object Text.UTF8Encoding $false))
+          $bytes = [IO.File]::ReadAllBytes("$PWD/signed/manifest.json")
+          # This run's identity, signed by GitHub, for the signer only (audience vi-release-signer).
+          $token = (Invoke-RestMethod -Headers @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=vi-release-signer").value
+          $sig = (Invoke-RestMethod -Method Post -Uri "$signer/v1/sign" -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json' -Body $bytes).signature
+          # Checked against the keys the launcher trusts before anything is published.
+          $ok = $false
+          foreach ($k in ([regex]::Matches((Get-Content launcher/ReleaseKey.cs -Raw), '"(<RSAKeyValue>.*?</RSAKeyValue>)"') | ForEach-Object { $_.Groups[1].Value })) {
+            $rsa = [System.Security.Cryptography.RSA]::Create(); $rsa.FromXmlString($k)
+            if ($rsa.VerifyData($bytes, [Convert]::FromBase64String($sig), 'SHA256', [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)) { $ok = $true }
+          }
+          if (-not $ok) { throw 'The signature does not match a key the launcher trusts: not publishing.' }
+          [IO.File]::WriteAllText("$PWD/signed/manifest.sig", $sig)
+          gh release upload $tag -R $repo --clobber signed/manifest.json signed/manifest.sig
+          gh release edit $tag -R $repo --draft=false --latest
+          "Published $tag."
+          if (Test-Path docs/ANNOUNCEMENT.md) {
+            $version = $tag.TrimStart('v') -replace '-.*$', ''
+            $text = [IO.File]::ReadAllText('docs/ANNOUNCEMENT.md').Replace('{tag}', $tag).Replace('{version}', $version).Trim()
+            $token = (Invoke-RestMethod -Headers @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=vi-release-signer").value
+            $r = Invoke-RestMethod -Method Post -Uri "$signer/v1/announce" -Headers @{ Authorization = "Bearer $token" } -ContentType 'text/plain; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($text))
+            "Announcement posted: $($r.posted)"
+          }
