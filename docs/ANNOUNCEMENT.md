@@ -1,4 +1,4 @@
-**Julia's Launcher {tag} is out** 🔧
+## Julia's Launcher {tag} is out 🔧
 **Fix**
 🛠️ **8 GB cards ran at 3-15 FPS** (RTX 4060, 3060 Ti...). "Crowds and fights" put 2 GB of the game's buffers on cards under 11 GB, so video memory spilled into RAM. Only 11 GB+ cards get it now.
 📁 **A game folder with only the `.exe`** (without the ~100 GB of game data) is flagged before PLAY, instead of the game closing at once.
