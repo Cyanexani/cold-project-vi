@@ -1,7 +1,4 @@
-Julia's Launcher 0.3.7: acabaram as texturas arco-íris, o Windows 10 arranca o jogo, e o teu disco mais rápido.
+Julia's Launcher 0.3.8: o launcher de novo todo em francês.
 
-- **Texturas arco-íris corrigidas.** Caras, camisolas e paredes cheias de ruído colorido vinham de uma textura ainda não lida: a memória de cópia dela, reutilizada de outra textura, ainda tinha os bytes dessa, e a placa mostrava-os. Agora essa memória é esvaziada primeiro, por isso a textura não mostra nada por um instante e depois a imagem certa. Custa alguns milissegundos por frame enquanto o mundo carrega. Era pior em placas de 8 GB e 16 GB de RAM, onde essa memória é mais reutilizada.
-- **Windows 10: o jogo arranca.** O Direct3D 12 do Windows 10 recusava o que o motor pede, e o jogo nunca passava do "D3D12 init". O VIctory vem agora com o D3D12 Agility SDK da Microsoft (`D3D12\D3D12Core.dll`), que o Windows 10 usa em vez do seu. No Windows 11 nada muda. Os launchers atualizados a partir da 0.3.6 descarregam-no sozinhos, verificado pelo SHA-256.
-- **O teu disco mais rápido.** Shaders > **Mudar para outro disco...** muda a cache de shaders (10-20 GB), os dados e saves do jogo, o motor AMD e as compilações para qualquer disco. Os saves são copiados antes de saírem do sítio antigo.
-
-É seguro? [docs/SAFETY.md](https://github.com/felicienradio/cold-project-vi/blob/main/docs/SAFETY.md) · [Política de assinatura de código](https://github.com/felicienradio/cold-project-vi/blob/main/docs/CODE-SIGNING-POLICY.md)
+- Francês: os três textos novos da 0.3.6 (o passo da Segurança do Windows para o "Acesso negado" ao compilar) estão traduzidos.
+- Tudo da 0.3.7: acabaram as texturas arco-íris, o Windows 10 arranca o jogo (D3D12 Agility SDK), e os ficheiros do VIctory podem ir para o teu disco mais rápido.

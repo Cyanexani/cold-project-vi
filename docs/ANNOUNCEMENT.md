@@ -1,10 +1,11 @@
 ## Julia's Launcher {tag} is out 🔧
 **Fix**
-🌈 **Rainbow textures are gone.** Faces, shirts and walls full of coloured noise were leftovers of *another* texture in reused memory. That memory is now emptied first: a texture is blank for a moment, then right. Worst on 8 GB cards / 16 GB of RAM, so tell us how it looks there.
-🪟 **Windows 10: the game starts.** No more "never gets past D3D12 init": VIctory now ships Microsoft's D3D12 Agility SDK, no patcher needed. Windows 11 is unchanged.
+🇫🇷 **The launcher is fully in French again**: the Windows Security step added in 0.3.6 is translated.
 
-**New**
-💾 **Use your fastest drive:** Shaders > **Move to another drive...** moves the shader cache, game data and saves, the AMD engine and builds to any drive.
+**Also since 0.3.7**
+🌈 No more rainbow textures on faces, shirts and walls.
+🪟 Windows 10 starts the game (D3D12 Agility SDK).
+💾 VIctory's files can go on your fastest drive.
 
 **Install**
 🔄 On 0.3.x: nothing to do, it installs itself within 5 minutes while the game is closed.
