@@ -1664,6 +1664,8 @@ namespace VIctoryLauncher
             AskToShare();
             // Once: a log of each game sent when it closes (SessionLogs.cs).
             AskSessionLogs();
+            // The saves as they are, before the game can change them (Saves.cs).
+            BackupSavesBeforePlay();
             long cardUsed;
             GpuUsers(out cardUsed);
             if (cardUsed > (2L << 30))

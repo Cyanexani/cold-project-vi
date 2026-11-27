@@ -1,5 +1,7 @@
-Julia's Launcher 0.3.10: uma galeria de saves, e relatórios de erros num clique.
+Julia's Launcher 0.3.11: menos crashes em PCs de 16 GB, e os teus saves copiados antes de cada jogo.
 
-- Galeria de saves: partilha o teu save em Hardware e ID > Saves do jogo > Partilhar na galeria (um título e uma nota). Aparece na página pública da galeria depois de os programadores o aprovarem; "Abrir a galeria de saves" mostra os de todos. Um save descarregado entra com "Importar um save..." (os teus ficam primeiro numa cópia de segurança). Só os ficheiros de save do jogo são aceites, verificados ao exportar e ao importar.
-- Enviar erros: dois botões, sem conta. "Enviar" guarda os logs em privado e abre um relatório público no GitHub só com o resumo (peças do PC, versões, definições e o que escreveste), que podes acompanhar; "Enviar em privado" não cria o relatório público.
-- Motor AMD do Belobug: saída no máximo 1080p (fechava com um erro fatal em 1440p e 4K), e só oferecido em placas Radeon.
+- **Menos crashes quando a memória aperta.** Em PCs com 16 GB de RAM, o Windows recusava por um momento um buffer de 64 MB ao VIctory, e o jogo fechava ("no host list for a state prelude", "device removed"). As logs dos jogadores mostraram isto em RX 9070 XT, RX 6600, RX 6700 XT e RTX 4070. O VIctory liberta agora os blocos de memória vazios que guarda de reserva (até 4 GB da placa e 512 MB do PC) e tenta de novo antes de desistir.
+- **Cópias dos saves.** Os teus saves são copiados antes de cada jogo (só quando mudaram; ficam os 15 mais recentes). Hardware e ID > Saves do jogo > **Restaurar uma cópia...** traz qualquer um de volta, e guarda também os saves atuais.
+- O motor AMD do Belobug só é usado em placas Radeon e no máximo a 1080p: a 1440p e 4K fechava ao arrancar.
+
+É seguro? [docs/SAFETY.md](https://github.com/felicienradio/cold-project-vi/blob/main/docs/SAFETY.md) · [Política de assinatura de código](https://github.com/felicienradio/cold-project-vi/blob/main/docs/CODE-SIGNING-POLICY.md)

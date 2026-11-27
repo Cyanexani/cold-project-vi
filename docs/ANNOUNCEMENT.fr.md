@@ -1,12 +1,13 @@
-## Julia's Launcher 0.3.10 est sortie 🎉
+## Julia's Launcher {tag} est sorti 🔧
+**Correctifs**
+🧠 **Moins de plantages sur les PC de 16 Go.** Quand Windows manque de mémoire un instant, VIctory libère ce qu'il garde en réserve et réessaie au lieu de se fermer (RX 9070 XT, RX 6600, RX 6700 XT, RTX 4070).
+🟥 Moteur AMD de Belobug : seulement sur les cartes Radeon, et au plus en 1080p (il se fermait au démarrage en 1440p/4K).
 
 **Nouveau**
-💾 **Galerie de sauvegardes** : partage ta sauvegarde depuis **Matériel et ID > Sauvegardes du jeu > Partager dans la galerie**, et récupère celles des autres avec **Ouvrir la galerie**. Elles apparaissent une fois validées ; en importer une sauvegarde d'abord la tienne.
-🐞 **Rapports de bug en un clic** : **Aide > Envoyer les erreurs > Envoyer** garde tes journaux privés et ouvre un rapport public sur GitHub avec seulement le résumé, pour que tu puisses le suivre. Pas besoin de compte. **Envoyer en privé** ne crée pas la partie publique.
+💾 **Copies des sauvegardes avant chaque partie.** Matériel et ID > Sauvegardes du jeu > **Restaurer une copie...** ramène l'une des 15 dernières.
 
-**Correctif**
-🎮 Le moteur AMD de Belobug reste en sortie 1080p (il plantait en 1440p/4K) et n'est proposé que sur les cartes Radeon.
+**Installer**
+🔄 En 0.3.x : rien à faire, la mise à jour s'installe seule en 5 minutes, jeu fermé.
+📥 Nouveau ou ancien launcher : télécharge **VI-Setup-{version}.exe** sur https://github.com/felicienradio/cold-project-vi/releases/latest et lance-le.
 
-**Installation**
-🔄 En 0.3.x : rien à faire, elle s'installe toute seule dans les 5 minutes, jeu fermé.
-📥 Nouveau ou sur un ancien launcher : télécharge **VI-Setup-0.3.10.exe** sur https://github.com/felicienradio/cold-project-vi/releases/latest et lance-le.
+Toujours bloqué ? **Aide > Envoyer les erreurs** dans le launcher, et poste ton ID matériel ici 💙

@@ -43,6 +43,9 @@ namespace VIctoryLauncher
             var gallery = new Pill { Text = L("Open the save gallery", "Abrir a galeria de saves", "Ouvrir la galerie"), Location = new Point(X + 210, y), Width = 200 };
             gallery.Click += (s, e) => OpenUrl(GalleryUrl);
             page.Controls.Add(share); page.Controls.Add(gallery);
+            var restore = new Pill { Text = L("Restore a backup...", "Restaurar uma copia...", "Restaurer une copie..."), Location = new Point(X + 420, y), Width = 200 };
+            restore.Click += (s, e) => RestoreBackup();
+            page.Controls.Add(restore);
             return y + 48;
         }
 
@@ -267,6 +270,70 @@ namespace VIctoryLauncher
             {
                 try { if (Directory.Exists(incoming)) Directory.Delete(incoming, true); } catch (Exception) { }
                 MessageBox.Show(this, L("The save could not be imported: ", "Nao deu para importar o save: ", "Impossible d'importer la sauvegarde : ") + ex.Message, "Julia's Launcher");
+            }
+        }
+
+        // ---------------------------------------------------------------- automatic backups
+        // Before every game the saves are copied to save-backups\auto-<time>.zip (a few hundred KB each; the
+        // newest 15 are kept), so a save the game breaks, a crash while it writes, or an import gone wrong can
+        // be undone from "Restore a backup...". Nothing is written if the saves did not change since the last one.
+        const int AutoBackupsKept = 15;
+
+        void BackupSavesBeforePlay()
+        {
+            try
+            {
+                if (!HasFiles(SavesDir)) return;
+                Directory.CreateDirectory(SaveBackups);
+                // Skipped when nothing changed since the newest automatic backup.
+                var newest = new DirectoryInfo(SaveBackups).EnumerateFiles("auto-*.zip").OrderByDescending(f => f.LastWriteTimeUtc).FirstOrDefault();
+                var changed = Directory.EnumerateFiles(SavesDir, "*", SearchOption.AllDirectories).Select(File.GetLastWriteTimeUtc).DefaultIfEmpty(DateTime.MinValue).Max();
+                if (newest != null && newest.LastWriteTimeUtc >= changed) return;
+                var zip = Path.Combine(SaveBackups, "auto-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".zip");
+                ZipFile.CreateFromDirectory(SavesDir, zip, CompressionLevel.Optimal, false);
+                foreach (var old in new DirectoryInfo(SaveBackups).EnumerateFiles("auto-*.zip").OrderByDescending(f => f.LastWriteTimeUtc).Skip(AutoBackupsKept))
+                    try { old.Delete(); } catch (Exception) { }
+            }
+            catch (Exception e) { Log(L("Save backup: ", "Copia dos saves: ", "Copie des sauvegardes : ") + e.Message); }
+        }
+
+        void RestoreBackup()
+        {
+            if (State() != GameState.None) { MessageBox.Show(this, L("Close the game first.", "Fecha o jogo primeiro.", "Ferme d'abord le jeu."), "Julia's Launcher"); return; }
+            var backups = Directory.Exists(SaveBackups) ? new DirectoryInfo(SaveBackups).EnumerateFiles("*.zip").OrderByDescending(f => f.LastWriteTime).ToList() : new List<FileInfo>();
+            if (backups.Count == 0) { MessageBox.Show(this, L("There is no backup yet: one is made before every game.", "Ainda nao ha copias: e feita uma antes de cada jogo.", "Pas encore de copie : une est faite avant chaque partie."), "Julia's Launcher"); return; }
+            using (var f = new Form { Text = L("Restore a backup", "Restaurar uma copia", "Restaurer une copie"), ClientSize = new Size(520, 400), BackColor = Theme.Back, ForeColor = Theme.Text,
+                Font = Theme.Ui(9.75f), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon })
+            {
+                f.Controls.Add(new Label { Location = new Point(20, 14), Size = new Size(480, 40), ForeColor = Theme.Dim, BackColor = Theme.Back,
+                    Text = L("Your saves as they were before each game (newest first). The current ones are kept in a backup too.",
+                             "Os teus saves como estavam antes de cada jogo (os mais recentes primeiro). Os atuais tambem ficam numa copia.",
+                             "Tes sauvegardes telles qu'avant chaque partie (les plus récentes d'abord). Les actuelles sont aussi gardées.") });
+                var list = new ListBox { Location = new Point(20, 60), Size = new Size(480, 270), BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
+                foreach (var b in backups)
+                    list.Items.Add(b.LastWriteTime.ToString("g") + "   " + (b.Name.StartsWith("auto-") ? L("before a game", "antes de um jogo", "avant une partie") : L("before an import", "antes de importar", "avant un import")) + "   " + Math.Max(1, b.Length / 1024) + " KB");
+                list.SelectedIndex = 0;
+                var ok = new Pill { Main = true, Text = L("Restore", "Restaurar", "Restaurer"), Location = new Point(20, 344), Size = new Size(180, 40) };
+                var cancel = new Pill { Text = L("Cancel", "Cancelar", "Annuler"), Location = new Point(210, 348), Size = new Size(140, 34) };
+                ok.Click += (s, e) => { f.DialogResult = DialogResult.OK; f.Close(); };
+                cancel.Click += (s, e) => f.Close();
+                f.Controls.Add(list); f.Controls.Add(ok); f.Controls.Add(cancel);
+                if (f.ShowDialog(this) != DialogResult.OK || list.SelectedIndex < 0) return;
+                var chosen = backups[list.SelectedIndex].FullName;
+                try
+                {
+                    if (HasFiles(SavesDir))
+                    {
+                        var keep = Path.Combine(SaveBackups, "saves-before-restore-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".zip");
+                        ZipFile.CreateFromDirectory(SavesDir, keep, CompressionLevel.Optimal, false);
+                        Directory.Delete(SavesDir, true);
+                    }
+                    Directory.CreateDirectory(SavesDir);
+                    ZipFile.ExtractToDirectory(chosen, SavesDir);
+                    Log(L("Saves restored from ", "Saves restaurados de ", "Sauvegardes restaurées depuis ") + Path.GetFileName(chosen));
+                    MessageBox.Show(this, L("Saves restored. Press PLAY and load from the game's menu.", "Saves restaurados. Carrega em JOGAR e abre-os no menu do jogo.", "Sauvegardes restaurées. Appuie sur PLAY et charge-les depuis le menu du jeu."), "Julia's Launcher");
+                }
+                catch (Exception ex) { MessageBox.Show(this, L("The backup could not be restored: ", "Nao deu para restaurar a copia: ", "Impossible de restaurer la copie : ") + ex.Message, "Julia's Launcher"); }
             }
         }
     }
