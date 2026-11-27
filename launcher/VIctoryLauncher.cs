@@ -1150,6 +1150,43 @@ namespace VIctoryLauncher
         int OutputHeight { get { return outputBox == null ? 1080 : outputBox.SelectedIndex == 2 ? 2160 : outputBox.SelectedIndex == 1 ? 1440 : 1080; } }
         int OutputWidth { get { return OutputHeight * 16 / 9; } }
 
+        // The edupode engine is the default on every card. On a Radeon, when it ends with an error in the first
+        // three minutes twice in a row, the launcher moves to Belobug's AMD engine on its own (built once by
+        // Setup if it is not there yet) and says how to go back. One early failure is not enough: a game can
+        // end at start once and then run (an RX 6800 player's first session, 27/11/2026).
+        void EngineFallback(bool failedEarly)
+        {
+            if (!failedEarly) { if (ReadSetting("edupode_fails") != "0") WriteSetting("edupode_fails", "0"); return; }
+            if (UseAmdEngine || !hasRadeon || hasNvidia) return;
+            int fails;
+            int.TryParse(ReadSetting("edupode_fails") ?? "0", out fails);
+            fails++;
+            WriteSetting("edupode_fails", fails.ToString());
+            if (fails < 2)
+            {
+                Log(L("The edupode engine ended at start on this Radeon (1 of 2): one more and the launcher moves to Belobug's AMD engine.",
+                      "O motor edupode fechou ao arrancar nesta Radeon (1 de 2): mais uma e o launcher passa para o motor AMD do Belobug."));
+                return;
+            }
+            WriteSetting("edupode_fails", "0");
+            WriteSetting("engine", "amd");
+            WriteSetting("engine_auto", "1");
+            try
+            {
+                BeginInvoke(new Action(() => {
+                    if (engineBox != null) engineBox.SelectedIndex = 1;
+                    UpdateBanner(); Refresh2();
+                    Log(L("The edupode engine ended at start twice on this Radeon: switched to Belobug's AMD engine.",
+                          "O motor edupode fechou ao arrancar duas vezes nesta Radeon: mudei para o motor AMD do Belobug."));
+                    MessageBox.Show(this, L("The edupode engine did not start twice in a row on your Radeon, so the launcher switched to Belobug's AMD engine (VIctory-Belobug-AMD, all credit to Belobug). If it is not built yet, Setup builds it now; then press PLAY.\r\n\r\nTo try the edupode engine again: Hardware & ID > Engine. A report ('Send errors') helps us make it start on your card.",
+                                            "O motor edupode nao arrancou duas vezes seguidas na tua Radeon, por isso o launcher mudou para o motor AMD do Belobug (VIctory-Belobug-AMD, todo o credito para o Belobug). Se ainda nao estiver compilado, o Preparar compila-o agora; depois carrega em JOGAR.\r\n\r\nPara experimentar o motor edupode outra vez: Hardware e ID > Motor. Um relatorio ('Enviar erros') ajuda-nos a pô-lo a arrancar na tua placa."),
+                                    "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (VictoryExe == null) { Show(PageSetup); RunSteps(steps.Where(st => st.Fix == (Func<bool>)BuildAmdEngine).ToArray()); }
+                }));
+            }
+            catch (Exception) { }
+        }
+
         // "1280×720 internal upscaled to 1080p · 60 FPS clock" for the preset's heading.
         string PresetSummary()
         {
@@ -1480,6 +1517,7 @@ namespace VIctoryLauncher
                 try
                 {
                     if (warmFirst) WarmWithBar(log);
+                    var started = DateTime.Now;
                     var p = Start("run \"" + game + "\" --console series-s --execute", log);
                     gameProc = p; gameHadWindow = false; windowGone = null;
                     WatchStart(log, p);
@@ -1495,6 +1533,7 @@ namespace VIctoryLauncher
                     gameProc = null;
                     if (code != 0)
                         Log(string.Format(L("The game ended with an error (code {0}). Log: {1}", "O jogo terminou com um erro (codigo {0}). Log: {1}"), code, log));
+                    EngineFallback(code != 0 && (DateTime.Now - started).TotalMinutes < 3);
                     Log(L("Game closed. Preparing this session's pipelines for the next one...", "Jogo fechado. A preparar as pipelines desta sessao para a proxima..."));
                     var w = Start("warm --used", log);
                     afterWarm = w;
