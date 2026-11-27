@@ -153,9 +153,15 @@ namespace VIctoryLauncher
         }
 
         // Work on other threads that reports back to the window starts once the window exists.
+        ToolTip tips;
+
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            // PLAY follows the game and the tasks on its own (a game closed, a build done).
+            var timer = new System.Windows.Forms.Timer { Interval = 2000 };
+            timer.Tick += (s, a) => { if (!setupBusy) Refresh2(); };
+            timer.Start();
             // No game folder yet: look for the game on its own.
             if (!File.Exists(GameExe)) RunSteps(steps.Where(st => st.Fix == (Func<bool>)FindGame).ToArray());
             else CheckAll();
@@ -777,9 +783,16 @@ namespace VIctoryLauncher
             buildStatus.Text = exe != null ? "✓  " + exe : L("Not built yet: press 'Build VIctory' (needs Rust and Visual Studio Build Tools).", "Ainda nao compilado: carrega em 'Compilar VIctory' (precisa do Rust e do Visual Studio Build Tools).");
             buildStatus.ForeColor = exe != null ? Theme.Good : Theme.Warn;
             modeInfo.Text = modeIndex < 0 ? "" : Selected.Description;
-            bool ready = game && exe != null && !Running();
+            bool running = Running();
+            bool ready = game && exe != null && !running && !busyNow;
             playButton.Enabled = ready;
             prepareButton.Enabled = ready;
+            playButton.Text = running ? L("RUNNING", "A CORRER") : busyNow ? L("WAIT...", "ESPERA...") : L("PLAY", "JOGAR");
+            if (tips == null) tips = new ToolTip();
+            tips.SetToolTip(playButton, ready ? "" : !game ? L("Choose the game folder first (Auto-detect).", "Escolhe primeiro a pasta do jogo (Detetar).")
+                : exe == null ? L("Build VIctory first (Setup).", "Compila o VIctory primeiro (Preparar).")
+                : running ? L("The game is already running.", "O jogo ja esta a correr.")
+                : L("Wait for the current task to finish.", "Espera que a tarefa atual acabe."));
             playButton.Invalidate();
             prepareButton.Invalidate();
         }
@@ -844,7 +857,16 @@ namespace VIctoryLauncher
             catch (Exception) { return ""; }
         }
 
-        static bool Running() { return Process.GetProcessesByName("victory").Length > 0; }
+        // A game running: a victory.exe with a window. Tools (replay, warm, shader translation) are
+        // victory.exe too but have none, and must not keep PLAY off.
+        static bool Running()
+        {
+            foreach (var p in Process.GetProcessesByName("victory"))
+                try { if (p.MainWindowHandle != IntPtr.Zero) return true; } catch (Exception) { }
+            return false;
+        }
+
+        bool busyNow;
 
         void Log(string line)
         {
@@ -967,6 +989,7 @@ namespace VIctoryLauncher
         void Busy(bool busy)
         {
             if (InvokeRequired) { BeginInvoke(new Action<bool>(Busy), busy); return; }
+            busyNow = busy;
             playButton.Enabled = !busy; prepareButton.Enabled = !busy; buildButton.Enabled = !busy;
             playButton.Invalidate(); prepareButton.Invalidate(); buildButton.Invalidate();
             if (!busy) Refresh2();

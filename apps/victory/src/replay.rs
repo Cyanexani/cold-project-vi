@@ -465,8 +465,19 @@ fn retranslate(folder: &std::path::Path, into: &std::path::Path, view_limit: u32
         }
     }
     println!("{} containers not found", missing.len());
-    victory_shader::emit::set_host_max_wave(64);
-    victory_shader::emit::set_host_rdna(true);
+    // `VICTORY_RETRANSLATE_WAVE=32`: for a host of 32-lane waves (NVIDIA), wave64 programs in two
+    // host waves (with `VICTORY_WAVE_WIDE_DIGESTS` as a run has it); unset: a 64-lane host. Replayed
+    // on WARP (`VICTORY_REPLAY_WARP=1`), which runs both, the two forms of one program can be compared.
+    let lanes = std::env::var("VICTORY_RETRANSLATE_WAVE").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(64);
+    victory_shader::emit::set_host_max_wave(lanes);
+    // (`VICTORY_RETRANSLATE_RDNA=0`/`1`: AMD's float shortcuts off/on whatever the lanes, so two
+    // forms compared differ only in how the wave is split.)
+    let rdna = match std::env::var("VICTORY_RETRANSLATE_RDNA").as_deref() {
+        Ok("0") => false,
+        Ok("1") => true,
+        _ => lanes == 64,
+    };
+    victory_shader::emit::set_host_rdna(rdna);
     victory_shader::emit::set_view_heap_limit(view_limit);
     victory_shader::emit::set_raw_views(raw_views);
     let all: Vec<_> = wanted.iter().collect();
