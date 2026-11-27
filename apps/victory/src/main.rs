@@ -127,6 +127,10 @@ enum Command {
         #[arg(long, hide = true)]
         these: Option<String>,
     },
+    /// The host card as a run sees it (`key=value` lines): its name, video
+    /// memory, and whether D3D12 offers GPU upload heaps (resizable BAR).
+    #[cfg(windows)]
+    Gpu,
     /// Prepare, map and bind a title executable; with --execute, run it.
     Run {
         exe: PathBuf,
@@ -216,6 +220,13 @@ fn main() -> Result<()> {
         Command::Shaders { paths, jobs } => translate::precompile(paths, jobs),
         #[cfg(windows)]
         Command::Warm { jobs, limit, again, used, these } => warm::run(jobs, limit, again, used, these),
+        #[cfg(windows)]
+        Command::Gpu => {
+            for line in victory_hle::gpu_probe::report() {
+                println!("{line}");
+            }
+            Ok(())
+        }
         Command::Run {
             exe,
             unimplemented,

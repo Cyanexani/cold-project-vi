@@ -34,6 +34,34 @@ GTA VI a partir do **teu próprio dump de Xbox Series**, no Windows com uma plac
 [VIctory](https://github.com/Marvisak/VIctory). Este ramo é a build do cgbj com a iluminação do VIctory-NVIDIA
 e muitas mudanças nossas. **Não inclui ficheiros do jogo.**
 
+## Download
+
+**[Versões](https://github.com/edupode/cold-project-vi/releases/latest)**: descarrega o `VI-Setup-<versão>.exe` e corre-o.
+
+- **Um pedido de administrador no início.** Depois o instalador faz o resto em segundo plano:
+  - modo de energia;
+  - memória virtual;
+  - regra anti-ransomware do Defender para a pasta dele;
+  - placa gráfica dedicada para o `victory.exe`;
+  - Smooth Motion.
+- **O launcher abre quando acaba.** Encontra o jogo e prepara os shaders.
+- **Não há nada para compilar:** não precisas do Rust nem do Build Tools.
+- **Os updates instalam-se sozinhos.** Vê [O que o launcher faz](#o-que-o-launcher-faz).
+
+**Discord:** <https://discord.gg/648WEXCAsZ>. Os erros enviam-se no canal **"Send bugs here please"**; o launcher faz o pacote por ti (vê [Logs e erros](#logs-e-erros)).
+
+### Verificar uma versão
+
+Todos os programas de uma versão são compilados pelo GitHub Actions a partir do código deste repositório ([`release.yml`](.github/workflows/release.yml)), nunca num PC. Qualquer pessoa pode confirmar que:
+
+1. **O download saiu deste código:**
+   ```powershell
+   gh attestation verify "VI-Launcher.exe" -R edupode/cold-project-vi
+   ```
+2. **O SHA-256 de cada ficheiro** bate com o `SHA256SUMS.txt` da versão.
+3. **O código do launcher vem incluído:** o `launcher-source.zip` fica ao lado de cada instalação. O `launcher\build-launcher.cmd` compila-o com o compilador de C# que vem com o Windows.
+4. **Cada update é assinado com a chave de versões do edupode.** O launcher só instala um ficheiro se a assinatura e o SHA-256 baterem certo ([`Updater.cs`](launcher/Updater.cs)).
+
 ## Começar: VI Launcher
 
 1. Descarrega este ramo (`git clone`, ou **Code → Download ZIP** no GitHub) e compila o launcher; só precisa do
@@ -79,16 +107,35 @@ O launcher vê a tua placa, a VRAM, a RAM, o Resizable BAR e o suporte do Smooth
 Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado no PC do autor. Em placas com menos de
 10 GB ou PCs com menos de 24 GB de RAM escolhe o modo **PC modesto**.
 
-### O que o launcher faz por ti
+### O que o launcher faz
 
 | | |
 |---|---|
-| **Barra de carregamento antes do jogo** | Antes de o jogo abrir (antes do primeiro menu), prepara em processos à parte todas as pipelines usadas nas sessões anteriores, para o driver já as ter: sem engasgos a primeira vez que vês um sítio. Demora segundos com a cache pronta. |
-| **NVIDIA Smooth Motion** | Escrito no perfil do próprio driver para o `victory.exe` (como o NVIDIA Profile Inspector faz): **não precisa da NVIDIA App**. RTX 40/50, driver 571.86 ou mais recente. A placa mostra um frame gerado entre dois do jogo. |
-| **Página Desempenho** | Mostra as apps que ocupam a VRAM e a RAM (NVIDIA Overlay, Discord, Wallpaper Engine, browsers...) e fecha as que marcares. O Windows só dá ao jogo o que as outras apps deixam livre. |
-| **Reserva de VRAM** | O VIctory pede ao Windows uma reserva de VRAM: quando falta memória, as outras apps saem primeiro. |
-| **Página Preparar** | Cada passo da primeira vez verificado (✓/✗) com um botão que o faz, e **Fazer tudo por mim**. O Resizable BAR está na BIOS/UEFI: o guia verifica o arranque UEFI, mostra onde estão as opções e pode reiniciar para a BIOS (depois de um sim). |
-| **Overlay de FPS (F3)** | FPS agora, média do último minuto (AVG 1M), média desde o início (ALL) e o pior meio segundo (LOW), tempo por frame, draws, VRAM e RAM. |
+| **Jogar** | Na primeira vez escolhe uma predefinição pelo teu hardware.<br>**Predefinições:** Recomendado (720p), Mais rápido e PC modesto (540p), **Ultra baixo** (placas de 4-6 GB, 8-16 GB de RAM), Nítido e cgbj clássico (1080p), **Personalizado** (os teus valores).<br>Uma faixa mostra se o dump, o emulador, os shaders e o Windows estão prontos. Um **aviso amarelo** diz o que falta ao jogo (memória virtual, energia, Resizable BAR, placa gráfica dedicada, shaders) e abre a correção. |
+| **Jogo preso** | Um VIctory que deixou de responder (um crash, uma janela de erro) nunca bloqueia o JOGAR: aparece **FECHAR E JOGAR**, e **Fechar o jogo** termina-o. |
+| **Vários executáveis** | Quando o dump tem mais do que um `game_scarlett*.exe`, escolhes qual ao lado da pasta do jogo.<br>Um ficheiro estragado (um download que parou, um pacote encriptado) é indicado antes do JOGAR, em vez do "malformed image" do VIctory. |
+| **Barra de carregamento antes do jogo** | Todas as pipelines usadas em sessões anteriores são preparadas antes de o jogo abrir, por isso não há engasgos a primeira vez que vês um sítio. |
+| **Preparar** | Cada passo da primeira vez, verificado (✓/✗), com um botão que o faz, e ainda **Fazer tudo por mim**:<br>Rust, Build Tools, compilação, motor AMD, Defender, pasta do jogo, shaders, energia, memória virtual, placa gráfica dedicada, Smooth Motion, Resizable BAR.<br>**Compilar** instala primeiro o que falta. Se o launcher não estiver dentro da pasta do código, descarrega o código; isto resolve o `could not find Cargo.toml in ...\Downloads`. |
+| **Resizable BAR** | Verificado como o jogo o vê (os GPU upload heaps do D3D12), não só na BIOS.<br>O guia cobre os menus da marca da tua placa-mãe, a atualização de firmware da NVIDIA para as primeiras RTX 30 e o Windows 11 24H2.<br>Quando não dá para o ligar, diz o que fazer em vez disso, e **Não o consigo ligar** acaba com o aviso. |
+| **Shaders** | Ao vivo: shaders traduzidos, pipelines feitas, as que falharam, o driver, o espaço em disco e os últimos erros.<br>**Reparar** tenta de novo o que falhou; **Refazer tudo** recomeça do zero. |
+| **Desempenho** | As apps que ocupam VRAM e RAM; marca-as e elas fecham.<br>A reserva de VRAM e a geração de frames definem-se aqui. |
+| **Geração de frames** | **RTX 40/50:** NVIDIA Smooth Motion, escrito no perfil do driver (sem a NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**RTX 20, GTX 10 e AMD:** geração de frames FSR 3 em preparação. |
+| **Placas AMD** | Detetadas sozinhas. Jogam com o **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) do Belobug**, o fork dele afinado para Radeon (GPL-3.0). Todo o crédito do motor AMD é dele. O Preparar descarrega-o e compila-o uma vez. |
+| **Ajustes avançados (Personalizado)** | Resolução, tamanho das texturas, buffers, proteções de memória e relógio de FPS.<br>**Copiar o meu perfil** dá um código (`VI1-...`) para partilhar. Cola o código de um amigo na caixa e carrega em **Aplicar**: mostra primeiro o que muda, e um código só pode ter estes valores. |
+| **Hardware e ID** | O teu ID permanente (`VI-XXXX-XXXX`, feito a partir de peças do PC; fica igual depois de reinstalar o Windows) com botão de copiar, o teu hardware e a escolha do motor. |
+| **Partilha de hardware** | **Desligada por defeito.** Ligada, envia **só hardware** (placa gráfica, processador, RAM, placa-mãe, Windows, tipo de disco), no máximo uma vez por dia, para uma base de dados que só recebe dados e que só o edupode lê.<br>Nunca envia logs, opções, caminhos, nomes nem o IP. A página mostra exatamente o que é enviado. |
+| **Atualizações** | Verifica o GitHub ao abrir e **de 5 em 5 minutos**. Uma versão nova instala-se sozinha quando o jogo não está a correr, e só se a assinatura e o SHA-256 baterem certo.<br>Isto e a partilha de hardware (opcional) são o único tráfego de rede do launcher. |
+| **Overlay de FPS (F3)** | FPS agora, média do último minuto (AVG 1M), média desde o início (ALL), o pior meio segundo (LOW), tempo por frame, draws, VRAM e RAM. |
+
+### Logs e erros
+
+- **Logs do jogo:** `%LOCALAPPDATA%\VIctory\luz\logs`. O `session-*.log` é um ficheiro por jogo; o `prepare.log`, o `build.log` e o `build-amd.log` são dos shaders e das compilações.
+- **Erros do launcher:** `%TEMP%\vi-launcher-error.txt`.
+- **Enviar erros no Discord** (barra lateral ou Ajuda):
+  1. Escolhe **erros do launcher** ou **erros do jogo**.
+  2. Marca o que aconteceu (shaders mal desenhados, memória virtual que não liga, ...) e escreve uma linha.
+  3. O launcher junta os ficheiros certos num zip no Ambiente de trabalho, sem o teu nome de utilizador nos caminhos. Abre a pasta e copia um resumo curto.
+  4. Envia o zip no canal **"Send bugs here please"** do [Discord](https://discord.gg/648WEXCAsZ). O launcher não envia nada sozinho.
 
 ## Modos
 

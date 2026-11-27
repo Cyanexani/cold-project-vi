@@ -81,3 +81,7 @@ Thumbs.db
 /edu-launcher.exe
 /Edu's Remake.exe
 /VI Launcher.exe
+/VI Launcher.old.exe
+/dist/
+/server/hardware-worker/node_modules/
+/server/hardware-worker/.wrangler/

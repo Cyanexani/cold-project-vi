@@ -98,22 +98,31 @@ namespace VIctoryLauncher
                 Title = L("Rust (builds VIctory)", "Rust (compila o VIctory)"),
                 Why = L("The compiler VIctory is written for. Installed with winget (rustup).", "O compilador do VIctory. Instalado com o winget (rustup)."),
                 FixText = L("Install", "Instalar"),
-                Check = () => File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo", "bin", "cargo.exe")) || RunCapture("where", "cargo").Contains("cargo") ? 1 : 0,
+                // Not needed with a ready-made emulator (a release or the installer put victory.exe here).
+                Check = () => NothingToBuild ? -1 : File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo", "bin", "cargo.exe")) || RunCapture("where", "cargo").Contains("cargo") ? 1 : 0,
                 Fix = () => Winget("Rustlang.Rustup", null),
             });
             steps.Add(new Step {
                 Title = L("Visual Studio Build Tools (C++)", "Visual Studio Build Tools (C++)"),
                 Why = L("The C++ linker and Windows SDK Rust needs. A large download (2-6 GB); Windows asks for permission.", "O linker de C++ e o Windows SDK de que o Rust precisa. Download grande (2-6 GB); o Windows pede autorizacao."),
                 FixText = L("Install", "Instalar"),
-                Check = () => HasCppTools() ? 1 : 0,
+                Check = () => NothingToBuild ? -1 : HasCppTools() ? 1 : 0,
                 Fix = () => Winget("Microsoft.VisualStudio.2022.BuildTools", "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"),
             });
             steps.Add(new Step {
                 Title = L("Build VIctory", "Compilar o VIctory"),
                 Why = L("Compiles the emulator from this folder (several minutes, once; again after an update).", "Compila o emulador a partir desta pasta (alguns minutos, uma vez; de novo depois de atualizar)."),
                 FixText = L("Build", "Compilar"),
-                Check = () => VictoryExe != null ? 1 : 0,
+                Check = () => UseAmdEngine ? (OwnVictoryExe != null ? 1 : -1) : VictoryExe != null ? 1 : 0,
                 Fix = BuildBlocking,
+            });
+            steps.Add(new Step {
+                Title = L("AMD engine (Belobug)", "Motor AMD (Belobug)"),
+                Why = L("AMD cards play with VIctory-Belobug-AMD, Belobug's fork for Radeon (GPL-3.0). Downloads its source and builds it once.",
+                        "As placas AMD jogam com o VIctory-Belobug-AMD, o fork do Belobug para Radeon (GPL-3.0). Descarrega o codigo e compila-o uma vez."),
+                FixText = L("Build it", "Compilar"),
+                Check = () => !UseAmdEngine ? -1 : VictoryExe != null ? 1 : 0,
+                Fix = BuildAmdEngine,
             });
             steps.Add(new Step {
                 Title = L("Windows Defender exception", "Excecao do Windows Defender"),
@@ -122,7 +131,7 @@ namespace VIctoryLauncher
                 FixText = L("Add it", "Adicionar"),
                 Check = () => ReadSetting("defender") == "1" ? 1 : -1,
                 Fix = () => {
-                    var target = Path.Combine(root, "target");
+                    var target = Path.Combine(SourceDir ?? root, "target");
                     bool ok = Elevated("powershell", "-NoProfile -ExecutionPolicy Bypass -Command \"Add-MpPreference -AttackSurfaceReductionOnlyExclusions '" + target.Replace("'", "''") + "'\"");
                     if (ok) WriteSetting("defender", "1");
                     return ok;
@@ -130,7 +139,7 @@ namespace VIctoryLauncher
             });
             steps.Add(new Step {
                 Title = L("Your game folder", "A pasta do jogo"),
-                Why = L("Looks for game_scarlett_master.exe in Downloads, Desktop, Documents, Games folders and the root of each drive.", "Procura o game_scarlett_master.exe em Transferencias, Ambiente de trabalho, Documentos, pastas Games e na raiz de cada disco."),
+                Why = L("Looks for game_scarlett_master.exe (or another game_scarlett*.exe) in Downloads, Desktop, Documents, Games folders and the root of each drive.", "Procura o game_scarlett_master.exe (ou outro game_scarlett*.exe) em Transferencias, Ambiente de trabalho, Documentos, pastas Games e na raiz de cada disco."),
                 FixText = L("Find it", "Encontrar"),
                 Check = () => { string g = null; Invoke(new Action(() => g = GameExe)); return File.Exists(g) ? 1 : 0; },
                 Fix = FindGame,
@@ -155,8 +164,16 @@ namespace VIctoryLauncher
                 Why = L("The game and VIctory commit 25+ GB; a fixed, small page file ends them. Windows asks for permission; it counts after a restart.",
                         "O jogo e o VIctory reservam 25+ GB; um ficheiro de paginacao fixo e pequeno fecha-os. O Windows pede autorizacao; conta depois de reiniciar."),
                 FixText = L("Set it", "Definir"),
-                Check = () => PagefileManaged() ? 1 : 0,
-                Fix = () => Elevated("powershell", "-NoProfile -ExecutionPolicy Bypass -Command \"Get-CimInstance Win32_ComputerSystem | Set-CimInstance -Property @{AutomaticManagedPagefile=$true}\""),
+                Check = () => PagefileOk() ? 1 : 0,
+                Fix = FixPagefile,
+            });
+            steps.Add(new Step {
+                Title = L("Dedicated graphics card for VIctory", "Placa grafica dedicada para o VIctory"),
+                Why = L("On a laptop with two graphics cards, Windows may give VIctory the slow built-in one. Sets 'High performance' for victory.exe (Windows > Graphics settings).",
+                        "Num portatil com duas placas, o Windows pode dar ao VIctory a integrada, lenta. Poe 'Alto desempenho' para o victory.exe (Windows > Definicoes de graficos)."),
+                FixText = L("Set it", "Definir"),
+                Check = () => VictoryExe == null ? -1 : GpuPreferenceSet() || (probeAdapter.Length > 0 && GpuPreferenceOk() && !(hasNvidia && hasRadeon)) ? 1 : 0,
+                Fix = () => { bool ok = SetGpuPreference(); ProbeGpu(); return ok; },
             });
             steps.Add(new Step {
                 Title = "NVIDIA Smooth Motion",
@@ -170,7 +187,7 @@ namespace VIctoryLauncher
                 Why = L("Lets the CPU write straight into all of the video memory (faster copies). It is switched on in the PC's BIOS/UEFI: the guide shows how.",
                         "Deixa o processador escrever diretamente em toda a VRAM (copias mais rapidas). Liga-se na BIOS/UEFI do PC: o guia mostra como."),
                 FixText = L("Show me how", "Mostra-me como"),
-                Check = () => rebar ? 1 : 0,
+                Check = () => rebar ? 1 : ReadSetting("rebar_ack") == "1" ? -1 : 0,
                 Fix = () => { BeginInvoke(new Action(ShowRebarGuide)); return false; },
                 Auto = false,
             });
@@ -243,10 +260,13 @@ namespace VIctoryLauncher
             }) { IsBackground = true }.Start();
         }
 
-        // Both bars (Setup page and Play page) show the same work.
+        float setupProgress;
+
+        // Both bars (Setup page and Play page) show the same work; the Shaders page mirrors them.
         void Progress(string text, float part)
         {
             if (InvokeRequired) { BeginInvoke(new Action<string, float>(Progress), text, part); return; }
+            setupProgress = part;
             foreach (var bar in new[] { setupBar, loadBar })
                 if (bar != null) { bar.Visible = true; bar.Set(part, text); }
         }
@@ -274,15 +294,99 @@ namespace VIctoryLauncher
             return !string.IsNullOrEmpty(s.Trim());
         }
 
+        // A ready-made emulator is here (a release, or the installer): nothing has to be compiled.
+        bool NothingToBuild { get { return !UseAmdEngine && File.Exists(Path.Combine(root, "victory.exe")); } }
+
+        // Where this repository's source is: beside the launcher (or a folder above it), or the copy
+        // the launcher downloaded. A launcher copied on its own to Downloads has none beside it
+        // ("could not find Cargo.toml in ...\Downloads"); then the source is fetched first.
+        string sourceSeen;
+
+        string SourceDir
+        {
+            get
+            {
+                Func<string, bool> isSource = d => d != null && File.Exists(Path.Combine(d, "Cargo.toml")) && File.Exists(Path.Combine(d, ".victory-root"));
+                for (var d = new DirectoryInfo(root); d != null; d = d.Parent)
+                    if (isSource(d.FullName))
+                    {
+                        // Remembered, so a copy of the launcher elsewhere (Desktop, Downloads) finds it again.
+                        if (sourceSeen != d.FullName) { sourceSeen = d.FullName; if (ReadSetting("source") != d.FullName) WriteSetting("source", d.FullName); }
+                        return d.FullName;
+                    }
+                var known = ReadSetting("source");
+                if (isSource(known)) return known;
+                var mine = Path.Combine(Path.GetDirectoryName(dataRoot), "source", "cold-project-vi");
+                return File.Exists(Path.Combine(mine, "Cargo.toml")) ? mine : null;
+            }
+        }
+
+        // The edupode branch's source from GitHub's zip (no git needed) into %LOCALAPPDATA%\VIctory\source.
+        bool EnsureSource()
+        {
+            if (SourceDir != null) return true;
+            var to = Path.Combine(Path.GetDirectoryName(dataRoot), "source", "cold-project-vi");
+            Log(L("The launcher is not inside the source folder: downloading the source (edupode branch)...", "O launcher nao esta dentro da pasta do codigo: a descarregar o codigo (ramo edupode)..."));
+            return DownloadZipInto("https://github.com/edupode/cold-project-vi/archive/refs/heads/edupode.zip", to, L("the source", "o codigo"));
+        }
+
+        // A GitHub source zip (one folder inside) unpacked as `to`.
+        bool DownloadZipInto(string url, string to, string what)
+        {
+            var zip = Path.Combine(Path.GetTempPath(), "vi-" + Guid.NewGuid().ToString("N") + ".zip");
+            Progress(string.Format(L("Downloading {0}...", "A descarregar {0}..."), what), 0.02f);
+            try
+            {
+                System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072;
+                using (var web = new System.Net.WebClient()) { web.Headers["User-Agent"] = "VI-Launcher"; web.DownloadFile(url, zip); }
+                var tmp = to + ".new";
+                if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
+                System.IO.Compression.ZipFile.ExtractToDirectory(zip, tmp);
+                var inner = Directory.GetDirectories(tmp).Single();
+                if (Directory.Exists(to)) Directory.Delete(to, true);
+                Directory.CreateDirectory(Path.GetDirectoryName(to));
+                Directory.Move(inner, to);
+                Directory.Delete(tmp, true);
+                Log(string.Format(L("Downloaded {0} into {1}", "{0} descarregado para {1}"), what, to));
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log(string.Format(L("{0} could not be downloaded: {1}", "Nao deu para descarregar {0}: {1}"), what, e.Message));
+                return false;
+            }
+            finally { try { File.Delete(zip); } catch (Exception) { } }
+        }
+
         bool BuildBlocking()
         {
-            var log = Path.Combine(dataRoot, "logs", "build.log");
+            if (!EnsureSource()) return false;
+            return BuildIn(SourceDir, "VIctory", "build.log");
+        }
+
+        // Belobug's AMD fork at the commit the launcher knows, from GitHub's source zip (no git
+        // needed), into engines\amd; then built like this repository.
+        bool BuildAmdEngine()
+        {
+            var dir = AmdEngineDir;
+            if (!File.Exists(Path.Combine(dir, "Cargo.toml")))
+            {
+                if (!DownloadZipInto(AmdRepo + "/archive/" + AmdCommit + ".zip", dir, L("Belobug's AMD engine", "o motor AMD do Belobug"))) return false;
+                var example = Path.Combine(dir, "victory.example.toml");
+                if (File.Exists(example) && !File.Exists(Path.Combine(dir, "victory.toml"))) File.Copy(example, Path.Combine(dir, "victory.toml"));
+            }
+            return BuildIn(dir, L("the AMD engine (Belobug)", "o motor AMD (Belobug)"), "build-amd.log");
+        }
+
+        bool BuildIn(string folder, string what, string logName)
+        {
+            var log = Path.Combine(dataRoot, "logs", logName);
             Directory.CreateDirectory(Path.GetDirectoryName(log));
             int crates = 0;
-            var psi = new ProcessStartInfo(CargoExe, "build --locked --profile diag -p victory --features diagnostics") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = root };
+            var psi = new ProcessStartInfo(CargoExe, "build --locked --profile diag -p victory --features diagnostics") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = folder };
             var cargoBin = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo", "bin");
             psi.EnvironmentVariables["PATH"] = cargoBin + ";" + Environment.GetEnvironmentVariable("PATH");
-            Log(L("Building VIctory... Log: ", "A compilar o VIctory... Log: ") + log);
+            Log(string.Format(L("Building {0}... Log: ", "A compilar {0}... Log: "), what) + log);
             using (var writer = new StreamWriter(log, false))
             {
                 Process p;
@@ -295,28 +399,45 @@ namespace VIctoryLauncher
                     if (m.Success)
                     {
                         crates++;
-                        Progress(string.Format(L("Building VIctory: {0} ({1} parts)", "A compilar o VIctory: {0} ({1} partes)"), m.Groups[1].Value, crates), Math.Min(0.95f, crates / 330f));
+                        Progress(string.Format(L("Building {2}: {0} ({1} parts)", "A compilar {2}: {0} ({1} partes)"), m.Groups[1].Value, crates, what), Math.Min(0.95f, crates / 330f));
                     }
                 };
                 p.OutputDataReceived += sink; p.ErrorDataReceived += sink;
                 p.BeginOutputReadLine(); p.BeginErrorReadLine();
                 p.WaitForExit();
-                Log(p.ExitCode == 0 ? L("VIctory built.", "VIctory compilado.") : L("The build failed: see ", "A compilacao falhou: ve ") + log);
-                BeginInvoke(new Action(Refresh2));
+                Log(p.ExitCode == 0 ? what + L(": built.", ": compilado.") : L("The build failed: see ", "A compilacao falhou: ve ") + log);
+                BeginInvoke(new Action(() => { Refresh2(); ProbeGpu(); }));
+                if (p.ExitCode != 0)
+                {
+                    writer.Flush();
+                    TellErrors(log, 0);
+                    BeginInvoke(new Action(() => MessageBox.Show(this, L("The build failed. The reason is in the Activity box and in ", "A compilacao falhou. O motivo esta na caixa Atividade e em ") + log
+                        + L("\r\n\r\nHelp > Send errors to Discord makes a package with it.", "\r\n\r\nAjuda > Enviar erros no Discord faz um pacote com isto."), "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning)));
+                }
                 return p.ExitCode == 0;
             }
         }
 
         bool PrepareBlocking()
         {
-            string dir = null;
-            Invoke(new Action(() => { SaveSettings(); dir = gameBox.Text.Trim(); }));
-            if (VictoryExe == null || !File.Exists(Path.Combine(dir, "game_scarlett_master.exe"))) { Log(L("Build VIctory and choose the game folder first.", "Compila o VIctory e escolhe a pasta do jogo primeiro.")); return false; }
+            string dir = null, game = null;
+            Invoke(new Action(() => { SaveSettings(); dir = gameBox.Text.Trim(); game = GameExe; }));
+            if (VictoryExe == null || !File.Exists(game)) { Log(L("Build VIctory and choose the game folder first.", "Compila o VIctory e escolhe a pasta do jogo primeiro.")); return false; }
+            if (!RoomForCache()) return false;
             var log = Path.Combine(dataRoot, "logs", "prepare.log");
+            long mark = 0;
+            try { if (File.Exists(log)) mark = new FileInfo(log).Length; } catch (Exception) { }
             Log(L("Translating the game's shaders and preparing pipelines (about 5 minutes)... Log: ", "A traduzir os shaders do jogo e a preparar pipelines (cerca de 5 minutos)... Log: ") + log);
             Progress(L("Translating the game's shaders (about 5 minutes)...", "A traduzir os shaders do jogo (cerca de 5 minutos)..."), 0.05f);
+            WriteSetting("shaders", "0");
             var p = Start("shaders \"" + dir + "\"", log);
             p.WaitForExit();
+            if (p.ExitCode != 0)
+            {
+                Log(string.Format(L("Translating the shaders failed (code {0}).", "A traducao dos shaders falhou (codigo {0})."), p.ExitCode));
+                TellErrors(log, mark);
+                return false;
+            }
             Progress(L("Preparing pipelines...", "A preparar pipelines..."), 0.6f);
             var w = Start("warm --used", log, line => {
                 var m = Regex.Match(line, @"^(\d+) of (\d+), (\d+) s");
@@ -327,18 +448,63 @@ namespace VIctoryLauncher
                 }
             });
             w.WaitForExit();
+            if (w.ExitCode != 0)
+            {
+                // The shaders are there; pipelines are made again before each game (and after it).
+                Log(string.Format(L("Preparing pipelines stopped (code {0}); the shaders are ready, PLAY makes the pipelines.", "A preparacao das pipelines parou (codigo {0}); os shaders estao prontos, o JOGAR faz as pipelines."), w.ExitCode));
+                TellErrors(log, mark);
+            }
             Log(L("Shaders ready. You can press PLAY.", "Shaders prontos. Podes carregar em JOGAR."));
             WriteSetting("shaders", "1");
-            return p.ExitCode == 0;
+            WriteSetting("shaders_driver", driverVersion);
+            return true;
         }
 
-        bool ShadersReady()
+        // The shader cache's drive needs room: a full disk leaves half a cache behind.
+        bool RoomForCache()
         {
-            if (ReadSetting("shaders") == "1") return true;
+            const long need = 12L << 30;
             try
             {
-                var dir = Path.Combine(cacheDir, "shaders");
-                return Directory.Exists(dir) && Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Take(1000).Count() >= 1000;
+                Directory.CreateDirectory(ActiveCacheDir);
+                var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(ActiveCacheDir)));
+                if (drive.AvailableFreeSpace >= need) return true;
+                Log(string.Format(L("Only {0:0.0} GB free on {1}: the shaders need about 12 GB. Free some space and try again.",
+                    "So {0:0.0} GB livres em {1}: os shaders precisam de cerca de 12 GB. Liberta espaco e tenta de novo."), drive.AvailableFreeSpace / 1073741824.0, drive.Name));
+                return false;
+            }
+            catch (Exception) { return true; }
+        }
+
+        // The lines of a log written since `mark` that say what went wrong (at most 8).
+        void TellErrors(string log, long mark)
+        {
+            try
+            {
+                using (var f = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    f.Seek(Math.Min(mark, f.Length), SeekOrigin.Begin);
+                    var lines = new StreamReader(f).ReadToEnd().Split('\n')
+                        .Select(s => s.TrimEnd('\r'))
+                        .Where(s => Regex.IsMatch(s, @"(?i)\b(error|panicked|failed|denied|not found|no space)\b"))
+                        .Reverse().Take(8).Reverse().ToList();
+                    foreach (var line in lines) Log("   " + (line.Length > 220 ? line.Substring(0, 220) + "..." : line));
+                    if (lines.Count == 0) Log(L("   (no error lines; the whole log: ", "   (sem linhas de erro; o log todo: ") + log + ")");
+                }
+            }
+            catch (Exception) { }
+        }
+
+        // Ready: a finished preparation (launcher.ini's shaders=1, written only when it ended well)
+        // whose cache is still there, or a cache as large as one (made by another way of starting VIctory).
+        bool ShadersReady()
+        {
+            try
+            {
+                var dir = Path.Combine(ActiveCacheDir, "shaders");
+                if (!Directory.Exists(dir)) return false;
+                var some = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Take(1000).Count();
+                return some >= 1000 || (ReadSetting("shaders") == "1" && some > 0);
             }
             catch (Exception) { return false; }
         }
@@ -352,7 +518,7 @@ namespace VIctoryLauncher
             };
             foreach (var d in DriveInfo.GetDrives())
                 if (d.DriveType == DriveType.Fixed && d.IsReady) { places.Add(d.RootDirectory.FullName); places.Add(Path.Combine(d.RootDirectory.FullName, "Games")); }
-            Progress(L("Looking for game_scarlett_master.exe...", "A procurar o game_scarlett_master.exe..."), 0.3f);
+            Progress(L("Looking for game_scarlett*.exe...", "A procurar o game_scarlett*.exe..."), 0.3f);
             foreach (var place in places.Distinct())
             {
                 var found = Search(place, 3);
@@ -374,6 +540,9 @@ namespace VIctoryLauncher
                 if (!Directory.Exists(dir)) return null;
                 var f = Path.Combine(dir, "game_scarlett_master.exe");
                 if (File.Exists(f)) return f;
+                // Dumps with another build's name (game_scarlett_*.exe): the Play page lets the player pick.
+                var other = GameExes(dir);
+                if (other.Length > 0) return Path.Combine(dir, other[0]);
                 if (depth == 0) return null;
                 foreach (var sub in Directory.EnumerateDirectories(dir))
                 {
@@ -400,17 +569,55 @@ namespace VIctoryLauncher
             catch (Exception) { return false; }
         }
 
-        static bool PagefileManaged()
+        // Virtual memory the game can grow into: managed by Windows on all drives ("?:\pagefile.sys"),
+        // system-managed size on a drive ("C:\pagefile.sys 0 0"), or fixed sizes of 32 GB and more.
+        // (The old check only took the first: a system-managed C: showed as off.)
+        public static bool PagefileOk()
         {
             try
             {
                 using (var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"))
                 {
                     var v = k == null ? null : k.GetValue("PagingFiles") as string[];
-                    return v != null && v.Any(s => s.StartsWith("?:\\pagefile.sys", StringComparison.OrdinalIgnoreCase));
+                    if (v == null) return false;
+                    long most = 0;
+                    foreach (var entry in v)
+                    {
+                        var parts = entry.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 0) continue;
+                        if (parts[0].StartsWith("?:", StringComparison.Ordinal)) return true;
+                        if (parts.Length == 1 || (parts.Length >= 3 && parts[1] == "0" && parts[2] == "0")) return true;
+                        long max;
+                        if (parts.Length >= 3 && long.TryParse(parts[2], out max)) most += max;
+                    }
+                    return most >= 32768;
                 }
             }
             catch (Exception) { return false; }
+        }
+
+        // The script both the Setup step and the installer run as administrator: Windows manages the
+        // page file on every drive. Set-CimInstance fails on some PCs ("Generic failure"), so the
+        // registry value it stands for is written too.
+        public const string PagefileScript =
+            "try { $cs = Get-CimInstance Win32_ComputerSystem; Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$true} -ErrorAction Stop } catch { }\n" +
+            "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' -Name PagingFiles -Type MultiString -Value @('?:\\pagefile.sys')\n" +
+            "exit 0\n";
+
+        public static string Encoded(string script) { return Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script)); }
+
+        bool FixPagefile()
+        {
+            bool ok = Elevated("powershell", "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + Encoded(PagefileScript));
+            if (ok && PagefileOk())
+            {
+                Log(L("Virtual memory is now managed by Windows. Restart Windows for it to count.", "A memoria virtual passou a ser gerida pelo Windows. Reinicia o Windows para contar."));
+                return true;
+            }
+            Log(L("Virtual memory could not be set. By hand: Windows key > 'Advanced system settings' > Performance: Settings > Advanced > Virtual memory: Change > tick 'Automatically manage paging file size for all drives' > OK, then restart.",
+                  "A memoria virtual nao ficou definida. A mao: tecla Windows > 'Definicoes avancadas do sistema' > Desempenho: Definicoes > Avancadas > Memoria virtual: Alterar > marca 'Gerir automaticamente o tamanho do ficheiro de paginacao para todas as unidades' > OK e reinicia."));
+            try { Process.Start("SystemPropertiesPerformance.exe"); } catch (Exception) { }
+            return false;
         }
 
         // Runs a program with administrator rights (the UAC prompt) and waits; false if refused or failed.
@@ -454,56 +661,132 @@ namespace VIctoryLauncher
         }
 
         // ---------------------------------------------------------------- Resizable BAR
+        // Whether the card can have Resizable BAR at all: GTX 10/16 and RTX 20 cannot; early RTX 30
+        // cards need NVIDIA's firmware update first.
+        int RebarCardSupport()
+        {
+            if (Regex.IsMatch(gpuName, @"GTX\s*(9|10|16)\d\d|RTX\s*20\d\d|TITAN\s*(X|V|RTX)", RegexOptions.IgnoreCase)) return 0;
+            if (Regex.IsMatch(gpuName, @"RTX\s*30\d\d", RegexOptions.IgnoreCase)) return 2;
+            return 1;
+        }
+
+        // The menus by motherboard maker (from the board's own name in Windows).
+        string[] RebarSteps(string maker)
+        {
+            var m = (maker ?? "").ToUpperInvariant();
+            if (m.Contains("ASUS")) return new[] {
+                L("ASUS: Advanced > PCI Subsystem Settings > Above 4G Decoding: Enabled, then Re-Size BAR Support: Auto/Enabled.", "ASUS: Advanced > PCI Subsystem Settings > Above 4G Decoding: Enabled, depois Re-Size BAR Support: Auto/Enabled."),
+                L("Boot > CSM (Compatibility Support Module) > Launch CSM: Disabled.", "Boot > CSM (Compatibility Support Module) > Launch CSM: Disabled.") };
+            if (m.Contains("MICRO-STAR") || m.Contains("MSI")) return new[] {
+                L("MSI: Settings > Advanced > PCI Subsystem Settings > Above 4G memory/Crypto Currency mining: Enabled, then Re-Size BAR Support: Enabled", "MSI: Settings > Advanced > PCI Subsystem Settings > Above 4G memory/Crypto Currency mining: Enabled, depois Re-Size BAR Support: Enabled"),
+                L("(newer boards: the 'Smart Access Memory / Re-Size BAR' button on the EZ Mode page). Turn CSM off under Boot.", "(placas recentes: o botao 'Smart Access Memory / Re-Size BAR' na pagina EZ Mode). Desliga o CSM em Boot.") };
+            if (m.Contains("GIGABYTE")) return new[] {
+                L("Gigabyte/AORUS: Settings > IO Ports > Above 4G Decoding: Enabled, then Re-Size BAR Support: Auto.", "Gigabyte/AORUS: Settings > IO Ports > Above 4G Decoding: Enabled, depois Re-Size BAR Support: Auto."),
+                L("Boot > CSM Support: Disabled.", "Boot > CSM Support: Disabled.") };
+            if (m.Contains("ASROCK")) return new[] {
+                L("ASRock: Advanced > PCI Configuration > Above 4G Decoding: Enabled, then Re-Size BAR Support: Enabled.", "ASRock: Advanced > PCI Configuration > Above 4G Decoding: Enabled, depois Re-Size BAR Support: Enabled."),
+                L("Boot > CSM (Compatibility Support Module): Disabled.", "Boot > CSM (Compatibility Support Module): Disabled.") };
+            return new[] {
+                L("Look for 'Above 4G Decoding' and 'Re-Size BAR' (or 'Resizable BAR', 'Smart Access Memory') under Advanced > PCI, and turn CSM off under Boot.",
+                  "Procura 'Above 4G Decoding' e 'Re-Size BAR' (ou 'Resizable BAR', 'Smart Access Memory') em Advanced > PCI, e desliga o CSM em Boot."),
+                L("Laptops (Acer, Lenovo, HP, Dell...): usually no switch; it comes with the maker's BIOS update for your model.", "Portateis (Acer, Lenovo, HP, Dell...): normalmente nao ha opcao; vem com a atualizacao de BIOS do fabricante para o teu modelo.") };
+        }
+
         void ShowRebarGuide()
         {
             bool uefi = Uefi();
-            var f = new Form { Text = "Resizable BAR", ClientSize = new Size(760, 560), BackColor = Theme.Back, ForeColor = Theme.Text, Font = new Font("Segoe UI", 10f), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon };
-            f.Controls.Add(new Heading(L("Turning on Resizable BAR", "Ligar o Resizable BAR")) { Location = new Point(20, 16), Width = 720 });
-            var state = new Label { Location = new Point(20, 50), Size = new Size(720, 50), Font = new Font("Segoe UI Semibold", 10f), BackColor = Theme.Back,
-                ForeColor = rebar ? Theme.Good : Theme.Warn,
-                Text = (rebar ? L("✓ It is already on for your card.", "✓ Ja esta ligado na tua placa.") : L("✗ It is off (or the card does not report it).", "✗ Esta desligado (ou a placa nao o indica)."))
-                    + "\r\n" + (uefi ? L("✓ Your PC starts in UEFI mode (needed).", "✓ O teu PC arranca em modo UEFI (necessario).") : L("✗ Your PC starts in Legacy/CSM mode: Resizable BAR needs UEFI (convert the disk with mbr2gpt first).", "✗ O teu PC arranca em modo Legacy/CSM: o Resizable BAR precisa de UEFI (converte o disco com o mbr2gpt primeiro).")) };
+            string maker = hw != null ? hw.BoardMaker : "", board = hw != null ? hw.Board : "";
+            if (hw == null)
+                try { maker = Wmi("SELECT Manufacturer FROM Win32_BaseBoard", "Manufacturer"); board = Wmi("SELECT Product FROM Win32_BaseBoard", "Product"); } catch (Exception) { }
+            int card = RebarCardSupport();
+            var f = new Form { Text = "Resizable BAR", ClientSize = new Size(820, 660), BackColor = Theme.Back, ForeColor = Theme.Text, Font = Theme.Ui(9.75f), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon };
+            f.Controls.Add(new Heading(L("Resizable BAR", "Resizable BAR")) { Location = new Point(20, 16), Width = 780 });
+            Func<bool, string, string> line = (ok, what) => (ok ? "✓  " : "✗  ") + what;
+            var lines = new List<string> {
+                line(rebar, rebarHeap == 1 ? L("The game gets it: D3D12 offers mapped video memory.", "O jogo tem-no: o D3D12 oferece memoria de video mapeada.")
+                    : rebarHeap == 0 && rebarBios ? L("On in the BIOS and on the card, but Windows does not offer it to games (see 3).", "Ligado na BIOS e na placa, mas o Windows nao o oferece aos jogos (ve o 3).")
+                    : L("The game does not get it.", "O jogo nao o tem.")),
+                line(rebarBios || !hasNvidia, hasNvidia ? (rebarBios ? L("The card reports a large BAR (nvidia-smi: BAR1 of 1 GB or more).", "A placa indica um BAR grande (nvidia-smi: BAR1 de 1 GB ou mais).") : L("The card reports a 256 MB BAR: off in the BIOS, or the card's firmware lacks it.", "A placa indica um BAR de 256 MB: desligado na BIOS, ou o firmware da placa nao o tem.")) : L("Not an NVIDIA card: only the game's side is checked.", "Nao e uma placa NVIDIA: so o lado do jogo e verificado.")),
+                line(uefi, uefi ? L("The PC starts in UEFI mode (needed).", "O PC arranca em modo UEFI (necessario).") : L("The PC starts in Legacy/CSM mode: Resizable BAR needs UEFI (convert the disk with mbr2gpt first).", "O PC arranca em Legacy/CSM: o Resizable BAR precisa de UEFI (converte o disco com o mbr2gpt primeiro).")),
+                line(card != 0, card == 0 ? string.Format(L("{0} cannot use Resizable BAR (only RTX 30 and newer, RX 5000 and newer).", "A {0} nao suporta Resizable BAR (so RTX 30 ou mais recente, RX 5000 ou mais recente)."), gpuName)
+                    : card == 2 ? string.Format(L("{0}: early RTX 30 cards need NVIDIA's Resizable BAR firmware update (see 2).", "{0}: as primeiras RTX 30 precisam da atualizacao de firmware Resizable BAR da NVIDIA (ve o 2)."), gpuName)
+                    : string.Format(L("{0} supports it.", "A {0} suporta-o."), gpuName)),
+            };
+            var state = new Label { Location = new Point(20, 50), Size = new Size(780, 92), Font = Theme.Mono(8.75f), BackColor = Theme.Back, ForeColor = rebar ? Theme.Good : Theme.Warn, Text = string.Join("\r\n", lines.ToArray()) };
             f.Controls.Add(state);
-            var text = new Label { Location = new Point(20, 108), Size = new Size(720, 360), ForeColor = Theme.Text, BackColor = Theme.Back };
-            text.Text = string.Join("\r\n", Pt ? new[] {
-                "O Resizable BAR deixa o processador escrever em toda a VRAM de uma vez. Liga-se na BIOS/UEFI, nao no Windows.",
-                "",
-                "1.  Atualiza a BIOS do PC/placa-mae e o driver da NVIDIA (RTX 30, 40 e 50 suportam-no).",
-                "2.  Reinicia para a BIOS/UEFI (botao em baixo, ou F2/Del durante o arranque).",
-                "3.  Liga 'Above 4G Decoding' e 'Re-Size BAR Support' (pode chamar-se 'Resizable BAR',",
-                "     'Smart Access Memory' ou 'Clever Access Memory'). Desliga o CSM se estiver ligado.",
-                "     Costuma estar em Advanced > PCI Subsystem, ou em Boot.",
-                "4.  Guarda e sai (normalmente F10). De volta ao Windows, o launcher mostra 'ReBAR ligado'.",
-                "",
-                "Portateis: muitos ja trazem o ReBAR ligado; noutros so aparece depois de uma atualizacao da BIOS do",
-                "fabricante (Acer, ASUS, Lenovo, MSI...). Procura 'BIOS update' na pagina de suporte do teu modelo.",
-                "Se a opcao nao existir, o jogo funciona na mesma: o launcher so desliga a escrita direta na VRAM.",
-            } : new[] {
-                "Resizable BAR lets the CPU write into all of the video memory at once. It is switched on in the BIOS/UEFI, not in Windows.",
-                "",
-                "1.  Update your PC's/motherboard's BIOS and the NVIDIA driver (RTX 30, 40 and 50 cards support it).",
-                "2.  Restart into the BIOS/UEFI (button below, or F2/Del while the PC starts).",
-                "3.  Turn on 'Above 4G Decoding' and 'Re-Size BAR Support' (it may be called 'Resizable BAR',",
-                "     'Smart Access Memory' or 'Clever Access Memory'). Turn CSM off if it is on.",
-                "     It is usually under Advanced > PCI Subsystem, or under Boot.",
-                "4.  Save and exit (usually F10). Back in Windows, the launcher shows 'ReBAR on'.",
-                "",
-                "Laptops: many have it on already; on others it only appears after the maker's BIOS update",
-                "(Acer, ASUS, Lenovo, MSI...). Look for 'BIOS update' on your model's support page.",
-                "If the option is not there, the game still works: the launcher only leaves the direct video-memory writes off.",
-            });
+            var steps = new List<string>();
+            steps.Add(L("1.  Motherboard: ", "1.  Placa-mae: ") + (maker + " " + board).Trim() + L(". Update its BIOS first, then in the BIOS:", ". Atualiza a BIOS primeiro, depois na BIOS:"));
+            foreach (var s in RebarSteps(maker)) steps.Add("       " + s);
+            steps.Add(L("       Save and exit (usually F10). Back in Windows, press 'Check again'.", "       Guarda e sai (normalmente F10). De volta ao Windows, carrega em 'Verificar de novo'."));
+            steps.Add(L("2.  Graphics card: update the driver. RTX 3060/3060 Ti/3070/3080/3090 bought before April 2021 may need NVIDIA's", "2.  Placa grafica: atualiza o driver. RTX 3060/3060 Ti/3070/3080/3090 compradas antes de abril de 2021 podem precisar da"));
+            steps.Add(L("       Resizable BAR firmware update (button below; from your card maker's site for some models).", "       atualizacao de firmware Resizable BAR da NVIDIA (botao em baixo; no site do fabricante da placa para alguns modelos)."));
+            steps.Add(L("3.  Windows: games get it through D3D12's GPU upload heaps: Windows 11 24H2 or newer and a recent driver.", "3.  Windows: os jogos tem-no pelos GPU upload heaps do D3D12: Windows 11 24H2 ou mais recente e um driver recente."));
+            steps.Add(L("       On but not offered: Windows Update (to 24H2+) and the newest NVIDIA/AMD driver, then restart.", "       Ligado mas nao oferecido: Windows Update (para 24H2+) e o driver NVIDIA/AMD mais recente, depois reinicia."));
+            steps.Add("");
+            steps.Add(L("If you cannot turn it on (older card, laptop without the option, Windows 10):", "Se nao o conseguires ligar (placa antiga, portatil sem a opcao, Windows 10):"));
+            steps.Add(L("   •  The game still works: the launcher leaves the direct video-memory writes off on its own.", "   •  O jogo funciona na mesma: o launcher deixa a escrita direta na VRAM desligada sozinho."));
+            steps.Add(L("   •  Pick Modest PC or Ultra Low, keep 'Keep the most video memory' on, and close apps on the Performance page:", "   •  Escolhe PC modesto ou Ultra baixo, deixa 'Guardar o maximo de VRAM' ligado e fecha apps na pagina Desempenho:"));
+            steps.Add(L("      without Resizable BAR the copies to the card are slower, so less to copy helps most.", "      sem Resizable BAR as copias para a placa sao mais lentas, por isso copiar menos e o que mais ajuda."));
+            steps.Add(L("   •  'I can't turn it on' stops the launcher warning you about it.", "   •  'Nao o consigo ligar' faz o launcher deixar de te avisar."));
+            var text = new Label { Location = new Point(20, 150), Size = new Size(780, 430), ForeColor = Theme.Text, BackColor = Theme.Back, Text = string.Join("\r\n", steps.ToArray()) };
             f.Controls.Add(text);
-            var bios = new Pill { Main = true, Text = L("Restart into the BIOS/UEFI", "Reiniciar para a BIOS/UEFI"), Location = new Point(20, 490), Size = new Size(300, 44), Enabled = uefi && !rebar };
+            int by = 600;
+            var bios = new Pill { Main = true, Text = L("Restart into the BIOS", "Reiniciar para a BIOS"), Location = new Point(20, by), Size = new Size(200, 40), Enabled = uefi && !rebar };
             bios.Click += (s, e) => {
                 var ask = L("Save your work first. The PC restarts in 5 seconds and opens its BIOS/UEFI settings. Restart now?", "Guarda o teu trabalho primeiro. O PC reinicia em 5 segundos e abre as definicoes da BIOS/UEFI. Reiniciar agora?");
                 if (MessageBox.Show(f, ask, "Resizable BAR", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                     new Thread(() => Elevated("shutdown", "/r /fw /t 5")) { IsBackground = true }.Start();
             };
             f.Controls.Add(bios);
-            var close = new Pill { Text = L("Close", "Fechar"), Location = new Point(600, 495), Size = new Size(140, 36) };
-            close.Click += (s, e) => f.Close();
-            f.Controls.Add(close);
+            var vbios = new Pill { Text = L("NVIDIA firmware update", "Firmware da NVIDIA"), Location = new Point(230, by + 3), Size = new Size(180, 34), Visible = card == 2 };
+            vbios.Click += (s, e) => OpenUrl("https://www.nvidia.com/en-us/geforce/news/geforce-rtx-30-series-resizable-bar-support/");
+            f.Controls.Add(vbios);
+            var again = new Pill { Text = L("Check again", "Verificar de novo"), Location = new Point(card == 2 ? 420 : 230, by + 3), Size = new Size(150, 34) };
+            again.Click += (s, e) => { f.Close(); DetectSystem(); ProbeGpu(); CheckAll(); };
+            f.Controls.Add(again);
+            var cant = new Pill { Text = L("I can't turn it on", "Nao o consigo ligar"), Location = new Point(card == 2 ? 580 : 390, by + 3), Size = new Size(170, 34), Visible = !rebar };
+            cant.Click += (s, e) => { WriteSetting("rebar_ack", "1"); Log(L("Resizable BAR: no more warnings. The game runs without it.", "Resizable BAR: sem mais avisos. O jogo corre sem ele.")); f.Close(); CheckAll(); Refresh2(); };
+            f.Controls.Add(cant);
             f.ShowDialog(this);
+        }
+    }
+
+    // The installer's one administrator pass (installer\VI.iss runs `VI Launcher.exe --admin-setup
+    // <install folder>`): the Windows settings the Setup page would ask for one by one.
+    static class AdminTasks
+    {
+        public static int Run(string[] args)
+        {
+            var dir = args.SkipWhile(a => a != "--admin-setup").Skip(1).FirstOrDefault() ?? AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+            var log = new List<string>();
+            Action<string, string> ps = (what, script) => {
+                try
+                {
+                    var p = Process.Start(new ProcessStartInfo("powershell", "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + LauncherForm.Encoded(script)) { UseShellExecute = false, CreateNoWindow = true });
+                    p.WaitForExit(120000);
+                    log.Add(what + ": " + (p.ExitCode == 0 ? "ok" : "code " + p.ExitCode));
+                }
+                catch (Exception e) { log.Add(what + ": " + e.Message); }
+            };
+            // Best performance power mode.
+            ps("power", "powercfg /overlaysetactive ded574b5-45a0-4f42-8737-46345c09c238; exit 0");
+            // Virtual memory managed by Windows (counts after a restart).
+            if (!LauncherForm.PagefileOk()) ps("virtual memory", LauncherForm.PagefileScript);
+            // Defender's ransomware rule: the programs in the install folder may run (that rule only).
+            ps("defender", "Add-MpPreference -AttackSurfaceReductionOnlyExclusions '" + dir.Replace("'", "''") + "'; exit 0");
+            // The high-performance graphics card for victory.exe.
+            try
+            {
+                using (var k = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences"))
+                    foreach (var exe in new[] { Path.Combine(dir, "victory.exe"), Path.Combine(dir, "engines", "amd", "target", "diag", "victory.exe") })
+                        k.SetValue(exe, "GpuPreference=2;");
+                log.Add("gpu preference: ok");
+            }
+            catch (Exception e) { log.Add("gpu preference: " + e.Message); }
+            // Smooth Motion in the driver's profile (RTX 40/50; ignored elsewhere).
+            try { var err = SmoothMotion.Set(true); log.Add("smooth motion: " + (err ?? "ok")); } catch (Exception e) { log.Add("smooth motion: " + e.Message); }
+            try { File.WriteAllLines(Path.Combine(Path.GetTempPath(), "vi-admin-setup.txt"), log); } catch (Exception) { }
+            return 0;
         }
     }
 }

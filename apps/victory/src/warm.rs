@@ -28,6 +28,8 @@ fn folder() -> Result<PathBuf> {
 
 pub fn run(jobs: Option<usize>, limit: Option<usize>, again: bool, used: bool, these: Option<String>) -> Result<()> {
     let dir = folder()?;
+    // A first run has no pipeline folder yet: the lists below are opened for appending in it.
+    std::fs::create_dir_all(&dir)?;
     if let Some(these) = these {
         return make(&dir, &these);
     }

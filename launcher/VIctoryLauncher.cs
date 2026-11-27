@@ -19,17 +19,45 @@ namespace VIctoryLauncher
 {
     static class Program
     {
+        public static readonly string ErrorFile = Path.Combine(Path.GetTempPath(), "vi-launcher-error.txt");
+
         [STAThread]
-        static void Main()
+        static int Main(string[] args)
         {
-            // What ends the launcher is written down (%TEMP%i-launcher-error.txt) for a bug report.
+            // What ends the launcher is written down (%TEMP%\vi-launcher-error.txt) for a bug report.
             AppDomain.CurrentDomain.UnhandledException += (s, e) => {
-                try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "vi-launcher-error.txt"), DateTime.Now + "  " + e.ExceptionObject + Environment.NewLine); } catch (Exception) { }
+                try { File.AppendAllText(ErrorFile, DateTime.Now + "  " + e.ExceptionObject + Environment.NewLine); } catch (Exception) { }
             };
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new LauncherForm());
+            Application.ThreadException += (s, e) => {
+                try { File.AppendAllText(ErrorFile, DateTime.Now + "  " + e.Exception + Environment.NewLine); } catch (Exception) { }
+                MessageBox.Show("VI Launcher: " + e.Exception.Message + "\r\n\r\n(Help > Send errors to Discord)", "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            };
+            // The installer's one administrator step (installer\VI.iss): Windows settings, then out.
+            if (args.Contains("--admin-setup")) return AdminTasks.Run(args);
+            // After an update: the launcher it replaced ends first (it still holds the one-launcher lock).
+            int wait = Array.IndexOf(args, "--wait-pid");
+            int pid;
+            if (wait >= 0 && wait + 1 < args.Length && int.TryParse(args[wait + 1], out pid))
+                try { Process.GetProcessById(pid).WaitForExit(15000); } catch (Exception) { }
+            // One launcher at a time: a second start brings the first to the front.
+            bool first;
+            using (var one = new Mutex(true, "VI-Launcher-edupode", out first))
+            {
+                if (!first)
+                {
+                    foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Application.ExecutablePath)))
+                        try { if (p.Id != Process.GetCurrentProcess().Id && p.MainWindowHandle != IntPtr.Zero) SetForegroundWindow(p.MainWindowHandle); } catch (Exception) { }
+                    return 0;
+                }
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.Run(new LauncherForm());
+            }
+            return 0;
         }
+
+        [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
     }
 
     // A preset: render scale and the switches it turns on.
@@ -39,6 +67,8 @@ namespace VIctoryLauncher
         public string Scale;      // null: native 1080p
         public bool LightTextures;
         public bool Modest;       // smaller textures and buffers for 6-8 GB cards and 16 GB of RAM
+        public bool UltraLow;     // the least memory: 4-6 GB cards, 8-16 GB of RAM
+        public bool Custom;       // the player's own values (Advanced Tweaks)
         public Mode(string name, string tag, string shortLine, string description, string scale, bool light, bool modest)
         {
             Name = name; Tag = tag; Short = shortLine; Description = description; Scale = scale; LightTextures = light; Modest = modest;
@@ -71,24 +101,42 @@ namespace VIctoryLauncher
         string cacheDir, dataDir;
 
         Banner banner;
+        StatusStrip statusStrip;
         TextBox gameBox;
-        Label gameStatus, buildStatus, modeInfo, vramSummary, smoothStatus;
+        Label gameStatus, buildStatus, modeInfo, vramSummary, smoothStatus, footerStatus, footerState, warnText, updateBadge;
+        Panel warnPanel;
+        Pill warnFix;
+        Heading presetHeading, gameHeading;
         readonly List<ModeCard> cards = new List<ModeCard>();
         int modeIndex = -1;
-        Toggle panelBox, borderlessBox, fps60Box, reserveBox, smoothBox, qualityBox, facesBox, loadingBox, fightsBox, warmBox;
+        CheckBox panelBox, borderlessBox, fps60Box, reserveBox, smoothBox, qualityBox, facesBox, loadingBox, fightsBox, warmBox;
         LoadBar loadBar;
         TextBox logBox;
-        Pill playButton, prepareButton, buildButton;
+        Pill playButton, prepareButton, buildButton, closeButton;
         ListView vramList;
         readonly List<Panel> pages = new List<Panel>();
         readonly List<NavButton> nav = new List<NavButton>();
 
         bool rebar, rtxFrameGen;
+        // Resizable BAR as the card reports it (nvidia-smi's BAR1 of 1 GB and more) and as D3D12
+        // offers it to a run (`victory gpu`: GPU upload heaps; -1 not asked yet).
+        bool rebarBios;
+        int rebarHeap = -1;
+        string probeAdapter = "", probeVendor = "";
         double vramGb, ramGb;
         string gpuName = "unknown GPU";
         string smoothState = "?";
 
         Mode[] modes;
+        // Pages by their place in `pages`; the side bar shows the first eight.
+        const int PagePlay = 0, PagePerf = 1, PageShaders = 2, PageControls = 3, PageSetup = 4, PageHardware = 5, PageUpdates = 6, PageHelp = 7, PageCustom = 8;
+        // The order the preset cards show the modes in (modes keep their numbers in launcher.ini).
+        static readonly int[] CardOrder = { 0, 1, 2, 5, 3, 4, 6 };
+        const int ModeUltraLow = 5, ModeCustom = 6;
+
+        public const string DiscordInvite = "https://discord.gg/648WEXCAsZ";
+        public const string DiscordChannel = "Send bugs here please";
+        public const string RepoUrl = "https://github.com/edupode/cold-project-vi/tree/edupode";
 
         public LauncherForm()
         {
@@ -97,55 +145,72 @@ namespace VIctoryLauncher
             cacheDir = ReadSetting("cache") ?? Path.Combine(dataRoot, "cache");
             dataDir = ReadSetting("data") ?? Path.Combine(dataRoot, "data");
             modes = new Mode[] {
-                new Mode(L("Recommended", "Recomendado"), "720p", L("★ Tested on edupode's PC", "★ Testado no PC do edupode"),
+                new Mode(L("Recommended", "Recomendado"), "720p → 1080p", L("Balanced · edupode", "Equilibrado · edupode"),
                     L("The world drawn at 1280x720 and rebuilt to 1080p by the game's own upscaler, texture levels held (video memory under budget), 60 FPS clock. About 22-26 FPS in the open world and 35+ in cutscenes on an RTX 5070 Ti laptop (6-8 GB of video memory, ~20 GB of RAM).",
                       "O mundo desenhado a 1280x720 e reconstruido para 1080p pelo upscaler do proprio jogo, niveis de texturas guardados (VRAM dentro do limite), relogio de 60 FPS. Cerca de 22-26 FPS no mundo aberto e 35+ nas cutscenes num portatil RTX 5070 Ti (6-8 GB de VRAM, ~20 GB de RAM)."),
                     "0.6666667", true, false),
-                new Mode(L("Fastest", "Mais rapido"), "540p", L("Most frames", "Mais frames"),
+                new Mode(L("Fastest", "Mais rapido"), "540p", L("Peak FPS", "Mais FPS"),
                     L("The world drawn at 960x540: the most frames, a softer picture. For slower CPUs.",
                       "O mundo desenhado a 960x540: mais frames, imagem mais suave. Para processadores mais lentos."),
                     "0.5", true, false),
-                new Mode(L("Modest PC", "PC modesto"), "540p", L("6-8 GB cards, 16 GB RAM", "Placas 6-8 GB, 16 GB RAM"),
+                new Mode(L("Modest PC", "PC modesto"), "540p", L("6-8 GB GPUs", "Placas 6-8 GB"),
                     L("For 6-8 GB cards and 16 GB of RAM: 540p, textures over 1024 texels halved, fewer of the game's buffers on the card, smaller texture batches, the memory guards on. Less video memory and RAM, a softer picture.",
                       "Para placas de 6-8 GB e 16 GB de RAM: 540p, texturas acima de 1024 cortadas a metade, menos buffers do jogo na placa, lotes de texturas mais pequenos, protecoes de memoria ligadas. Menos VRAM e RAM, imagem mais suave."),
                     "0.5", true, true),
-                new Mode(L("Sharp", "Nitido"), "1080p", L("12 GB+ cards", "Placas de 12 GB+"),
+                new Mode(L("Sharp", "Nitido"), "1080p", L("12 GB+ GPUs", "Placas 12 GB+"),
                     L("The world at full 1080p with held texture levels. Needs a strong GPU with 12 GB or more; slower in the open world.",
                       "O mundo a 1080p completos com niveis de texturas guardados. Precisa de uma placa forte com 12 GB ou mais; mais lento no mundo aberto."),
                     null, true, false),
-                new Mode(L("Classic cgbj", "cgbj classico"), "1080p", L("For comparison", "Para comparar"),
+                new Mode(L("Classic cgbj", "cgbj classico"), "1080p", L("Reference", "Referencia"),
                     L("The original cgbj settings at 1080p, no texture changes. For comparison.",
                       "As definicoes originais do cgbj a 1080p, sem mudancas nas texturas. Para comparar."),
                     null, false, false),
+                new Mode(L("Ultra Low", "Ultra baixo"), "540p", L("4-6 GB, 8-16 GB RAM", "4-6 GB, 8-16 GB RAM"),
+                    L("For the weakest PCs (4-6 GB cards, 8-16 GB of RAM): 540p, textures capped at 512 texels, the fewest buffers on the card, small texture batches, the memory guards on and a 30 FPS clock. The least memory of all; a soft picture. Give Windows a large page file (Setup).",
+                      "Para os PCs mais fracos (placas de 4-6 GB, 8-16 GB de RAM): 540p, texturas ate 512 texels, o minimo de buffers na placa, lotes de texturas pequenos, protecoes de memoria ligadas e relogio de 30 FPS. A menor memoria de todas; imagem suave. Da ao Windows um ficheiro de paginacao grande (Preparar)."),
+                    "0.5", true, true) { UltraLow = true },
+                new Mode(L("Custom", "Personalizado"), L("your values", "os teus valores"), L("Advanced Tweaks", "Ajustes avancados"),
+                    L("Your own values from Advanced Tweaks: resolution, texture size, buffers, memory guards, FPS clock. Copy them as a code to share, or paste a friend's.",
+                      "Os teus proprios valores dos Ajustes avancados: resolucao, tamanho das texturas, buffers, protecoes de memoria, relogio de FPS. Copia-os como um codigo para partilhar, ou cola o de um amigo."),
+                    null, true, false) { Custom = true },
             };
 
             Text = "VI Launcher";
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
-            ClientSize = new Size(1120, 940);
-            MinimumSize = new Size(1000, 700);
+            ClientSize = new Size(1200, 900);
+            MinimumSize = new Size(1080, 720);
             BackColor = Theme.Back;
             ForeColor = Theme.Text;
-            Font = new Font("Segoe UI", 9.75f);
+            Font = Theme.Ui(9.75f);
             StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true;
 
+            var main = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Back };
             var content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Back };
-            Controls.Add(content);
+            main.Controls.Add(content);
+            main.Controls.Add(Footer());
             pages.Add(PlayPage());
-            pages.Add(SetupPage());
             pages.Add(MemoryPage());
+            pages.Add(ShadersPage());
             pages.Add(ControlsPage());
+            pages.Add(SetupPage());
+            pages.Add(HardwarePage());
+            pages.Add(UpdatesPage());
             pages.Add(HelpPage());
+            pages.Add(CustomPage());
             foreach (var p in pages) { p.Dock = DockStyle.Fill; p.Visible = false; content.Controls.Add(p); }
+            Controls.Add(main);
             Controls.Add(SideBar());
+            Controls.Add(TopBar());
 
             LoadSettings();
             DetectSystem();
-            Show(0);
+            Show(PagePlay);
             Refresh2();
             // A first run (nothing built or no game yet): the Setup page, checked.
-            if (VictoryExe == null || !File.Exists(GameExe)) Show(1);
-            // `--page N` opens on that page (0 Play, 1 Setup, 2 Performance, 3 Controls, 4 Help).
+            if (VictoryExe == null || !File.Exists(GameExe)) Show(PageSetup);
+            // `--page N` opens on that page (0 Play, 1 Performance, 2 Shaders, 3 Controls, 4 Setup,
+            // 5 Hardware, 6 Updates, 7 Help, 8 Advanced Tweaks).
             var argv = Environment.GetCommandLineArgs();
             int page;
             for (int a = 1; a + 1 < argv.Length; a++)
@@ -169,6 +234,10 @@ namespace VIctoryLauncher
                 var s = SmoothMotion.Status();
                 try { BeginInvoke(new Action(() => { smoothState = s; UpdateBanner(); UpdateSmooth(); })); } catch (Exception) { }
             }) { IsBackground = true }.Start();
+            ProbeGpu();
+            StartChecks();
+            StartUpdates();
+            StartHardwareShare();
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -178,42 +247,93 @@ namespace VIctoryLauncher
             try { if (DwmSetWindowAttribute(Handle, 20, ref on, 4) != 0) DwmSetWindowAttribute(Handle, 19, ref on, 4); } catch (Exception) { }
         }
 
-        // ---------------------------------------------------------------- side bar
+        // ---------------------------------------------------------------- top bar and side bar
+        Control TopBar()
+        {
+            var bar = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Theme.Side };
+            bar.Paint += (s, e) => {
+                var g = e.Graphics;
+                Theme.Smooth(g);
+                using (var f = new Font("Segoe UI Symbol", 11f))
+                using (var b = new SolidBrush(Theme.Text)) g.DrawString("❄", f, b, 14, 8);
+                float x = 38;
+                using (var f = Theme.UiBold(10f))
+                using (var b = new SolidBrush(Theme.Text)) { g.DrawString("Cold Project VI", f, b, x, 9); x += g.MeasureString("Cold Project VI", f).Width + 6; }
+                using (var f = Theme.Mono(8.5f))
+                using (var b = new SolidBrush(Theme.Dim)) g.DrawString("v" + Updater.Version, f, b, x, 12);
+                using (var p = new Pen(Theme.Line)) g.DrawLine(p, 0, bar.Height - 1, bar.Width, bar.Height - 1);
+            };
+            Func<string, string, Label> link = (text, url) => {
+                var l = new Label { Text = text, AutoSize = true, ForeColor = Theme.Dim, BackColor = Theme.Side, Font = Theme.Ui(9f), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+                l.Click += (s, e) => OpenUrl(url);
+                l.MouseEnter += (s, e) => l.ForeColor = Theme.Text;
+                l.MouseLeave += (s, e) => l.ForeColor = Theme.Dim;
+                bar.Controls.Add(l);
+                return l;
+            };
+            var site = link("↗ Site", RepoUrl);
+            var discord = link("↗ Discord", DiscordInvite);
+            updateBadge = new Label { Text = "", AutoSize = true, ForeColor = Theme.Good, BackColor = Theme.Side, Font = Theme.Mono(8.5f), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            updateBadge.Click += (s, e) => Show(PageUpdates);
+            bar.Controls.Add(updateBadge);
+            bar.Resize += (s, e) => {
+                site.Location = new Point(bar.Width - site.Width - 16, 11);
+                discord.Location = new Point(site.Left - discord.Width - 14, 11);
+                updateBadge.Location = new Point(discord.Left - updateBadge.Width - 18, 12);
+            };
+            return bar;
+        }
+
         Control SideBar()
         {
             var side = new Panel { Dock = DockStyle.Left, Width = 216, BackColor = Theme.Side };
-            var logo = new Label { Text = "VI", Font = new Font("Segoe UI Black", 28f), ForeColor = Theme.Pink, AutoSize = true, Location = new Point(18, 12), BackColor = Theme.Side };
-            var logo2 = new Label { Text = "Launcher", Font = new Font("Segoe UI Light", 16f), ForeColor = Theme.Text, AutoSize = true, Location = new Point(22, 62), BackColor = Theme.Side };
-            var by = new Label { Text = "by edupode", Font = new Font("Segoe UI", 8.5f), ForeColor = Theme.Dim, AutoSize = true, Location = new Point(24, 94), BackColor = Theme.Side };
-            side.Controls.Add(logo); side.Controls.Add(logo2); side.Controls.Add(by);
+            side.Paint += (s, e) => { using (var p = new Pen(Theme.Line)) e.Graphics.DrawLine(p, side.Width - 1, 0, side.Width - 1, side.Height); };
             string[][] items = {
                 new[] { "", L("Play", "Jogar") },
-                new[] { "\uE713", L("Setup", "Preparar") },
                 new[] { "", L("Performance", "Desempenho") },
+                new[] { "", L("Shaders", "Shaders") },
                 new[] { "", L("Controls", "Controlos") },
+                new[] { "", L("Setup", "Preparar") },
+                new[] { "", L("Hardware & ID", "Hardware e ID") },
+                new[] { "", L("Updates", "Atualizacoes") },
                 new[] { "", L("Help", "Ajuda") },
             };
             for (int i = 0; i < items.Length; i++)
             {
                 int k = i;
-                var b = new NavButton { Glyph = items[i][0], Text = items[i][1], Location = new Point(4, 132 + i * 46) };
-                b.Click += (s, e) => { Show(k); if (k == 1) CheckAll(); if (k == 2) ScanMemory(); };
+                var b = new NavButton { Glyph = items[i][0], Text = items[i][1], Location = new Point(6, 16 + i * 42) };
+                b.Click += (s, e) => Show(k);
                 nav.Add(b);
                 side.Controls.Add(b);
             }
-            var lang = new Pill { Text = Pt ? "English" : "Portugues", Size = new Size(176, 34), Location = new Point(20, 0), Anchor = AnchorStyles.Bottom | AnchorStyles.Left, BackColor = Theme.Side };
-            lang.Click += (s, e) => { Pt = !Pt; SaveSettings(); Application.Restart(); };
-            side.Controls.Add(lang);
-            var repo = new Label { Text = "github.com/edupode/cold-project-vi", Font = new Font("Segoe UI", 8f), ForeColor = Theme.Dim, AutoSize = true, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, BackColor = Theme.Side, Cursor = Cursors.Hand };
-            repo.Click += (s, e) => { try { Process.Start("https://github.com/edupode/cold-project-vi/tree/edupode"); } catch (Exception) { } };
-            side.Controls.Add(repo);
-            side.Resize += (s, e) => { lang.Top = side.Height - 84; repo.Location = new Point(22, side.Height - 40); };
+            var report = new Pill { Text = L("Send errors to Discord", "Enviar erros no Discord"), Size = new Size(184, 34), Location = new Point(16, 0), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            report.Click += (s, e) => ReportErrors();
+            side.Controls.Add(report);
+            var en = new Pill { Text = "EN", Size = new Size(90, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = !Pt };
+            var pt = new Pill { Text = "PT", Size = new Size(90, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = Pt };
+            en.Click += (s, e) => { if (Pt) { Pt = false; SaveSettings(); Application.Restart(); } };
+            pt.Click += (s, e) => { if (!Pt) { Pt = true; SaveSettings(); Application.Restart(); } };
+            side.Controls.Add(en); side.Controls.Add(pt);
+            var tech = new Label { Text = "D3D12 · SM 6.6", Font = Theme.Mono(8f), ForeColor = Theme.Dim, AutoSize = true, BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            side.Controls.Add(tech);
+            side.Resize += (s, e) => {
+                report.Top = side.Height - 124;
+                en.Location = new Point(16, side.Height - 80); pt.Location = new Point(110, side.Height - 80);
+                tech.Location = new Point((side.Width - tech.Width) / 2, side.Height - 36);
+            };
             return side;
         }
 
         void Show(int page)
         {
-            for (int i = 0; i < pages.Count; i++) { pages[i].Visible = i == page; nav[i].Active = i == page; }
+            for (int i = 0; i < pages.Count; i++) pages[i].Visible = i == page;
+            for (int i = 0; i < nav.Count; i++) nav[i].Active = i == page || (page == PageCustom && i == PagePlay);
+            if (page == PageSetup) CheckAll();
+            if (page == PagePerf) ScanMemory();
+            if (page == PageShaders) RefreshShaders();
+            if (page == PageHardware) RefreshHardware();
+            if (page == PageUpdates) RefreshUpdates();
+            if (page == PageCustom) RefreshCustom();
         }
 
         Panel Page()
@@ -226,118 +346,163 @@ namespace VIctoryLauncher
             return new Label { Text = text, Location = new Point(x, y), Size = new Size(width, 20), ForeColor = Theme.Dim, BackColor = Theme.Back };
         }
 
+        // ---------------------------------------------------------------- footer: state and PLAY
+        Control Footer()
+        {
+            var foot = new Panel { Dock = DockStyle.Bottom, Height = 76, BackColor = Theme.Back };
+            var box = new Panel { BackColor = Theme.Card, Location = new Point(28, 14), Height = 48 };
+            box.Paint += (s, e) => { using (var p = new Pen(Theme.Line)) e.Graphics.DrawRectangle(p, 0, 0, box.Width - 1, box.Height - 1); };
+            footerState = new Label { Location = new Point(14, 0), Size = new Size(96, 48), TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Mono(9f), ForeColor = Theme.Good, BackColor = Theme.Card };
+            footerStatus = new Label { Location = new Point(110, 0), Height = 48, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Mono(9f), ForeColor = Theme.Text, BackColor = Theme.Card, AutoEllipsis = true };
+            box.Controls.Add(footerState); box.Controls.Add(footerStatus);
+            foot.Controls.Add(box);
+            closeButton = new Pill { Text = L("Close game", "Fechar o jogo"), Size = new Size(158, 48), Visible = false };
+            closeButton.Click += (s, e) => {
+                if (State() == GameState.Running && MessageBox.Show(this, L("Close the game now? What was not saved is lost.", "Fechar o jogo agora? O que nao foi guardado perde-se."),
+                    "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                CloseGames();
+                Refresh2();
+            };
+            foot.Controls.Add(closeButton);
+            playButton = new Pill { Main = true, Text = L("▶  PLAY", "▶  JOGAR"), Size = new Size(210, 48), Font = new Font("Segoe UI Semibold", 12.5f) };
+            playButton.Click += (s, e) => Play();
+            foot.Controls.Add(playButton);
+            foot.Paint += (s, e) => { using (var p = new Pen(Theme.Line)) e.Graphics.DrawLine(p, 0, 0, foot.Width, 0); };
+            foot.Resize += (s, e) => {
+                playButton.Location = new Point(foot.Width - 28 - playButton.Width, 14);
+                closeButton.Location = new Point(playButton.Left - 10 - closeButton.Width, 14);
+                box.Width = Math.Max(200, (closeButton.Visible ? closeButton.Left : playButton.Left) - 14 - box.Left);
+                footerStatus.Width = box.Width - footerStatus.Left - 10;
+            };
+            closeButton.VisibleChanged += (s, e) => { var w = foot.Width; foot.Width = w + 1; foot.Width = w; };
+            return foot;
+        }
+
         // ---------------------------------------------------------------- Play page
         Panel PlayPage()
         {
             var page = Page();
-            const int X = 24, W = 852;
-            int y = 20;
-            banner = new Banner { Location = new Point(X, y), Size = new Size(W, 128), Title = "VI Launcher",
-                Subtitle = "VIctory + cgbj + AnyXboxSeries + Leonidas + VIctory-NVIDIA + fxceless + VIctory-7900XTX  —  " + L("remake by edupode", "remake por edupode") };
+            const int X = 28, W = 900;
+            int y = 18;
+            banner = new Banner { Location = new Point(X, y), Size = new Size(W, 110),
+                Title = L("Xbox Series-to-Windows compatibility runtime · ", "Runtime de compatibilidade Xbox Series para Windows · ramo "),
+                Accent = "edupode", Subtitle = L(" branch", "") };
             page.Controls.Add(banner);
-            y += 146;
+            y += 124;
 
-            page.Controls.Add(new Heading(L("Game folder", "Pasta do jogo")) { Location = new Point(X, y), Width = W - 250 });
-            var auto = new Pill { Main = true, Text = L("⚡  First-time auto-setup", "⚡  Preparar tudo (1a vez)"), Location = new Point(X + W - 240, y - 6), Size = new Size(240, 34) };
-            auto.Click += (s, e) => { Show(1); DoEverything(); };
-            page.Controls.Add(auto);
-            y += 34;
-            gameBox = new TextBox { Location = new Point(X, y + 3), Width = W - 312, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.5f) };
+            // The checks in one strip, with Auto-Setup and Configure.
+            statusStrip = new StatusStrip { Location = new Point(X, y), Size = new Size(W, 52), BackColor = Theme.Card };
+            var auto = new Pill { Text = "Auto-Setup", Location = new Point(W - 222, 9), Size = new Size(104, 34), BackColor = Theme.Card };
+            auto.Click += (s, e) => { Show(PageSetup); DoEverything(); };
+            var conf = new Pill { Text = L("Configure", "Configurar"), Location = new Point(W - 112, 9), Size = new Size(100, 34), BackColor = Theme.Card };
+            conf.Click += (s, e) => Show(PageSetup);
+            statusStrip.Controls.Add(auto); statusStrip.Controls.Add(conf);
+            page.Controls.Add(statusStrip);
+            y += 60;
+
+            // What is missing (Windows settings, Resizable BAR, shaders), with the way to fix it.
+            warnPanel = new Panel { Location = new Point(X, y), Size = new Size(W, 44), BackColor = Theme.Card };
+            warnPanel.Paint += (s, e) => { using (var p = new Pen(warnText.ForeColor == Theme.Warn ? Color.FromArgb(120, 100, 40) : Theme.Line)) e.Graphics.DrawRectangle(p, 0, 0, warnPanel.Width - 1, warnPanel.Height - 1); };
+            warnText = new Label { Location = new Point(12, 0), Size = new Size(W - 160, 44), TextAlign = ContentAlignment.MiddleLeft, ForeColor = Theme.Dim, BackColor = Theme.Card, Font = Theme.Ui(9f), AutoEllipsis = true };
+            warnFix = new Pill { Text = L("Fix it", "Corrigir"), Location = new Point(W - 132, 6), Size = new Size(120, 32), BackColor = Theme.Card, Visible = false };
+            warnFix.Click += (s, e) => Show(PageSetup);
+            warnPanel.Controls.Add(warnText); warnPanel.Controls.Add(warnFix);
+            page.Controls.Add(warnPanel);
+            y += 58;
+
+            gameHeading = new Heading(L("Game", "Jogo")) { Location = new Point(X, y), Width = W };
+            page.Controls.Add(gameHeading);
+            y += 30;
+            gameBox = new TextBox { Location = new Point(X, y + 4), Width = W - 316, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Mono(9.5f) };
             gameBox.TextChanged += (s, e) => Refresh2();
             page.Controls.Add(gameBox);
-            var detect = new Pill { Text = L("Auto-detect", "Detetar"), Location = new Point(X + W - 300, y), Width = 144 };
+            var detect = new Pill { Text = L("Auto-detect", "Detetar"), Location = new Point(X + W - 304, y), Width = 146 };
             detect.Click += (s, e) => RunSteps(steps.Where(st => st.Fix == (Func<bool>)FindGame).ToArray());
             page.Controls.Add(detect);
-            var browse = new Pill { Text = L("Browse...", "Procurar..."), Location = new Point(X + W - 144, y), Width = 144 };
+            var browse = new Pill { Text = L("Browse...", "Procurar..."), Location = new Point(X + W - 146, y), Width = 146 };
             browse.Click += (s, e) => {
-                using (var d = new FolderBrowserDialog { Description = L("Choose the folder that holds game_scarlett_master.exe", "Escolhe a pasta que tem o game_scarlett_master.exe") })
+                using (var d = new FolderBrowserDialog { Description = L("Choose the folder that holds the game's game_scarlett*.exe", "Escolhe a pasta que tem o game_scarlett*.exe do jogo") })
                     if (d.ShowDialog(this) == DialogResult.OK) gameBox.Text = d.SelectedPath;
             };
             page.Controls.Add(browse);
-            y += 38;
-            gameStatus = Small("", X, y, W);
+            y += 40;
+            gameStatus = Small("", X, y, W - 310);
             page.Controls.Add(gameStatus);
-            y += 30;
-
-            page.Controls.Add(new Heading("VIctory") { Location = new Point(X, y), Width = W });
-            y += 32;
-            buildStatus = new Label { Location = new Point(X, y + 7), Size = new Size(W - 320, 20), ForeColor = Theme.Dim, BackColor = Theme.Back, AutoEllipsis = true };
-            page.Controls.Add(buildStatus);
-            buildButton = new Pill { Text = L("Build VIctory", "Compilar VIctory"), Location = new Point(X + W - 304, y), Width = 144 };
-            buildButton.Click += (s, e) => Build();
-            page.Controls.Add(buildButton);
-            prepareButton = new Pill { Text = L("Prepare shaders", "Preparar shaders"), Location = new Point(X + W - 144, y), Width = 144 };
-            prepareButton.Click += (s, e) => Prepare();
-            page.Controls.Add(prepareButton);
-            y += 50;
-
-            page.Controls.Add(new Heading(L("Mode", "Modo")) { Location = new Point(X, y), Width = W });
+            page.Controls.Add(ExeBox(X + W - 300, y - 2, 300));
             y += 34;
-            int cw = (W - 4 * 10) / 5;
-            for (int i = 0; i < modes.Length; i++)
+
+            presetHeading = new Heading(L("Render preset", "Predefinicao de imagem")) { Location = new Point(X, y), Width = W };
+            page.Controls.Add(presetHeading);
+            y += 32;
+            int cw = (W - 6 * 8) / 7;
+            for (int i = 0; i < CardOrder.Length; i++)
             {
-                int k = i;
-                var c = new ModeCard { Title = modes[i].Name, Tag2 = modes[i].Tag, Line = modes[i].Short, Location = new Point(X + i * (cw + 10), y), Size = new Size(cw, 92) };
-                c.Click += (s, e) => SelectMode(k);
+                int k = CardOrder[i];
+                var c = new ModeCard { Title = modes[k].Name, Tag2 = modes[k].Tag, Line = modes[k].Short, Location = new Point(X + i * (cw + 8), y), Size = new Size(cw, 74), Tag = k };
+                c.Click += (s, e) => { SelectMode(k); if (k == ModeCustom) Show(PageCustom); };
                 cards.Add(c);
                 page.Controls.Add(c);
             }
-            y += 100;
-            modeInfo = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Dim, BackColor = Theme.Back };
+            y += 82;
+            modeInfo = new Label { Location = new Point(X, y), Size = new Size(W, 36), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.Ui(8.75f) };
             page.Controls.Add(modeInfo);
-            y += 48;
+            y += 42;
 
-            page.Controls.Add(new Heading(L("Options", "Opcoes")) { Location = new Point(X, y), Width = W - 230 });
-            var best = new Pill { Text = L("★  Recommended setup", "★  Configuracao recomendada"), Location = new Point(X + W - 220, y - 4), Width = 220 };
+            page.Controls.Add(new Heading(L("Launch options", "Opcoes de arranque")) { Location = new Point(X, y), Width = W - 360 });
+            var best = new Pill { Text = L("★ Recommended setup", "★ Configuracao recomendada"), Location = new Point(X + W - 352, y - 4), Width = 200 };
             best.Click += (s, e) => Recommended();
             page.Controls.Add(best);
-            y += 32;
-            int half = W / 2;
-            Func<string, int, int, bool, Toggle> T = (text, col, row, on) => {
-                var t = new Toggle { Text = text, Checked = on, Location = new Point(X + col * half, y + row * 32), Width = half - 10 };
+            var tweaks = new Pill { Text = L("Advanced Tweaks", "Ajustes avancados"), Location = new Point(X + W - 144, y - 4), Width = 144 };
+            tweaks.Click += (s, e) => Show(PageCustom);
+            page.Controls.Add(tweaks);
+            y += 36;
+            int half = (W - 10) / 2;
+            Func<string, string, int, int, bool, CheckBox> T = (title, line, col, row, on) => {
+                var t = new OptionCard { Text = title, Line = line, Checked = on, Location = new Point(X + col * (half + 10), y + row * 66), Size = new Size(half, 58) };
+                t.CheckedChanged += (s, e) => Refresh2();
                 page.Controls.Add(t);
                 return t;
             };
-            panelBox = T(L("★ FPS and diagnostics overlay (F3)", "★ Overlay de FPS e diagnostico (F3)"), 0, 0, true);
-            borderlessBox = T(L("★ Borderless full screen", "★ Ecra inteiro sem bordas"), 0, 1, true);
-            fps60Box = T(L("★ Unlock 30 FPS (60 FPS clock)", "★ Desbloquear 30 FPS (relogio de 60)"), 0, 2, true);
-            smoothBox = T(L("NVIDIA Smooth Motion (RTX 40/50, set up for you)", "NVIDIA Smooth Motion (RTX 40/50, configurado por ti)"), 0, 3, true);
-            reserveBox = T(L("Keep the most video memory for the game", "Guardar o maximo de VRAM para o jogo"), 0, 4, true);
-            fightsBox = T(L("★ Crowds and fights: 2 GB of buffers on the card", "★ Multidoes e lutas: 2 GB de buffers na placa"), 1, 0, true);
-            qualityBox = T(L("Anti-stretch: fewer stretched bodies (slower)", "Anti-esticados: menos corpos esticados (mais lento)"), 1, 1, false);
-            facesBox = T(L("Rainbow-face fix (slower)", "Correcao das caras arco-iris (mais lento)"), 1, 2, false);
-            loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), 1, 3, false);
-            warmBox = T(L("Load the pipelines before the game opens", "Carregar as pipelines antes de o jogo abrir"), 1, 4, true);
-            y += 5 * 32 + 4;
-            explain = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Cyan, BackColor = Theme.Back,
+            borderlessBox = T(L("★ Borderless Fullscreen", "★ Ecra inteiro sem bordas"), L("Native desktop presentation", "Apresentacao nativa no ambiente de trabalho"), 0, 0, true);
+            fps60Box = T(L("★ Unlock 60 FPS Clock", "★ Desbloquear relogio de 60 FPS"), L("Decoupled simulation tick (no 30 FPS cap)", "Tick de simulacao separado (sem limite de 30 FPS)"), 0, 1, true);
+            smoothBox = T(L("Frame generation", "Geracao de frames"), FrameGenLine(), 0, 2, true);
+            panelBox = T(L("★ Diagnostics Overlay (F3)", "★ Overlay de diagnostico (F3)"), L("FPS, frame time, VRAM & RAM", "FPS, tempo de frame, VRAM e RAM"), 0, 3, true);
+            reserveBox = T(L("Keep the most video memory", "Guardar o maximo de VRAM"), L("Windows reserves video memory for the game", "O Windows reserva VRAM para o jogo"), 0, 4, true);
+            fightsBox = T(L("★ Crowds and fights", "★ Multidoes e lutas"), L("2 GB of the game's buffers on the card", "2 GB dos buffers do jogo na placa"), 1, 0, true);
+            qualityBox = T(L("Anti-stretch", "Anti-esticados"), L("Fewer stretched bodies; several FPS slower", "Menos corpos esticados; varios FPS mais lento"), 1, 1, false);
+            facesBox = T(L("Rainbow-face fix", "Correcao das caras arco-iris"), L("Textures finish uploading first; costs FPS", "Texturas acabam de subir primeiro; custa FPS"), 1, 2, false);
+            loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), L("Shorter loading pauses; untested", "Pausas de carregamento mais curtas; nao testado"), 1, 3, false);
+            warmBox = T(L("Load pipelines before the game", "Carregar pipelines antes do jogo"), L("No stutter the first time you see a place", "Sem engasgos a primeira vez que ves um sitio"), 1, 4, true);
+            y += 5 * 66 + 2;
+            explain = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Cyan, BackColor = Theme.Back, Font = Theme.Ui(9f),
                 Text = L("Point at an option to see what it does. ★ marks what was tested on edupode's PC (RTX 5070 Ti laptop).", "Passa o rato por uma opcao para ver o que faz. ★ marca o que foi testado no PC do edupode (portatil RTX 5070 Ti).") };
             page.Controls.Add(explain);
-            var tips = new ToolTip { AutoPopDelay = 20000, InitialDelay = 300 };
+            var tipsBox = new ToolTip { AutoPopDelay = 20000, InitialDelay = 300 };
             foreach (var kv in Explanations())
             {
                 var t = kv.Key; var text = kv.Value;
-                tips.SetToolTip(t, text);
+                tipsBox.SetToolTip(t, text);
                 t.MouseEnter += (s, e) => { explain.Text = text; };
             }
             y += 46;
 
-            logBox = new TextBox { Location = new Point(X, y), Size = new Size(W - 290, 86), Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.None, BackColor = Theme.Side, ForeColor = Theme.Dim, BorderStyle = BorderStyle.None, Font = new Font("Consolas", 9f) };
+            page.Controls.Add(new Heading(L("Activity", "Atividade")) { Location = new Point(X, y), Width = W });
+            y += 30;
+            logBox = new TextBox { Location = new Point(X, y), Size = new Size(W, 120), Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Theme.Card, ForeColor = Theme.Dim, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Mono(8.5f) };
             page.Controls.Add(logBox);
-            playButton = new Pill { Main = true, Text = L("PLAY", "JOGAR"), Location = new Point(X + W - 270, y + 12), Size = new Size(270, 60), Font = new Font("Segoe UI Black", 16f) };
-            playButton.Click += (s, e) => Play();
-            page.Controls.Add(playButton);
-            loadBar = new LoadBar { Location = new Point(X, y + 92), Size = new Size(W, 26), Visible = false };
+            y += 128;
+            loadBar = new LoadBar { Location = new Point(X, y), Size = new Size(W, 26), Visible = false };
             page.Controls.Add(loadBar);
-            page.Controls.Add(new Label { Location = new Point(X, y + 100), Size = new Size(10, 10), BackColor = Theme.Back });
+            page.Controls.Add(new Label { Location = new Point(X, y + 36), Size = new Size(10, 10), BackColor = Theme.Back });
             return page;
         }
 
         Label explain;
 
         // What each option does, and whether it is part of the setup tested on edupode's PC.
-        Dictionary<Toggle, string> Explanations()
+        Dictionary<CheckBox, string> Explanations()
         {
-            var d = new Dictionary<Toggle, string>();
+            var d = new Dictionary<CheckBox, string>();
             d[panelBox] = L("★ Shows FPS (now, last-minute average, whole-run average, worst), frame time, draws, video memory and RAM in the upper left corner. F3 hides it.",
                             "★ Mostra os FPS (agora, media do ultimo minuto, media total, pior), tempo por frame, draws, VRAM e RAM no canto superior esquerdo. F3 esconde.");
             d[borderlessBox] = L("★ A window without borders over the whole screen (test A: 22-24 FPS on edupode's PC). Needed for Smooth Motion and quick Alt+Tab.",
@@ -377,7 +542,7 @@ namespace VIctoryLauncher
         {
             if (k < 0 || k >= modes.Length) return;
             modeIndex = k;
-            for (int i = 0; i < cards.Count; i++) cards[i].Selected = i == k;
+            foreach (var c in cards) c.Selected = (int)c.Tag == k;
             Refresh2();
         }
 
@@ -585,7 +750,7 @@ namespace VIctoryLauncher
             var names = vramList.CheckedItems.Cast<ListViewItem>().Select(i => i.Tag as MemoryUser).Where(u => u != null && !u.Protected).Select(u => u.Name).ToList();
             if (names.Count == 0) { MessageBox.Show(this, L("Check the apps to close first.", "Marca primeiro as apps a fechar.")); return; }
             var ask = L("Close these apps? Unsaved work in them is lost.\r\n\r\n", "Fechar estas apps? O que nao estiver guardado nelas perde-se.\r\n\r\n") + string.Join("\r\n", names);
-            if (MessageBox.Show(this, ask, "edu launcher", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            if (MessageBox.Show(this, ask, "VI Launcher", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
             foreach (var n in names)
                 foreach (var p in Process.GetProcessesByName(n))
                 {
@@ -621,7 +786,7 @@ namespace VIctoryLauncher
                     if (err != null) Log("Smooth Motion: " + err);
                     else Log(on ? L("Smooth Motion is on for victory.exe (driver profile).", "Smooth Motion ligado para o victory.exe (perfil do driver).")
                                 : L("Smooth Motion is off for victory.exe.", "Smooth Motion desligado para o victory.exe."));
-                    if (loud && err != null) MessageBox.Show(this, "Smooth Motion: " + err, "edu launcher");
+                    if (loud && err != null) MessageBox.Show(this, "Smooth Motion: " + err, "VI Launcher");
                 }));
             }) { IsBackground = true }.Start();
         }
@@ -691,59 +856,127 @@ namespace VIctoryLauncher
         Panel HelpPage()
         {
             var page = Page();
-            page.Controls.Add(new Heading(L("Help", "Ajuda")) { Location = new Point(24, 20), Width = 852 });
-            var text = new Label { Location = new Point(24, 56), Size = new Size(852, 640), ForeColor = Theme.Text, BackColor = Theme.Back, Font = new Font("Segoe UI", 10.5f) };
-            text.Text = string.Join("\r\n", Pt ? new[] {
-                "Primeira vez: a pagina Preparar faz tudo isto por ti ('Fazer tudo por mim'). A mao:",
-                "   1.  Instala o Rust (https://rustup.rs) e o Visual Studio Build Tools com C++ e um Windows SDK.",
-                "   2.  Carrega em 'Compilar VIctory' (alguns minutos, uma vez).",
-                "   3.  Se o Windows disser 'Acesso negado', a regra anti-ransomware do Defender bloqueou o exe novo. Numa PowerShell",
-                "        de administrador: Add-MpPreference -AttackSurfaceReductionOnlyExclusions \"<esta pasta>\\target\"",
-                "   4.  Escolhe a pasta do jogo e carrega em 'Preparar shaders' (~5 min; de novo depois de cada compilacao).",
-                "   5.  Carrega em JOGAR.",
-                "",
-                "Para bons FPS",
-                "   •  Separador Desempenho: fecha o que ocupa a placa e liga o Smooth Motion.",
-                "   •  Portatil ligado a corrente, modo de desempenho.",
-                "   •  Memoria virtual do Windows gerida pelo sistema; em sessoes longas, reinicia o jogo a cada ~45 minutos.",
-                "",
-                "Overlay (F3)",
-                "   FPS agora, media do ultimo minuto (AVG 1M), media desde o inicio (ALL) e o pior meio segundo (LOW).",
-                "",
-                "Resizable BAR",
-                "   O launcher verifica-o (nvidia-smi). Sem ele, a escrita direta na VRAM fica desligada; o resto funciona.",
-                "",
-                "Logs: " + Path.Combine(dataRoot, "logs"),
-                "Guia: docs\\LUZ-24FPS.md   ·   Projeto: github.com/edupode/cold-project-vi (ramo edupode)",
-                "",
-                "Sobre: o VI Launcher e o remake do edupode, feito com o trabalho de:",
-            }.Concat(Credits()).ToArray() : new[] {
-                "First time: the Setup page does all of this for you ('Do everything for me'). By hand:",
-                "   1.  Install Rust (https://rustup.rs) and Visual Studio Build Tools with the C++ workload and a Windows SDK.",
-                "   2.  Press 'Build VIctory' (several minutes, once).",
-                "   3.  If Windows says 'Access denied' when playing, Defender's ransomware rule blocked the new exe. In an",
-                "        administrator PowerShell: Add-MpPreference -AttackSurfaceReductionOnlyExclusions \"<this folder>\\target\"",
-                "   4.  Choose your game folder and press 'Prepare shaders' (about 5 minutes; again after each rebuild).",
-                "   5.  Press PLAY.",
-                "",
-                "For good frame rates",
-                "   •  Performance page: close what holds the card and turn Smooth Motion on.",
-                "   •  Laptop plugged in, performance mode.",
-                "   •  Windows virtual memory: system managed; in long sessions restart the game every 45 minutes or so.",
-                "",
-                "Overlay (F3)",
-                "   FPS now, the last minute's average (AVG 1M), the average since the start (ALL) and the worst half second (LOW).",
-                "",
-                "Resizable BAR",
-                "   The launcher checks for it (nvidia-smi). Without it the direct writes into video memory stay off; the rest works.",
-                "",
-                "Logs: " + Path.Combine(dataRoot, "logs"),
-                "Guide: docs\\GUIDE-30FPS.md   ·   Project: github.com/edupode/cold-project-vi (edupode branch)",
-                "",
-                "About: VI Launcher is edupode's remake, built on the work of:",
-            }.Concat(Credits()).ToArray());
+            const int X = 28, W = 900;
+            int y = 18;
+            page.Controls.Add(new Heading(L("Help: everything the launcher does", "Ajuda: tudo o que o launcher faz")) { Location = new Point(X, y), Width = W });
+            y += 32;
+            var discord = new Pill { Main = true, Text = L("Send errors to Discord", "Enviar erros no Discord"), Location = new Point(X, y), Size = new Size(220, 38) };
+            discord.Click += (s, e) => ReportErrors();
+            page.Controls.Add(discord);
+            var join = new Pill { Text = L("Join the Discord", "Entrar no Discord"), Location = new Point(X + 230, y), Size = new Size(170, 38) };
+            join.Click += (s, e) => OpenUrl(DiscordInvite);
+            page.Controls.Add(join);
+            var logs = new Pill { Text = L("Open the logs folder", "Abrir a pasta dos logs"), Location = new Point(X + 410, y), Size = new Size(190, 38) };
+            logs.Click += (s, e) => { Directory.CreateDirectory(Path.Combine(dataRoot, "logs")); OpenUrl(Path.Combine(dataRoot, "logs")); };
+            page.Controls.Add(logs);
+            y += 52;
+            var text = new TextBox { Location = new Point(X, y), Size = new Size(W, 1180), Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.None, ForeColor = Theme.Text, BackColor = Theme.Back, Font = Theme.Ui(10f), ScrollBars = ScrollBars.None, TabStop = false };
+            text.Text = string.Join("\r\n", FunctionList().Concat(new[] { "", L("ABOUT", "SOBRE"), L("VI Launcher is edupode's remake, built on the work of:", "O VI Launcher e o remake do edupode, feito com o trabalho de:") }).Concat(Credits()).ToArray());
             page.Controls.Add(text);
+            page.Controls.Add(new Label { Location = new Point(X, y + 1190), Size = new Size(10, 10), BackColor = Theme.Back });
             return page;
+        }
+
+        // Every function, as the Help page and the README's download section list it.
+        IEnumerable<string> FunctionList()
+        {
+            return Pt ? new[] {
+                "JOGAR",
+                "   •  Predefinicoes: Recomendado (720p), Mais rapido e PC modesto (540p), Ultra baixo (PCs com muito pouca memoria), Nitido e",
+                "      cgbj classico (1080p), Personalizado (os teus valores). O launcher escolhe uma pelo teu hardware na primeira vez.",
+                "   •  Opcoes de arranque: passa o rato por cada uma para ver o que faz. A ★ marca o que foi testado.",
+                "   •  JOGAR prepara as pipelines, abre o jogo e, quando fecha, guarda as pipelines desta sessao para a proxima.",
+                "   •  Um jogo preso (um erro, uma janela que deixou de responder) nunca bloqueia o JOGAR: aparece 'FECHAR E JOGAR'.",
+                "   •  Se faltar alguma coisa (memoria virtual, energia, Resizable BAR, shaders), um aviso amarelo diz o que e e leva-te a corrigir.",
+                "",
+                "PREPARAR",
+                "   •  'Fazer tudo por mim' corre os passos que faltam: motor, excecao do Defender, pasta do jogo, shaders, energia,",
+                "      memoria virtual, placa grafica certa para o VIctory e geracao de frames. O Windows pede administrador quando e preciso.",
+                "   •  Resizable BAR: o launcher ve o que o D3D12 da ao jogo (nao so a BIOS) e mostra o guia da tua placa-mae.",
+                "",
+                "SHADERS",
+                "   •  Mostra em tempo real os shaders traduzidos, as pipelines prontas, as que falharam, o espaco em disco e os erros.",
+                "   •  'Reparar' refaz o que falta; 'Refazer tudo' apaga a cache e prepara de novo.",
+                "",
+                "DESEMPENHO",
+                "   •  Quem ocupa a VRAM e a RAM; marca apps e fecha-as antes de jogar. Liga ou desliga a geracao de frames.",
+                "",
+                "HARDWARE E ID",
+                "   •  O teu ID permanente (VI-XXXX-XXXX), com botao de copiar. Vem de pecas do PC e nao muda ao reinstalar o Windows.",
+                "   •  Partilha de hardware (desligada por defeito): envia SO o hardware (placa, processador, RAM, placa-mae, Windows,",
+                "      tipo de disco). Nunca envia logs, opcoes, caminhos, nomes nem o IP. A pagina mostra exatamente o que e enviado.",
+                "",
+                "ATUALIZACOES",
+                "   •  O launcher verifica o GitHub ao abrir e de 5 em 5 minutos. Um update so e instalado se a assinatura e o SHA-256",
+                "      baterem certo; instala-se sozinho quando o jogo nao esta a correr. E a unica coisa que o launcher recebe da internet.",
+                "",
+                "AJUSTES AVANCADOS (PERSONALIZADO)",
+                "   •  Resolucao, texturas, buffers, protecoes de memoria e relogio de FPS. 'Copiar o meu perfil' da um codigo (VI1-...)",
+                "      para partilhar; cola o de um amigo na caixa e carrega em 'Aplicar' (mostra o que muda antes).",
+                "",
+                "LOGS E ERROS",
+                "   •  Logs do jogo: " + Path.Combine(dataRoot, "logs") + " (session-*.log, prepare.log).",
+                "   •  Erros do launcher: " + Program.ErrorFile,
+                "   •  'Enviar erros no Discord': escolhes 'erros do launcher' ou 'erros do jogo' e escreves o que aconteceu. O launcher junta os",
+                "      ficheiros certos num zip no Ambiente de trabalho, abre a pasta e diz-te para o enviares no canal \"" + DiscordChannel + "\".",
+                "      Nada e enviado sozinho: es tu que envias.",
+                "",
+                "PLACAS",
+                "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). RTX 20, GTX 10 e AMD: em preparacao (FSR 3).",
+                "   •  AMD: o launcher deteta a placa e usa o motor AMD do Belobug (VIctory-Belobug-AMD).",
+                "",
+                "TECLAS NO JOGO",
+                "   •  F3 mostra/esconde o overlay: FPS, media do ultimo minuto (AVG 1M), media total (ALL), pior meio segundo (LOW).",
+                "   •  Alt ou F1 solta o rato. A pagina Controlos tem o resto.",
+            } : new[] {
+                "PLAY",
+                "   •  Presets: Recommended (720p), Fastest and Modest PC (540p), Ultra Low (PCs with very little memory), Sharp and",
+                "      Classic cgbj (1080p), Custom (your values). The launcher picks one from your hardware the first time.",
+                "   •  Launch options: point at each to see what it does. ★ marks what was tested.",
+                "   •  PLAY loads the pipelines, starts the game and, when it closes, keeps this session's pipelines for the next one.",
+                "   •  A stuck game (an error, a window that stopped answering) never blocks PLAY: it turns into 'CLOSE AND PLAY'.",
+                "   •  When something is missing (virtual memory, power, Resizable BAR, shaders), a yellow notice says what and takes you to fix it.",
+                "",
+                "SETUP",
+                "   •  'Do everything for me' runs the missing steps: engine, Defender exception, game folder, shaders, power, virtual",
+                "      memory, the right graphics card for VIctory and frame generation. Windows asks for administrator rights when needed.",
+                "   •  Resizable BAR: the launcher checks what D3D12 gives the game (not only the BIOS) and shows your motherboard's guide.",
+                "",
+                "SHADERS",
+                "   •  Shows, live, the translated shaders, the pipelines ready, the ones that failed, disk space and errors.",
+                "   •  'Repair' makes what is missing; 'Rebuild everything' clears the cache and prepares again.",
+                "",
+                "PERFORMANCE",
+                "   •  What holds video memory and RAM; check apps and close them before playing. Frame generation on or off.",
+                "",
+                "HARDWARE & ID",
+                "   •  Your permanent ID (VI-XXXX-XXXX), with a copy button. It comes from PC parts and stays after a Windows reinstall.",
+                "   •  Hardware sharing (off by default): sends ONLY hardware (graphics card, CPU, RAM, motherboard, Windows, disk type).",
+                "      It never sends logs, options, paths, names or your IP. The page shows exactly what is sent.",
+                "",
+                "UPDATES",
+                "   •  The launcher checks GitHub when it opens and every 5 minutes. An update is installed only when its signature and",
+                "      SHA-256 match; it installs itself while the game is not running. It is the only thing the launcher takes from the internet.",
+                "",
+                "ADVANCED TWEAKS (CUSTOM)",
+                "   •  Resolution, textures, buffers, memory guards and FPS clock. 'Copy my profile' gives a code (VI1-...) to share;",
+                "      paste a friend's in the box and press 'Apply' (it shows what changes first).",
+                "",
+                "LOGS AND ERRORS",
+                "   •  Game logs: " + Path.Combine(dataRoot, "logs") + " (session-*.log, prepare.log).",
+                "   •  Launcher errors: " + Program.ErrorFile,
+                "   •  'Send errors to Discord': choose 'launcher errors' or 'game errors' and write what happened. The launcher puts the",
+                "      right files in a zip on your Desktop, opens the folder and asks you to send it in the \"" + DiscordChannel + "\" channel.",
+                "      Nothing is sent on its own: you send it.",
+                "",
+                "GRAPHICS CARDS",
+                "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). RTX 20, GTX 10 and AMD: in the works (FSR 3).",
+                "   •  AMD: the launcher detects the card and uses Belobug's AMD engine (VIctory-Belobug-AMD).",
+                "",
+                "KEYS IN THE GAME",
+                "   •  F3 shows/hides the overlay: FPS, last minute's average (AVG 1M), average since the start (ALL), worst half second (LOW).",
+                "   •  Alt or F1 releases the mouse. The Controls page has the rest.",
+            };
         }
 
         // The projects inside this build, for the Help page.
@@ -757,44 +990,136 @@ namespace VIctoryLauncher
                 "   •  VIctory-NVIDIA (trustno1-coder) — the lighting for NVIDIA cards",
                 "   •  fxceless — rendering and performance fixes",
                 "   •  VIctory-7900XTX (avatarmanz) — adaptations from the AMD fork",
+                "   •  VIctory-Belobug-AMD (Belobug) — the AMD engine AMD cards play with: github.com/Belobug/VIctory-Belobug-AMD",
+                "   •  NVSmooth30 (ItsAdeline) — Smooth Motion on RTX 30 cards (experimental): github.com/ItsAdeline/NVSmooth30",
                 "   •  Cold Project VI (felicienradio) — the project page this remake follows",
             };
         }
 
         // ---------------------------------------------------------------- state
+        // The emulator this PC plays with: on an AMD card the AMD fork's (Hardware.cs, Engine), this
+        // repository's otherwise; a build from source first, then the one an update put in place.
         string VictoryExe
         {
             get
             {
-                foreach (var p in new[] { Path.Combine(root, "target", "diag", "victory.exe"), Path.Combine(root, "victory.exe") })
+                var places = UseAmdEngine
+                    ? new[] { Path.Combine(AmdEngineDir, "target", "diag", "victory.exe"), Path.Combine(AmdEngineDir, "victory.exe") }
+                    : OwnExeCandidates;
+                foreach (var p in places)
                     if (File.Exists(p)) return p;
                 return null;
             }
         }
 
-        string GameExe { get { return Path.Combine(gameBox.Text.Trim(), "game_scarlett_master.exe"); } }
+        // Where this repository's emulator may be: built in the source folder (beside the launcher,
+        // above it, or the one the launcher downloaded), or ready-made beside the launcher (a release).
+        IEnumerable<string> OwnExeCandidates
+        {
+            get
+            {
+                var list = new List<string>();
+                var src = SourceDir;
+                if (src != null) list.Add(Path.Combine(src, "target", "diag", "victory.exe"));
+                list.Add(Path.Combine(root, "target", "diag", "victory.exe"));
+                list.Add(Path.Combine(root, "victory.exe"));
+                return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            }
+        }
+
+        // This repository's own build (the `victory gpu` probe and the tools), whatever the engine.
+        string OwnVictoryExe
+        {
+            get
+            {
+                foreach (var p in OwnExeCandidates)
+                    if (File.Exists(p)) return p;
+                return null;
+            }
+        }
 
         void Refresh2()
         {
+            RefreshExes();
             bool game = gameBox.Text.Trim().Length > 0 && File.Exists(GameExe);
-            gameStatus.Text = game ? L("✓  Game found.", "✓  Jogo encontrado.") : L("Choose the folder of your dump.", "Escolhe a pasta do teu dump.");
-            gameStatus.ForeColor = game ? Theme.Good : Theme.Dim;
+            int count = exeBox != null && exeBox.Visible ? exeBox.Items.Count : 0;
+            gameStatus.Text = !game ? L("Choose the folder of your dump.", "Escolhe a pasta do teu dump.")
+                : exeProblem != null ? "✗  " + exeProblem
+                : count > 1 ? string.Format(L("✓  Game found: {0} executables, choose one on the right.", "✓  Jogo encontrado: {0} executaveis, escolhe um a direita."), count)
+                : L("✓  Game found.", "✓  Jogo encontrado.");
+            gameStatus.ForeColor = !game ? Theme.Dim : exeProblem != null ? Theme.Warn : Theme.Good;
+            gameHeading.Note = game ? Path.GetFileName(GameExe) : "";
+            gameHeading.Invalidate();
             var exe = VictoryExe;
-            buildStatus.Text = exe != null ? "✓  " + exe : L("Not built yet: press 'Build VIctory' (needs Rust and Visual Studio Build Tools).", "Ainda nao compilado: carrega em 'Compilar VIctory' (precisa do Rust e do Visual Studio Build Tools).");
-            buildStatus.ForeColor = exe != null ? Theme.Good : Theme.Warn;
+            if (buildStatus != null)
+            {
+                buildStatus.Text = exe != null ? "✓  " + exe : UseAmdEngine
+                    ? L("The AMD engine is not built yet: Setup > 'AMD engine (Belobug)'.", "O motor AMD ainda nao foi compilado: Preparar > 'Motor AMD (Belobug)'.")
+                    : L("Not built yet: press 'Build VIctory' (needs Rust and Visual Studio Build Tools).", "Ainda nao compilado: carrega em 'Compilar VIctory' (precisa do Rust e do Visual Studio Build Tools).");
+                buildStatus.ForeColor = exe != null ? Theme.Good : Theme.Warn;
+            }
             modeInfo.Text = modeIndex < 0 ? "" : Selected.Description;
-            bool running = Running();
-            bool ready = game && exe != null && !running && !busyNow;
+            presetHeading.Note = PresetSummary();
+            presetHeading.Invalidate();
+            var state = State();
+            // A stuck session never keeps PLAY off: PLAY closes it first.
+            bool ready = game && exe != null && state != GameState.Running && !busyNow;
             playButton.Enabled = ready;
-            prepareButton.Enabled = ready;
-            playButton.Text = running ? L("RUNNING", "A CORRER") : busyNow ? L("WAIT...", "ESPERA...") : L("PLAY", "JOGAR");
+            if (prepareButton != null) { prepareButton.Enabled = ready && state == GameState.None; prepareButton.Invalidate(); }
+            playButton.Text = state == GameState.Running ? L("RUNNING", "A CORRER") : busyNow ? L("WAIT...", "ESPERA...")
+                : state == GameState.Stuck ? L("CLOSE AND PLAY", "FECHAR E JOGAR") : L("▶  PLAY", "▶  JOGAR");
+            closeButton.Visible = state != GameState.None;
+            closeButton.Text = state == GameState.Stuck ? L("Close stuck game", "Fechar jogo preso") : L("Close game", "Fechar o jogo");
             if (tips == null) tips = new ToolTip();
-            tips.SetToolTip(playButton, ready ? "" : !game ? L("Choose the game folder first (Auto-detect).", "Escolhe primeiro a pasta do jogo (Detetar).")
+            tips.SetToolTip(playButton, state == GameState.Stuck ? L("A VIctory session stopped answering: PLAY closes it and starts again.", "Uma sessao do VIctory deixou de responder: JOGAR fecha-a e arranca de novo.")
+                : ready ? "" : !game ? L("Choose the game folder first (Auto-detect).", "Escolhe primeiro a pasta do jogo (Detetar).")
                 : exe == null ? L("Build VIctory first (Setup).", "Compila o VIctory primeiro (Preparar).")
-                : running ? L("The game is already running.", "O jogo ja esta a correr.")
+                : state == GameState.Running ? L("The game is already running ('Close game' ends it).", "O jogo ja esta a correr ('Fechar o jogo' termina-o).")
                 : L("Wait for the current task to finish.", "Espera que a tarefa atual acabe."));
             playButton.Invalidate();
-            prepareButton.Invalidate();
+            closeButton.Invalidate();
+
+            // The strip of checks, the warnings and the footer.
+            var missing = Missing();
+            statusStrip.Items = new[] {
+                game && exeProblem == null ? L("Dump verified", "Dump verificado") : L("No game dump", "Sem dump do jogo"),
+                exe != null ? L("Binary ready", "Binario pronto") : L("Binary missing", "Falta o binario"),
+                shaderFiles > 0 ? string.Format(L("{0:N0} shaders cached", "{0:N0} shaders em cache"), shaderFiles) : L("Shaders not prepared", "Shaders por preparar"),
+                missing.Count == 0 ? L("Windows ready", "Windows pronto") : string.Format(L("{0} to fix", "{0} por corrigir"), missing.Count),
+            };
+            statusStrip.States = new[] { game && exeProblem == null ? 1 : 0, exe != null ? 1 : 0, shaderFiles >= 1000 ? 1 : 0, missing.Count == 0 ? 1 : 0 };
+            statusStrip.Invalidate();
+            if (missing.Count > 0)
+            {
+                warnText.Text = "⚠  " + L("Running without: ", "A jogar sem: ") + string.Join(" · ", missing.ToArray());
+                warnText.ForeColor = Theme.Warn;
+                warnFix.Visible = true;
+            }
+            else
+            {
+                warnText.Text = "✓  " + L("Windows settings, Resizable BAR and shaders are all set.", "Definicoes do Windows, Resizable BAR e shaders: tudo pronto.");
+                warnText.ForeColor = Theme.Dim;
+                warnFix.Visible = false;
+            }
+            warnPanel.Invalidate();
+            footerState.Text = state == GameState.Running ? "RUNNING" : state == GameState.Stuck ? "STUCK" : busyNow ? "WORKING" : ready ? "READY" : "NOT READY";
+            footerState.ForeColor = state == GameState.Running ? Theme.Cyan : state == GameState.Stuck ? Theme.Warn : busyNow ? Theme.Cyan : ready ? Theme.Good : Theme.Warn;
+            footerStatus.Text = string.Format("{0} ({1})  ·  {2:0} GB VRAM  ·  {3:0} GB RAM  ·  {4}", Selected.Name, Selected.Custom ? CustomTag() : Selected.Tag, vramGb, ramGb, EngineName);
+        }
+
+        // "1280×720 internal upscaled to 1080p · 60 FPS clock" for the preset's heading.
+        string PresetSummary()
+        {
+            if (modeIndex < 0) return "";
+            var m = Selected;
+            string scale = m.Custom ? custom.Scale : m.Scale;
+            string pic;
+            double sc;
+            if (scale != null && double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out sc) && sc < 0.999)
+                pic = string.Format(L("{0}×{1} internal upscaled to 1080p", "{0}×{1} interno ampliado para 1080p"), (int)Math.Round(1920 * sc), (int)Math.Round(1080 * sc));
+            else pic = L("native 1080p", "1080p nativo");
+            bool sixty = m.Custom ? custom.Fps == 60 : fps60Box.Checked && !m.UltraLow;
+            return pic + " · " + (sixty ? L("60 FPS clock", "relogio de 60 FPS") : L("30 FPS clock", "relogio de 30 FPS"));
         }
 
         void UpdateBanner()
@@ -802,35 +1127,67 @@ namespace VIctoryLauncher
             if (banner == null) return;
             var chips = new List<string>();
             var colors = new List<Color>();
-            chips.Add(gpuName); colors.Add(Theme.Pink);
-            chips.Add(string.Format(L("{0:0} GB VRAM", "{0:0} GB VRAM"), vramGb)); colors.Add(vramGb >= 10 ? Theme.Good : Theme.Warn);
-            chips.Add(string.Format("{0:0} GB RAM", ramGb)); colors.Add(ramGb >= 24 ? Theme.Good : Theme.Warn);
-            chips.Add("ReBAR " + (rebar ? L("on", "ligado") : L("off", "desligado"))); colors.Add(rebar ? Theme.Good : Theme.Warn);
-            chips.Add("Smooth Motion " + (smoothState == "on" ? L("on", "ligado") : rtxFrameGen ? L("ready", "pronto") : "n/a")); colors.Add(smoothState == "on" ? Theme.Good : rtxFrameGen ? Theme.Cyan : Theme.Dim);
+            chips.Add(gpuName); colors.Add(Theme.Dim);
+            chips.Add(string.Format("{0:0} GB VRAM", vramGb)); colors.Add(vramGb >= 10 ? Theme.Dim : Theme.Warn);
+            chips.Add(string.Format("{0:0} GB RAM", ramGb)); colors.Add(ramGb >= 24 ? Theme.Dim : Theme.Warn);
+            chips.Add(RebarText()); colors.Add(rebar ? Theme.Dim : Theme.Warn);
+            chips.Add(FrameGenChip()); colors.Add(Theme.Dim);
+            if (UseAmdEngine) { chips.Add("AMD · Belobug"); colors.Add(Theme.Cyan); }
+            var fg = smoothBox as OptionCard;
+            if (fg != null) { fg.Line = FrameGenLine(); fg.Enabled = FrameGenAvailable; fg.Invalidate(); }
             banner.Chips = chips.ToArray();
             banner.ChipColors = colors.ToArray();
             banner.Invalidate();
+        }
+
+        // Resizable BAR in one chip: what a run gets (D3D12) and, when it differs, what the card says.
+        string RebarText()
+        {
+            if (rebarHeap == 1) return L("ReBAR On", "ReBAR ligado");
+            if (rebarHeap == 0 && rebarBios) return L("ReBAR On (not used by Windows)", "ReBAR ligado (o Windows nao o usa)");
+            if (rebarHeap == 0) return L("ReBAR Off", "ReBAR desligado");
+            return rebarBios ? L("ReBAR On", "ReBAR ligado") : L("ReBAR Off?", "ReBAR desligado?");
+        }
+
+        static string NvidiaSmi
+        {
+            get
+            {
+                var mine = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "nvidia-smi.exe");
+                return File.Exists(mine) ? mine : "nvidia-smi";
+            }
         }
 
         void DetectSystem()
         {
             try
             {
-                var smi = RunCapture("nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits");
-                if (!string.IsNullOrEmpty(smi))
+                var smi = RunCapture(NvidiaSmi, "--query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits");
+                if (!string.IsNullOrEmpty(smi) && smi.Contains(","))
                 {
-                    var parts = smi.Split('\n')[0].Split(',');
-                    gpuName = parts[0].Trim().Replace("NVIDIA GeForce ", "");
-                    vramGb = double.Parse(parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture) / 1024.0;
-                    var q = RunCapture("nvidia-smi", "-q -d MEMORY");
-                    // BAR1 total as large as video memory (or 1 GB and more) means Resizable BAR is on.
-                    var i = q.IndexOf("BAR1 Memory Usage", StringComparison.OrdinalIgnoreCase);
-                    if (i >= 0)
+                    // The card with the most memory (a laptop may list more than one).
+                    string best = null; double bestMb = -1;
+                    foreach (var line in smi.Split('\n'))
                     {
-                        var t = q.IndexOf("Total", i, StringComparison.OrdinalIgnoreCase);
-                        var digits = new string(q.Substring(t).SkipWhile(c => !char.IsDigit(c)).TakeWhile(char.IsDigit).ToArray());
+                        var parts = line.Split(',');
+                        double mb;
+                        if (parts.Length >= 2 && double.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out mb) && mb > bestMb)
+                        { bestMb = mb; best = line; }
+                    }
+                    if (best != null)
+                    {
+                        var parts = best.Split(',');
+                        gpuName = parts[0].Trim().Replace("NVIDIA GeForce ", "");
+                        vramGb = bestMb / 1024.0;
+                        if (parts.Length > 2) driverVersion = parts[2].Trim();
+                    }
+                    hasNvidia = true;
+                    var q = RunCapture(NvidiaSmi, "-q -d MEMORY");
+                    // BAR1 of 1 GB or more: the card and the PC's firmware have Resizable BAR on.
+                    foreach (Match m in Regex.Matches(q, @"BAR1 Memory Usage\s+Total\s*:\s*(\d+)\s*MiB", RegexOptions.IgnoreCase))
+                    {
                         double bar;
-                        if (double.TryParse(digits, out bar)) rebar = bar >= 1024;
+                        if (double.TryParse(m.Groups[1].Value, out bar) && bar >= 1024) rebarBios = true;
                     }
                     rtxFrameGen = Regex.IsMatch(gpuName, @"RTX\s*(40|50)\d\d");
                 }
@@ -838,9 +1195,12 @@ namespace VIctoryLauncher
                 ramGb = mem.TotalPhysicalMemory / 1073741824.0;
             }
             catch (Exception) { }
-            if (!rtxFrameGen) smoothBox.Checked = false;
+            DetectCards();
+            rebar = rebarBios;
+            if (!FrameGenAvailable) smoothBox.Checked = false;
             if (modeIndex < 0)
-                SelectMode((vramGb > 0 && vramGb < 10) || (ramGb > 0 && ramGb < 24) ? 2 : 0);
+                SelectMode((ramGb > 0 && ramGb <= 16.5) || (vramGb > 0 && vramGb <= 6.5) ? ModeUltraLow
+                    : (vramGb > 0 && vramGb < 10) || (ramGb > 0 && ramGb < 24) ? 2 : 0);
             UpdateBanner();
             UpdateSmooth();
         }
@@ -857,15 +1217,6 @@ namespace VIctoryLauncher
             catch (Exception) { return ""; }
         }
 
-        // A game running: a victory.exe with a window. Tools (replay, warm, shader translation) are
-        // victory.exe too but have none, and must not keep PLAY off.
-        static bool Running()
-        {
-            foreach (var p in Process.GetProcessesByName("victory"))
-                try { if (p.MainWindowHandle != IntPtr.Zero) return true; } catch (Exception) { }
-            return false;
-        }
-
         bool busyNow;
 
         void Log(string line)
@@ -877,6 +1228,8 @@ namespace VIctoryLauncher
         // ---------------------------------------------------------------- environment
         Dictionary<string, string> Environment2()
         {
+            // The AMD fork reads its own switches (Hardware.cs).
+            if (UseAmdEngine) return AmdEnvironment();
             var e = new Dictionary<string, string>();
             Action<string, string> set = (k, v) => e[k] = v;
             set("VICTORY_GAME_DIR", gameBox.Text.Trim());
@@ -917,7 +1270,7 @@ namespace VIctoryLauncher
             set("VICTORY_NAN_SCRUB", "1");
             set("VICTORY_DYNAMIC_SLOTS", "524288");
             set("VICTORY_WAVE_WIDE_DIGESTS", "7099a57fded142613b44f410463d6be6");
-            var skip = Path.Combine(root, "scripts", "rt_off_hashes.txt");
+            var skip = Path.Combine(SourceDir ?? root, "scripts", "rt_off_hashes.txt");
             if (File.Exists(skip)) set("VICTORY_SKIP_PIPELINES", "@" + skip);
 
             var m = Selected;
@@ -952,10 +1305,25 @@ namespace VIctoryLauncher
                 e.Remove("VICTORY_PRESSURE_CLEAR_MB");
                 e.Remove("VICTORY_TEXTURE_RAM_GUARD");
             }
+            if (m.UltraLow)
+            {
+                // The least memory: 4-6 GB cards and 8-16 GB of RAM.
+                set("VICTORY_CARD_BUFFERS_MB", "512");
+                set("VICTORY_TEXTURE_MAX", "512");
+                set("VICTORY_TEXTURE_STAGE_MB", "64");
+                set("VICTORY_RIPE_BLOCKS", "2");
+                set("VICTORY_CARD_ROOM_FOR_TARGETS_MB", "768");
+                set("VICTORY_CARD_BUFFERS_MIN_KB", "128");
+                set("VICTORY_LEVELS_ON_DEMAND", "1");
+                e.Remove("VICTORY_POOL_FULLEST");
+                e.Remove("VICTORY_WINDOWS_BAR_MB");
+            }
             if (fightsBox.Checked && !m.Modest) set("VICTORY_CARD_BUFFERS_MB", "2048");
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
-            if (fps60Box.Checked) set("VICTORY_FPS_MAX", "60");
+            if (fps60Box.Checked && !m.UltraLow) set("VICTORY_FPS_MAX", "60");
+            // Advanced Tweaks: the player's values over the preset they start from (Custom.cs).
+            if (m.Custom) ApplyCustom(e);
             set("VICTORY_VRAM_RESERVE", reserveBox.Checked ? "max" : "0");
             if (qualityBox.Checked) { set("VICTORY_RELAY", "1"); set("VICTORY_CARD_STEPS", "0"); }
             if (facesBox.Checked) set("VICTORY_TEXTURE_NO_WAIT", "0");
@@ -967,7 +1335,7 @@ namespace VIctoryLauncher
 
         Process Start(string args, string logFile, Action<string> onLine)
         {
-            var psi = new ProcessStartInfo(VictoryExe, args) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = root };
+            var psi = new ProcessStartInfo(VictoryExe, args) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = UseAmdEngine ? AmdEngineDir : root };
             foreach (var kv in Environment2()) psi.EnvironmentVariables[kv.Key] = kv.Value;
             Directory.CreateDirectory(Path.GetDirectoryName(logFile));
             var writer = new StreamWriter(logFile, true, new UTF8Encoding(false)) { AutoFlush = true };
@@ -999,13 +1367,44 @@ namespace VIctoryLauncher
         void Play()
         {
             SaveSettings();
-            if (Running()) { MessageBox.Show(this, L("VIctory is already running.", "O VIctory ja esta a correr.")); return; }
+            var state = State();
+            if (state == GameState.Running)
+            {
+                if (MessageBox.Show(this, L("VIctory is already running. Close it and start again?", "O VIctory ja esta a correr. Fechar e arrancar de novo?"),
+                    "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                CloseGames();
+            }
+            else if (state == GameState.Stuck)
+            {
+                Log(L("The last session had stopped answering: closing it.", "A ultima sessao tinha deixado de responder: a fecha-la."));
+                CloseGames();
+            }
+            // The pipelines of the last session, still being made: the warm-up before this one makes them too.
+            if (afterWarm != null && !afterWarm.HasExited)
+                try { RunWait("taskkill", "/PID " + afterWarm.Id + " /T /F", false); } catch (Exception) { }
+            afterWarm = null;
+            // A game file that cannot be a program (a download that stopped, a placeholder): say so
+            // instead of VIctory's "malformed image".
+            if (exeProblem != null)
+            {
+                MessageBox.Show(this, exeProblem, "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            // What is missing (virtual memory, power, Resizable BAR...): asked once per launcher session.
+            var missing = Missing();
+            if (missing.Count > 0 && !warnedThisSession)
+            {
+                var ask = L("The game will run worse (or close) without these:\r\n\r\n", "O jogo vai correr pior (ou fechar) sem isto:\r\n\r\n")
+                    + string.Join("\r\n", missing.Select(x => "  •  " + x).ToArray())
+                    + L("\r\n\r\nYes: play anyway.   No: open Setup to fix them.", "\r\n\r\nSim: jogar na mesma.   Nao: abrir o Preparar para corrigir.");
+                if (MessageBox.Show(this, ask, "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { Show(PageSetup); return; }
+                warnedThisSession = true;
+            }
             long cardUsed;
             GpuUsers(out cardUsed);
             if (cardUsed > (2L << 30))
                 Log(string.Format(L("Other apps already hold {0:0.0} GB of the card: the Performance page frees it.", "Outras apps ja ocupam {0:0.0} GB da placa: a pagina Desempenho liberta-a."), cardUsed / 1073741824.0));
-            if (rtxFrameGen && smoothBox.Checked && smoothState != "on") ApplySmooth(true, false);
-            else if (!smoothBox.Checked && smoothState == "on") ApplySmooth(false, false);
+            ApplyFrameGen();
             var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
             var log = Path.Combine(dataRoot, "logs", "session-" + stamp + ".log");
             Log(L("Starting ", "A iniciar ") + Selected + ". Log: " + log);
@@ -1017,17 +1416,37 @@ namespace VIctoryLauncher
                 {
                     if (warmFirst) WarmWithBar(log);
                     var p = Start("run \"" + game + "\" --console series-s --execute", log);
+                    gameProc = p; gameHadWindow = false; windowGone = null;
+                    // From here the game's own state keeps PLAY off (RUNNING), not the launcher's task,
+                    // so a game that ends badly never leaves PLAY waiting.
+                    Busy(false);
                     p.WaitForExit();
+                    // NVSmooth30's version.dll is there for the game only (tools must not load it).
+                    RemoveNvSmooth();
+                    int code = 0;
+                    try { code = p.ExitCode; } catch (Exception) { }
+                    if (gameProc != p) return; // closed from the launcher (Close game, or PLAY again)
+                    gameProc = null;
+                    if (code != 0)
+                        Log(string.Format(L("The game ended with an error (code {0}). Log: {1}", "O jogo terminou com um erro (codigo {0}). Log: {1}"), code, log));
                     Log(L("Game closed. Preparing this session's pipelines for the next one...", "Jogo fechado. A preparar as pipelines desta sessao para a proxima..."));
                     var w = Start("warm --used", log);
-                    w.WaitForExit();
-                    Log(L("Done.", "Feito."));
+                    afterWarm = w;
+                    BeginInvoke(new Action(Refresh2));
+                    // Stops on its own if it runs past 10 minutes; PLAY ends it too.
+                    if (!w.WaitForExit(10 * 60 * 1000))
+                        try { RunWait("taskkill", "/PID " + w.Id + " /T /F", false); } catch (Exception) { }
+                    if (afterWarm == w) { afterWarm = null; Log(L("Done.", "Feito.")); }
                 }
                 catch (Exception ex)
                 {
                     Log(L("Could not start: ", "Nao arrancou: ") + ex.Message + (ex.Message.Contains("denied") ? L("  (Defender: see Help)", "  (Defender: ve a Ajuda)") : ""));
                 }
-                Busy(false);
+                finally
+                {
+                    if (busyNow) Busy(false);
+                    BeginInvoke(new Action(Refresh2));
+                }
             }) { IsBackground = true }.Start();
         }
 
@@ -1060,9 +1479,15 @@ namespace VIctoryLauncher
             RunSteps(steps.Where(st => st.Fix == (Func<bool>)PrepareBlocking).ToArray());
         }
 
+        // Build: Rust and the C++ tools first when they are missing (the build alone "did nothing"
+        // without them), then the emulator (or the AMD engine on an AMD card).
         void Build()
         {
-            RunSteps(steps.Where(st => st.Fix == (Func<bool>)BuildBlocking).ToArray());
+            Show(PageSetup);
+            var chain = steps.Take(4).Where(st => { int s; try { s = st.Check(); } catch (Exception) { s = 0; } return s == 0; }).ToList();
+            var build = steps.First(st => st.Fix == (Func<bool>)(UseAmdEngine ? (Func<bool>)BuildAmdEngine : BuildBlocking));
+            if (!chain.Contains(build)) chain.Add(build);
+            RunSteps(chain.ToArray());
         }
 
         // ---------------------------------------------------------------- settings
@@ -1091,6 +1516,7 @@ namespace VIctoryLauncher
                     switch (k)
                     {
                         case "game": gameBox.Text = v; break;
+                        case "exe": exeChoice = v.Length > 0 ? v : null; break;
                         case "mode": int m; if (int.TryParse(v, out m)) SelectMode(m); break;
                         case "panel": panelBox.Checked = v == "1"; break;
                         case "borderless": borderlessBox.Checked = v == "1"; break;
@@ -1114,12 +1540,16 @@ namespace VIctoryLauncher
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(settingsFile));
                 Func<CheckBox, string> b = c => c.Checked ? "1" : "0";
-                File.WriteAllLines(settingsFile, new[] {
+                var mine = new[] {
                     "lang=" + (Pt ? "pt" : "en"), "cache=" + cacheDir, "data=" + dataDir,
-                    "game=" + gameBox.Text.Trim(), "mode=" + modeIndex,
+                    "game=" + gameBox.Text.Trim(), "exe=" + (exeChoice ?? ""), "mode=" + modeIndex,
                     "panel=" + b(panelBox), "borderless=" + b(borderlessBox), "fps60=" + b(fps60Box), "reserve=" + b(reserveBox),
                     "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox),
-                });
+                };
+                // The other keys (shaders=, engine=, custom=, source=...) are kept: this used to drop them.
+                var keys = new HashSet<string>(mine.Select(l => l.Substring(0, l.IndexOf('=') + 1)));
+                var others = File.Exists(settingsFile) ? File.ReadAllLines(settingsFile).Where(l => l.Contains("=") && !keys.Contains(l.Substring(0, l.IndexOf('=') + 1))) : new string[0];
+                File.WriteAllLines(settingsFile, mine.Concat(others).ToArray());
             }
             catch (Exception) { }
         }

@@ -59,6 +59,34 @@ GTA VI from **your own Xbox Series dump**, on Windows with an NVIDIA RTX card, t
 [VIctory](https://github.com/Marvisak/VIctory) (this branch: the cgbj build with the VIctory-NVIDIA
 lighting and many changes of our own). **No game files are included.**
 
+## Download
+
+**[Releases](https://github.com/edupode/cold-project-vi/releases/latest)**: get `VI-Setup-<version>.exe` and run it.
+
+- **One administrator prompt at the start.** After that the installer does the rest in the background:
+  - power mode;
+  - virtual memory;
+  - Defender's ransomware rule for its folder;
+  - the dedicated graphics card for `victory.exe`;
+  - Smooth Motion.
+- **The launcher opens when it finishes.** It finds your game and prepares the shaders.
+- **Nothing to compile:** you don't need Rust or Build Tools.
+- **Updates install themselves.** See [What the launcher does](#what-the-launcher-does).
+
+**Discord:** <https://discord.gg/648WEXCAsZ>. Send bugs in the **"Send bugs here please"** channel; the launcher makes the package for you (see [Logs and errors](#logs-and-errors)).
+
+### Checking a release
+
+Every program in a release is built by GitHub Actions from this repository's code ([`release.yml`](.github/workflows/release.yml)), never on a PC. Anyone can check that:
+
+1. **The download came from this code:**
+   ```powershell
+   gh attestation verify "VI-Launcher.exe" -R edupode/cold-project-vi
+   ```
+2. **The SHA-256 of each file** matches `SHA256SUMS.txt` in the release.
+3. **The launcher's source is included:** `launcher-source.zip` sits beside every install. `launcher\build-launcher.cmd` builds it with the C# compiler that ships with Windows.
+4. **Each update is signed with edupode's release key.** The launcher installs a file only when the signature and its SHA-256 match ([`Updater.cs`](launcher/Updater.cs)).
+
 ## Quick start: VI Launcher
 
 1. Get this branch (`git clone`, or **Code → Download ZIP** on GitHub) and build the launcher; it needs nothing
@@ -106,16 +134,35 @@ less than 10 GB or PCs with less than 24 GB of RAM it picks the **Modest PC** mo
 English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the same from a command line
 (`Jogar-Luz.cmd tudo`).
 
-### What the launcher does for you
+### What the launcher does
 
 | | |
 |---|---|
-| **Loading bar before the game** | Before the game opens (before the first menu), every pipeline earlier sessions drew with is made in separate processes, so the driver already has them: no stutter the first time you see a place. Seconds once the cache is ready. |
-| **NVIDIA Smooth Motion** | Written into the driver's own profile for `victory.exe` (as NVIDIA Profile Inspector does): **no NVIDIA App needed**. RTX 40/50, driver 571.86+. The card shows a generated frame between two of the game's. |
-| **Performance page** | Lists the apps holding your video memory and RAM (NVIDIA Overlay, Discord, Wallpaper Engine, browsers...) and closes the ones you tick. Windows only gives the game what other apps leave free. |
-| **Video memory reserve** | VIctory asks Windows to reserve video memory for itself, so other apps are moved out first when memory runs short. |
-| **Setup page** | Every first-run step checked (✓/✗) with a button that does it, and **Do everything for me**. Resizable BAR lives in the BIOS/UEFI: the guide checks UEFI boot, shows where the options are and can restart into the BIOS (after a yes). |
-| **FPS overlay (F3)** | FPS now, the last minute's average (AVG 1M), the whole run's (ALL) and the worst half second (LOW), frame time, draws, video memory and RAM. |
+| **Play** | Picks a preset from your hardware the first time.<br>**Presets:** Recommended (720p), Fastest and Modest PC (540p), **Ultra Low** (4-6 GB cards, 8-16 GB of RAM), Sharp and Classic cgbj (1080p), **Custom** (your values).<br>A strip shows whether the dump, the emulator, the shaders and Windows are ready. A **yellow notice** lists what the game would run without (virtual memory, power, Resizable BAR, the dedicated graphics card, shaders) and opens the fix. |
+| **Stuck game** | A VIctory that stopped answering (a crash, an error window) never blocks PLAY: it turns into **CLOSE AND PLAY**, and **Close game** ends it. |
+| **Several game executables** | When the dump has more than one `game_scarlett*.exe`, you choose which one beside the game folder.<br>A broken file (a download that stopped, an encrypted package) is named before PLAY, instead of VIctory's "malformed image". |
+| **Loading bar before the game** | Every pipeline earlier sessions drew with is made before the game opens, so there is no stutter the first time you see a place. |
+| **Setup** | Every first-run step, checked (✓/✗), with a button that does it, plus **Do everything for me**:<br>Rust, Build Tools, build, AMD engine, Defender, game folder, shaders, power, virtual memory, dedicated graphics card, Smooth Motion, Resizable BAR.<br>**Build** installs what it needs first. If the launcher is not inside the source folder, it downloads the source; this fixes `could not find Cargo.toml in ...\Downloads`. |
+| **Resizable BAR** | Checked the way the game sees it (D3D12's GPU upload heaps), not only in the BIOS.<br>The guide covers your motherboard maker's menus, NVIDIA's firmware update for early RTX 30 cards, and Windows 11 24H2.<br>When it cannot be turned on, it says what to do instead, and **I can't turn it on** stops the warning. |
+| **Shaders** | Live: shaders translated, pipelines made, the ones that failed, the driver, disk room, the last errors.<br>**Repair** retries what failed; **Rebuild everything** starts again. |
+| **Performance** | The apps holding video memory and RAM; tick them and they close.<br>The video memory reserve and frame generation are set here. |
+| **Frame generation** | **RTX 40/50:** NVIDIA Smooth Motion, written into the driver's profile (no NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**RTX 20, GTX 10 and AMD:** FSR 3 frame generation is planned. |
+| **AMD cards** | Detected on their own. They play with **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug**, his fork tuned for Radeon (GPL-3.0). All credit for the AMD engine is his. Setup downloads and builds it once. |
+| **Advanced Tweaks (Custom)** | Resolution, texture size, buffers, memory guards and FPS clock.<br>**Copy my profile** gives a code (`VI1-...`) to share. Paste a friend's code in the box and **Apply**: it shows what changes first, and a code can only hold these values. |
+| **Hardware & ID** | Your permanent ID (`VI-XXXX-XXXX`, from PC parts; it stays after reinstalling Windows) with a copy button, your hardware, and the engine choice. |
+| **Hardware sharing** | **Off by default.** When on, it sends **only hardware** (graphics card, processor, RAM, motherboard, Windows, disk type), at most once a day, to a write-only database only edupode can read.<br>It never sends logs, options, paths, names or your IP. The page shows exactly what is sent. |
+| **Updates** | Checks GitHub when the launcher opens and **every 5 minutes**. A new version installs itself while the game is not running, and only when its signature and SHA-256 match.<br>This and the opt-in hardware report are the launcher's only network traffic. |
+| **FPS overlay (F3)** | FPS now, the last minute's average (AVG 1M), the whole run's (ALL), the worst half second (LOW), frame time, draws, video memory and RAM. |
+
+### Logs and errors
+
+- **Game logs:** `%LOCALAPPDATA%\VIctory\luz\logs`. `session-*.log` is one file per game; `prepare.log`, `build.log` and `build-amd.log` cover shaders and builds.
+- **Launcher errors:** `%TEMP%\vi-launcher-error.txt`.
+- **Send errors to Discord** (side bar or Help):
+  1. Choose **launcher errors** or **game errors**.
+  2. Tick what happened (shaders not rendering, virtual memory not turning on, ...) and write a line.
+  3. The launcher puts the right files in a zip on your Desktop, with your user name taken out of every path. It opens the folder and copies a short summary.
+  4. Send the zip in the **"Send bugs here please"** channel on [Discord](https://discord.gg/648WEXCAsZ). Nothing is sent by the launcher itself.
 
 ## Modes
 
