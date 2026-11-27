@@ -1219,6 +1219,9 @@ struct Hosted {
     refused: std::sync::atomic::AtomicBool,
     /// Its host copy was let go as idle once.
     gone: std::sync::atomic::AtomicBool,
+    /// How many times its host copy was made again after the sweep let it
+    /// go ([`let_go_idle`] keeps such textures longer).
+    remade: std::sync::atomic::AtomicU32,
     /// A texture of [`PLACED_TEXTURES`].
     placed: std::sync::atomic::AtomicBool,
     /// The lowest level a view asked for since it had no host copy
@@ -1625,6 +1628,7 @@ fn hosted(this: This, make: bool) -> Option<Made> {
         if r.host.gone.load(Relaxed) {
             KINDS[4].fetch_add(1, Relaxed);
             KINDS[5].fetch_add(host.bytes, Relaxed);
+            r.host.remade.fetch_add(1, Relaxed);
         }
         KINDS[6].fetch_add(1, Relaxed);
         *made = Some((std::sync::Arc::new(host), twin));
@@ -2056,7 +2060,12 @@ pub(crate) fn let_go_idle() {
             let r = unsafe { &*(at as *const Resource) };
             let used = r.host.used.load(Relaxed);
             if used != 0 && fills(&r.desc) && crate::host::long_ago(used, idle_ms, IDLE_FRAMES) {
-                by_age.push((used & 0xffff_ffff, at));
+                // A texture made again after it was let go counts as used
+                // later, 20 s (200 tenths) for each time (up to 8): of a long play, 34 %
+                // of those let go came back (40,796 of 121,015, 14 GB sent
+                // up again, and textures in the distance blinking).
+                let favour = if favour_reused() { u64::from(r.host.remade.load(Relaxed).min(8)) * 200 } else { 0 };
+                by_age.push(((used & 0xffff_ffff) + favour, at));
             }
         }
         by_age.sort_unstable();
@@ -2135,6 +2144,14 @@ pub(crate) fn let_go_idle() {
             )
         });
     }
+}
+
+/// Whether textures made again after being let go are let go later
+/// ([`let_go_idle`]; `VICTORY_TEXTURE_FAVOR_REUSED=0`: by idle time alone).
+#[cfg(windows)]
+fn favour_reused() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_FAVOR_REUSED").is_none_or(|v| v != "0"))
 }
 
 /// Since the start: looks of [`let_go_idle`], their microseconds, and the
@@ -2689,6 +2706,7 @@ fn hand_out_resource(
             used: std::sync::atomic::AtomicU64::new(0),
             refused: std::sync::atomic::AtomicBool::new(false),
             gone: std::sync::atomic::AtomicBool::new(false),
+            remade: std::sync::atomic::AtomicU32::new(0),
             placed: std::sync::atomic::AtomicBool::new(false),
             wanted: std::sync::atomic::AtomicU32::new(u32::MAX),
             grown: std::sync::atomic::AtomicBool::new(false),

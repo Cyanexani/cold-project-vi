@@ -168,7 +168,7 @@ fn place(
     height: i32,
 ) -> (u32, u32, i32, i32, i32, i32) {
     let top_level = parent.is_null() && style & wm::WS_CHILD == 0 && style & wm::WS_CAPTION != 0;
-    if top_level && std::env::var_os("VICTORY_BORDERLESS").is_none_or(|v| v != "0") {
+    if top_level && std::env::var_os("VICTORY_BORDERLESS").is_some_and(|v| v == "1") {
         static AWARE: std::sync::Once = std::sync::Once::new();
         AWARE.call_once(|| {
             use windows_sys::Win32::UI::HiDpi::{

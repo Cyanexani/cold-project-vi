@@ -9391,7 +9391,7 @@ impl Host {
 /// flip"), which a window with a frame never is.
 pub(crate) fn borderless() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VICTORY_BORDERLESS").is_none_or(|v| v != "0"))
+    *ON.get_or_init(|| std::env::var_os("VICTORY_BORDERLESS").is_some_and(|v| v == "1"))
 }
 
 /// The swap chain's size for a frame of `frame`: the window's client area

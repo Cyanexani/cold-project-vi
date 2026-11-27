@@ -89,8 +89,10 @@ used in that session for the next one.
    - NVIDIA App → Graphics → Program settings → add
      `...\cold-project-vi\target\diag\victory.exe` (or the copy your launcher
      starts) → **Smooth Motion: On**.
-   - It needs the borderless window, which is now the default
-     (`VICTORY_BORDERLESS`; set it to `0` for a normal window).
+   - It needs a borderless full-screen window (`VICTORY_BORDERLESS=1`). That
+     window is **off by default**: on the 2560x1600 laptop screen with 150 %
+     scaling it dropped the game to 1-2 FPS (under investigation), so Smooth
+     Motion does not engage yet.
    - Also in the NVIDIA App for that program: **Power management mode: Prefer
      maximum performance**, **Low latency mode: On**.
 4. **Plug the laptop in** and use the vendor's performance mode.
@@ -141,7 +143,11 @@ The game reads an Xbox controller; a connected controller replaces all of this.
   the open world ran at 1 FPS.
 - Settings for a 12 GB card: 1080p output, 1 GB of game buffers on the card, a
   smaller render-target reserve, fewer texture blocks made ahead.
-- Keyboard/mouse layout, borderless window for Smooth Motion.
+- Keyboard/mouse layout; an optional borderless window for Smooth Motion
+  (`VICTORY_BORDERLESS=1`, off by default, see above).
+- Textures that come back after being evicted are evicted last
+  (`VICTORY_TEXTURE_FAVOR_REUSED`, on by default): in a long session a third
+  of the evicted textures had to be loaded again.
 
 Details, measurements and the full list of changes: [LUZ-24FPS.md](LUZ-24FPS.md)
 (Portuguese).
