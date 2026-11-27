@@ -16,6 +16,9 @@ const MAX_ENCODED_RUN: usize = 512;
 
 const ALLOWED_EXTENSIONS: &[&str] = &[
     "rs", "toml", "md", "txt", "lock", "yml", "yaml", "json", "hlsl", "hlsli", "ps1", "cmd", "sh",
+    // The launcher (C#), its installer script (Inno Setup) and the hardware database's Worker
+    // (JavaScript, SQL, the Python that writes its averages page): source we wrote, as text.
+    "cs", "iss", "js", "sql", "py",
 ];
 const ALLOWED_NAMES: &[&str] = &[
     ".gitignore",
@@ -29,10 +32,15 @@ const ALLOWED_NAMES: &[&str] = &[
 ];
 
 /// Paths explicitly exempted, with a reason. Keep this empty if at all possible.
-const EXCEPTIONS: &[(&str, &str)] = &[(
-    "crates/victory-formats/src/bcpack-tables.bin",
-    "the BCPack format's constant tables: nothing decodes without them and they cannot be derived (owner's decision, 2026-11-23; docs/asset-policy.md)",
-)];
+const EXCEPTIONS: &[(&str, &str)] = &[
+    (
+        "crates/victory-formats/src/bcpack-tables.bin",
+        "the BCPack format's constant tables: nothing decodes without them and they cannot be derived (owner's decision, 2026-11-23; docs/asset-policy.md)",
+    ),
+    ("launcher/icon.ico", "VI Launcher's own icon (drawn for it, nothing of the game's); the build embeds it (owner's decision, 2026-11-27)"),
+    ("launcher/icon.png", "VI Launcher's own icon as an image, for the README (owner's decision, 2026-11-27)"),
+    ("launcher/screenshot.png", "a screenshot of VI Launcher itself, for the README (owner's decision, 2026-11-27)"),
+];
 
 /// Signatures of formats that must never be committed.
 const FORBIDDEN_MAGIC: &[(&[u8], &str)] = &[

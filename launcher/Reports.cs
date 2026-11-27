@@ -1,4 +1,4 @@
-// VI Launcher: "Send errors to Discord". The player picks launcher errors or game errors, ticks what
+// Julia's Launcher: "Send errors to Discord". The player picks launcher errors or game errors, ticks what
 // happened and writes a line; the launcher puts the right files in a zip on the Desktop (user name
 // taken out of every path), opens the folder and asks them to send it in the Discord channel.
 // Nothing is sent by the launcher itself.
@@ -72,7 +72,7 @@ namespace VIctoryLauncher
                     {
                         BeginInvoke(new Action(() => {
                             f.Close();
-                            if (zip == null) { MessageBox.Show(this, L("The package could not be made: ", "Nao deu para criar o pacote: ") + error, "VI Launcher"); return; }
+                            if (zip == null) { MessageBox.Show(this, L("The package could not be made: ", "Nao deu para criar o pacote: ") + error, "Julia's Launcher"); return; }
                             try { Clipboard.SetText(summary); } catch (Exception) { }
                             try { Process.Start("explorer.exe", "/select,\"" + zip + "\""); } catch (Exception) { }
                             var msg = string.Format(L("Done: {0}\r\n\r\nSend this zip on Discord, in the channel \"{1}\".\r\nA short summary is already copied: paste it with the zip.\r\n\r\nOpen Discord now?",
@@ -105,7 +105,7 @@ namespace VIctoryLauncher
             }));
             var missing = Missing();
             var sb = new StringBuilder();
-            sb.AppendLine("VI Launcher error report");
+            sb.AppendLine("Julia's Launcher error report");
             sb.AppendLine("ID: " + h.Id);
             sb.AppendLine("Kind: " + (game ? "game errors" : "launcher errors"));
             sb.AppendLine("Launcher: v" + Updater.Version + "   Engine: " + EngineName + "   Preset: " + Selected.Name);

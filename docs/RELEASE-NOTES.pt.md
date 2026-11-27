@@ -1,4 +1,4 @@
-VI Launcher 0.2.0: a grande renovação.
+Julia's Launcher 0.2.0: a grande renovação.
 
 - Visual novo (estilo Cold Project). Páginas novas: Shaders (ao vivo), Hardware e ID, Atualizações, Ajustes avançados.
 - Instalador: um pedido de administrador e o Windows fica configurado em segundo plano. Nada para compilar.

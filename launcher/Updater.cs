@@ -1,4 +1,4 @@
-// VI Launcher: updates from GitHub, the launcher's only way in. Every 5 minutes (and when it opens)
+// Julia's Launcher: updates from GitHub, the launcher's only way in. Every 5 minutes (and when it opens)
 // it reads manifest.json of the latest release of edupode/cold-project-vi and its signature
 // (manifest.sig, RSA-SHA256 by edupode's release key, which never leaves edupode's PC: the
 // public half is in ReleaseKey.cs). A file is installed only when the signature and its SHA-256
@@ -26,7 +26,7 @@ namespace VIctoryLauncher
         public const string SignatureUrl = "https://github.com/edupode/cold-project-vi/releases/latest/download/manifest.sig";
         public const string DownloadPrefix = "https://github.com/edupode/cold-project-vi/releases/download/";
         // What an update may bring, and where each goes (beside the launcher).
-        public static readonly string[] Allowed = { "VI Launcher.exe", "victory.exe", "tools/nvsmooth30/version.dll" };
+        public static readonly string[] Allowed = { "Julia's Launcher.exe", "victory.exe", "tools/nvsmooth30/version.dll" };
 
         public static Version Number(string v)
         {
@@ -60,7 +60,7 @@ namespace VIctoryLauncher
         void StartUpdates()
         {
             // The launcher an update replaced: gone once the new one runs.
-            try { var old = Path.Combine(root, "VI Launcher.old.exe"); if (File.Exists(old)) File.Delete(old); } catch (Exception) { }
+            try { var old = Path.Combine(root, "Julia's Launcher.old.exe"); if (File.Exists(old)) File.Delete(old); } catch (Exception) { }
             updateTimer = new System.Threading.Timer(_ => CheckForUpdate(false), null, 3000, 5 * 60 * 1000);
         }
 
@@ -76,7 +76,7 @@ namespace VIctoryLauncher
                 byte[] manifestBytes, sig;
                 using (var web = new WebClient())
                 {
-                    web.Headers[HttpRequestHeader.UserAgent] = "VI-Launcher";
+                    web.Headers[HttpRequestHeader.UserAgent] = "Julias-Launcher";
                     try { manifestBytes = web.DownloadData(Updater.ManifestUrl); }
                     catch (WebException e)
                     {
@@ -102,7 +102,7 @@ namespace VIctoryLauncher
                 Directory.CreateDirectory(dir);
                 using (var web = new WebClient())
                 {
-                    web.Headers[HttpRequestHeader.UserAgent] = "VI-Launcher";
+                    web.Headers[HttpRequestHeader.UserAgent] = "Julias-Launcher";
                     foreach (var f in m.Files)
                     {
                         var to = Path.Combine(dir, f.Name.Replace('/', '\\'));
@@ -154,8 +154,8 @@ namespace VIctoryLauncher
                 foreach (var f in m.Files)
                 {
                     var from = Path.Combine(pendingDir, f.Name.Replace('/', '\\'));
-                    if (f.Name == "VI Launcher.exe") { launcher = true; continue; }
-                    var to = Path.Combine(root, f.Name.Replace('/', '\\'));
+                    if (f.Name == "Julia's Launcher.exe") { launcher = true; continue; }
+                    var to = Path.Combine(AppDir, f.Name.Replace('/', '\\'));
                     Directory.CreateDirectory(Path.GetDirectoryName(to));
                     File.Copy(from, to, true);
                 }
@@ -163,10 +163,10 @@ namespace VIctoryLauncher
                 {
                     // A running program may be renamed but not overwritten: the new one takes its name.
                     var me = Application.ExecutablePath;
-                    var old = Path.Combine(root, "VI Launcher.old.exe");
+                    var old = Path.Combine(root, "Julia's Launcher.old.exe");
                     if (File.Exists(old)) File.Delete(old);
                     File.Move(me, old);
-                    File.Copy(Path.Combine(pendingDir, "VI Launcher.exe"), me, true);
+                    File.Copy(Path.Combine(pendingDir, "Julia's Launcher.exe"), me, true);
                 }
                 Log(string.Format(L("Updated to v{0}.", "Atualizado para a v{0}."), m.Version));
                 // Shaders made by an older translator are made again (the Shaders page shows it).
@@ -174,7 +174,7 @@ namespace VIctoryLauncher
                 pending = null;
                 if (launcher)
                 {
-                    MessageBox.Show(this, string.Format(L("VI Launcher was updated to v{0}. It opens again now.", "O VI Launcher foi atualizado para a v{0}. Volta a abrir agora."), m.Version), "VI Launcher");
+                    MessageBox.Show(this, string.Format(L("Julia's Launcher was updated to v{0}. It opens again now.", "O Julia's Launcher foi atualizado para a v{0}. Volta a abrir agora."), m.Version), "Julia's Launcher");
                     Process.Start(Application.ExecutablePath, "--wait-pid " + Process.GetCurrentProcess().Id);
                     Application.Exit();
                     return;

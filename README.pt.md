@@ -3,7 +3,7 @@
 <img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=0:ff5fa2,50:ffc371,100:5f6dff&text=Cold%20Project%20VI&fontColor=ffffff&fontSize=54&fontAlignY=36&desc=remake%20edupode%20%E2%80%94%20GTA%20VI%20(Xbox%20Series)%20num%20port%C3%A1til%20RTX&descAlignY=58&animation=fadeIn" alt="Cold Project VI - remake edupode" width="100%"/>
 
 <p>
-  <a href="#come%C3%A7ar-vi-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20VI%20Launcher-come%C3%A7a%20aqui-ff5fa2?style=for-the-badge" alt="VI Launcher"/></a>
+  <a href="#come%C3%A7ar-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-come%C3%A7a%20aqui-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Read%20in-English-C8102E?style=for-the-badge" alt="English"/></a>
   <a href="docs/LUZ-24FPS.md"><img src="https://img.shields.io/badge/Notas-Portugu%C3%AAs-006600?style=for-the-badge" alt="Notas"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/por-%40edupode-222?style=for-the-badge&logo=github" alt="por edupode"/></a>
@@ -56,13 +56,13 @@ Todos os programas de uma versão são compilados pelo GitHub Actions a partir d
 
 1. **O download saiu deste código:**
    ```powershell
-   gh attestation verify "VI-Launcher.exe" -R edupode/cold-project-vi
+   gh attestation verify "Julias-Launcher.exe" -R edupode/cold-project-vi
    ```
 2. **O SHA-256 de cada ficheiro** bate com o `SHA256SUMS.txt` da versão.
 3. **O código do launcher vem incluído:** o `launcher-source.zip` fica ao lado de cada instalação. O `launcher\build-launcher.cmd` compila-o com o compilador de C# que vem com o Windows.
 4. **Cada update é assinado com a chave de versões do edupode.** O launcher só instala um ficheiro se a assinatura e o SHA-256 baterem certo ([`Updater.cs`](launcher/Updater.cs)).
 
-## Começar: VI Launcher
+## Começar: Julia's Launcher
 
 1. Descarrega este ramo (`git clone`, ou **Code → Download ZIP** no GitHub) e compila o launcher; só precisa do
    Windows:
@@ -71,7 +71,7 @@ Todos os programas de uma versão são compilados pelo GitHub Actions a partir d
    cd cold-project-vi
    launcher\build-launcher.cmd
    ```
-2. Abre o **`VI Launcher.exe`**, carrega em **Português** na barra lateral e em **⚡ Preparar tudo (1a vez)** (ou na página
+2. Abre o **`Julia's Launcher.exe`**, carrega em **Português** na barra lateral e em **⚡ Preparar tudo (1a vez)** (ou na página
    **Preparar**). Instala o Rust e o C++ Build Tools com o winget, compila o VIctory com barra de progresso, junta a exceção do
    Defender (o Windows pergunta), encontra a pasta do jogo sozinho, prepara os shaders, põe o Windows em melhor desempenho e a
    memória virtual gerida pelo sistema, e liga o Smooth Motion. À mão, os passos são:
@@ -101,7 +101,7 @@ winget install --id Git.Git -e --source winget
 Sem winget? Descarrega o Git em <https://git-scm.com/download/win>, ou passa sem Git: nesta página carrega em
 **Code → Download ZIP**, extrai e corre `launcher\build-launcher.cmd` dentro da pasta extraída.
 
-<p align="center"><img src="launcher/screenshot.png" alt="VI Launcher" width="760"/></p>
+<p align="center"><img src="launcher/screenshot.png" alt="Julia's Launcher" width="760"/></p>
 
 O launcher vê a tua placa, a VRAM, a RAM, o Resizable BAR e o suporte do Smooth Motion, e configura o resto.
 Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado no PC do autor. Em placas com menos de
@@ -119,11 +119,11 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
 | **Resizable BAR** | Verificado como o jogo o vê (os GPU upload heaps do D3D12), não só na BIOS.<br>O guia cobre os menus da marca da tua placa-mãe, a atualização de firmware da NVIDIA para as primeiras RTX 30 e o Windows 11 24H2.<br>Quando não dá para o ligar, diz o que fazer em vez disso, e **Não o consigo ligar** acaba com o aviso. |
 | **Shaders** | Ao vivo: shaders traduzidos, pipelines feitas, as que falharam, o driver, o espaço em disco e os últimos erros.<br>**Reparar** tenta de novo o que falhou; **Refazer tudo** recomeça do zero. |
 | **Desempenho** | As apps que ocupam VRAM e RAM; marca-as e elas fecham.<br>A reserva de VRAM e a geração de frames definem-se aqui. |
-| **Geração de frames** | **RTX 40/50:** NVIDIA Smooth Motion, escrito no perfil do driver (sem a NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**RTX 20, GTX 10 e AMD:** geração de frames FSR 3 em preparação. |
+| **Geração de frames** | **RTX 40/50:** NVIDIA Smooth Motion, escrito no perfil do driver (sem a NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Todas as outras placas (GTX 10, RTX 20, AMD com o motor edupode, Intel):** geração de frames VI (experimental, desligada por defeito). Cria um frame entre cada dois do jogo só a partir das imagens, à custa de meio frame de atraso. |
 | **Placas AMD** | Detetadas sozinhas. Jogam com o **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) do Belobug**, o fork dele afinado para Radeon (GPL-3.0). Todo o crédito do motor AMD é dele. O Preparar descarrega-o e compila-o uma vez. |
 | **Ajustes avançados (Personalizado)** | Resolução, tamanho das texturas, buffers, proteções de memória e relógio de FPS.<br>**Copiar o meu perfil** dá um código (`VI1-...`) para partilhar. Cola o código de um amigo na caixa e carrega em **Aplicar**: mostra primeiro o que muda, e um código só pode ter estes valores. |
 | **Hardware e ID** | O teu ID permanente (`VI-XXXX-XXXX`, feito a partir de peças do PC; fica igual depois de reinstalar o Windows) com botão de copiar, o teu hardware e a escolha do motor. |
-| **Partilha de hardware** | **Desligada por defeito.** Ligada, envia **só hardware** (placa gráfica, processador, RAM, placa-mãe, Windows, tipo de disco), no máximo uma vez por dia, para uma base de dados que só recebe dados e que só o edupode lê.<br>Nunca envia logs, opções, caminhos, nomes nem o IP. A página mostra exatamente o que é enviado. |
+| **Partilha de hardware** | **Desligada por defeito.** Ligada, envia **só hardware** (placa gráfica, processador, RAM, placa-mãe, Windows, tipo de disco), no máximo uma vez por dia, para uma base de dados que só recebe dados e que só o edupode lê.<br>Nunca envia logs, opções, caminhos, nomes nem o IP. A página mostra exatamente o que é enviado.<br>Enquanto está desligada, o launcher pergunta antes de cada jogo e explica porque ajuda; **Não perguntar mais** acaba com isso. Só as médias são públicas: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), atualizadas de 6 em 6 horas. |
 | **Atualizações** | Verifica o GitHub ao abrir e **de 5 em 5 minutos**. Uma versão nova instala-se sozinha quando o jogo não está a correr, e só se a assinatura e o SHA-256 baterem certo.<br>Isto e a partilha de hardware (opcional) são o único tráfego de rede do launcher. |
 | **Overlay de FPS (F3)** | FPS agora, média do último minuto (AVG 1M), média desde o início (ALL), o pior meio segundo (LOW), tempo por frame, draws, VRAM e RAM. |
 
@@ -156,7 +156,7 @@ página Controlos do launcher ou [docs/LUZ-24FPS.md](docs/LUZ-24FPS.md).
 
 ## Antes e depois
 
-| | Antes (cgbj neste portátil) | Agora (VI Launcher, Recomendado) |
+| | Antes (cgbj neste portátil) | Agora (Julia's Launcher, Recomendado) |
 |---|---|---|
 | Menus e mapa | 30-33 FPS | **60 FPS** |
 | Mundo aberto | 10-15 FPS | **22-26 FPS** |

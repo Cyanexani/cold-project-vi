@@ -5,7 +5,7 @@
 <a href="#where-it-stands"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&pause=1200&color=FF5FA2&center=true&vCenter=true&width=680&lines=Open+world+22-26+fps%2C+cutscenes+35%2B%2C+menus+60;NVIDIA+Smooth+Motion+set+up+for+you;Pipelines+loaded+before+the+game+opens;VI+Launcher%3A+one+window+to+build+and+play;Missions+playable%2C+long+sessions+without+crashes" alt="animation"/></a>
 
 <p>
-  <a href="#quick-start-vi-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20VI%20Launcher-start%20here-ff5fa2?style=for-the-badge" alt="VI Launcher"/></a>
+  <a href="#quick-start-julias-launcher"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Julia%27s%20Launcher-start%20here-ff5fa2?style=for-the-badge" alt="Julia's Launcher"/></a>
   <a href="docs/GUIDE-30FPS.md"><img src="https://img.shields.io/badge/Guide-English-C8102E?style=for-the-badge" alt="Guide"/></a>
   <a href="README.pt.md"><img src="https://img.shields.io/badge/Leia%20em-Portugu%C3%AAs-006600?style=for-the-badge" alt="Portugues"/></a>
   <a href="https://github.com/edupode"><img src="https://img.shields.io/badge/by-%40edupode-222?style=for-the-badge&logo=github" alt="by edupode"/></a>
@@ -22,7 +22,7 @@
 </p>
 
 <p>
-  <a href="#quick-start-vi-launcher"><img src="https://img.shields.io/badge/%E2%96%B6%20Run-222?style=for-the-badge" alt="Run"/></a>
+  <a href="#quick-start-julias-launcher"><img src="https://img.shields.io/badge/%E2%96%B6%20Run-222?style=for-the-badge" alt="Run"/></a>
   <a href="#modes"><img src="https://img.shields.io/badge/%E2%9A%A1%20Modes-222?style=for-the-badge" alt="Modes"/></a>
   <a href="#controls"><img src="https://img.shields.io/badge/%F0%9F%95%B9%20Controls-222?style=for-the-badge" alt="Controls"/></a>
   <a href="#where-it-stands"><img src="https://img.shields.io/badge/%F0%9F%93%8B%20Status-222?style=for-the-badge" alt="Status"/></a>
@@ -81,13 +81,13 @@ Every program in a release is built by GitHub Actions from this repository's cod
 
 1. **The download came from this code:**
    ```powershell
-   gh attestation verify "VI-Launcher.exe" -R edupode/cold-project-vi
+   gh attestation verify "Julias-Launcher.exe" -R edupode/cold-project-vi
    ```
 2. **The SHA-256 of each file** matches `SHA256SUMS.txt` in the release.
 3. **The launcher's source is included:** `launcher-source.zip` sits beside every install. `launcher\build-launcher.cmd` builds it with the C# compiler that ships with Windows.
 4. **Each update is signed with edupode's release key.** The launcher installs a file only when the signature and its SHA-256 match ([`Updater.cs`](launcher/Updater.cs)).
 
-## Quick start: VI Launcher
+## Quick start: Julia's Launcher
 
 1. Get this branch (`git clone`, or **Code → Download ZIP** on GitHub) and build the launcher; it needs nothing
    but Windows:
@@ -96,7 +96,7 @@ Every program in a release is built by GitHub Actions from this repository's cod
    cd cold-project-vi
    launcher\build-launcher.cmd
    ```
-2. Open **`VI Launcher.exe`** and press **⚡ First-time auto-setup** (or the **Setup** page). It installs Rust and the
+2. Open **`Julia's Launcher.exe`** and press **⚡ First-time auto-setup** (or the **Setup** page). It installs Rust and the
    C++ Build Tools with winget, builds VIctory with a progress bar, adds the Defender exception (Windows asks
    first), finds your game folder on its own, prepares the shaders, sets Windows to best performance and
    system-managed virtual memory, and turns Smooth Motion on. By hand, the same steps are:
@@ -126,7 +126,7 @@ winget install --id Git.Git -e --source winget
 No winget? Download Git from <https://git-scm.com/download/win>, or skip Git: on this page press
 **Code → Download ZIP**, extract it and run `launcher\build-launcher.cmd` inside the extracted folder.
 
-<p align="center"><img src="launcher/screenshot.png" alt="VI Launcher" width="760"/></p>
+<p align="center"><img src="launcher/screenshot.png" alt="Julia's Launcher" width="760"/></p>
 
 The launcher checks your GPU, video memory, RAM, Resizable BAR and Smooth Motion support and sets everything
 else. Point at any option to see what it does; **★** marks what was tested on the author's PC. On cards with
@@ -146,11 +146,11 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 | **Resizable BAR** | Checked the way the game sees it (D3D12's GPU upload heaps), not only in the BIOS.<br>The guide covers your motherboard maker's menus, NVIDIA's firmware update for early RTX 30 cards, and Windows 11 24H2.<br>When it cannot be turned on, it says what to do instead, and **I can't turn it on** stops the warning. |
 | **Shaders** | Live: shaders translated, pipelines made, the ones that failed, the driver, disk room, the last errors.<br>**Repair** retries what failed; **Rebuild everything** starts again. |
 | **Performance** | The apps holding video memory and RAM; tick them and they close.<br>The video memory reserve and frame generation are set here. |
-| **Frame generation** | **RTX 40/50:** NVIDIA Smooth Motion, written into the driver's profile (no NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**RTX 20, GTX 10 and AMD:** FSR 3 frame generation is planned. |
+| **Frame generation** | **RTX 40/50:** NVIDIA Smooth Motion, written into the driver's profile (no NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Every other card (GTX 10, RTX 20, AMD with the edupode engine, Intel):** VI frame generation (experimental, off by default) makes a frame between each two of the game's from the pictures alone, at the cost of half a frame of delay. |
 | **AMD cards** | Detected on their own. They play with **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug**, his fork tuned for Radeon (GPL-3.0). All credit for the AMD engine is his. Setup downloads and builds it once. |
 | **Advanced Tweaks (Custom)** | Resolution, texture size, buffers, memory guards and FPS clock.<br>**Copy my profile** gives a code (`VI1-...`) to share. Paste a friend's code in the box and **Apply**: it shows what changes first, and a code can only hold these values. |
 | **Hardware & ID** | Your permanent ID (`VI-XXXX-XXXX`, from PC parts; it stays after reinstalling Windows) with a copy button, your hardware, and the engine choice. |
-| **Hardware sharing** | **Off by default.** When on, it sends **only hardware** (graphics card, processor, RAM, motherboard, Windows, disk type), at most once a day, to a write-only database only edupode can read.<br>It never sends logs, options, paths, names or your IP. The page shows exactly what is sent. |
+| **Hardware sharing** | **Off by default.** When on, it sends **only hardware** (graphics card, processor, RAM, motherboard, Windows, disk type), at most once a day, to a write-only database only edupode can read.<br>It never sends logs, options, paths, names or your IP. The page shows exactly what is sent.<br>While it is off, the launcher asks before each game, explaining why it helps; **Don't ask again** ends that. Only the averages are public: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), updated every 6 hours. |
 | **Updates** | Checks GitHub when the launcher opens and **every 5 minutes**. A new version installs itself while the game is not running, and only when its signature and SHA-256 match.<br>This and the opt-in hardware report are the launcher's only network traffic. |
 | **FPS overlay (F3)** | FPS now, the last minute's average (AVG 1M), the whole run's (ALL), the worst half second (LOW), frame time, draws, video memory and RAM. |
 
@@ -188,7 +188,7 @@ the launcher's Controls tab or [docs/GUIDE-30FPS.md](docs/GUIDE-30FPS.md).
 
 ## Before and after
 
-| | Before (cgbj on this laptop) | Now (VI Launcher, Recommended) |
+| | Before (cgbj on this laptop) | Now (Julia's Launcher, Recommended) |
 |---|---|---|
 | Menus and map | 30-33 FPS | **60 FPS** |
 | Open world | 10-15 FPS | **22-26 FPS** |

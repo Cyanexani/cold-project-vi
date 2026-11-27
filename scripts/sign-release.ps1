@@ -12,13 +12,13 @@ if (-not (Test-Path $key)) { throw "No release key at $key (scripts\new-release-
 $work = Join-Path $env:TEMP "vi-release-$Tag"
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $work | Out-Null
-gh release download $Tag -R $repo -D $work -p 'VI-Launcher.exe' -p 'victory.exe' -p 'nvsmooth30-version.dll'
+gh release download $Tag -R $repo -D $work -p 'Julias-Launcher.exe' -p 'victory.exe' -p 'nvsmooth30-version.dll'
 foreach ($f in Get-ChildItem $work -File) {
     gh attestation verify $f.FullName -R $repo | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "$($f.Name): no provenance from $repo's workflow; not signing." }
 }
 # Where each download goes beside the launcher (Updater.Allowed).
-$map = @{ 'VI-Launcher.exe' = 'VI Launcher.exe'; 'victory.exe' = 'victory.exe'; 'nvsmooth30-version.dll' = 'tools/nvsmooth30/version.dll' }
+$map = @{ 'Julias-Launcher.exe' = "Julia's Launcher.exe"; 'victory.exe' = 'victory.exe'; 'nvsmooth30-version.dll' = 'tools/nvsmooth30/version.dll' }
 $files = foreach ($f in Get-ChildItem $work -File) {
     [ordered]@{
         name   = $map[$f.Name]

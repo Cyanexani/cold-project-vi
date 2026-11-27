@@ -1,8 +1,8 @@
-; VI Launcher installer (Inno Setup 6). Built by .github\workflows\release.yml from the files in dist\:
+; Julia's Launcher installer (Inno Setup 6). Built by .github\workflows\release.yml from the files in dist\:
 ;   iscc /DAppVersion=0.2.0 installer\VI.iss
 ; Asks for administrator rights once, installs outside Windows' protected folders (C:\Games\VI by
 ; default, writable by the player so updates install themselves), runs the Windows settings in the
-; background (VI Launcher.exe --admin-setup: power, virtual memory, Defender's ransomware rule for this
+; background (Julia's Launcher.exe --admin-setup: power, virtual memory, Defender's ransomware rule for this
 ; folder, the high-performance graphics card, Smooth Motion), then opens the launcher without
 ; administrator rights, which finds the game and prepares the shaders.
 
@@ -12,7 +12,7 @@
 
 [Setup]
 AppId=VI-Launcher-edupode
-AppName=VI Launcher
+AppName=Julia's Launcher
 AppVersion={#AppVersion}
 AppPublisher=edupode
 AppPublisherURL=https://github.com/edupode/cold-project-vi/tree/edupode
@@ -25,7 +25,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
 OutputBaseFilename=VI-Setup-{#AppVersion}
 SetupIconFile=..\launcher\icon.ico
-UninstallDisplayIcon={app}\VI Launcher.exe
+UninstallDisplayIcon={app}\Julia's Launcher.exe
 LicenseFile=..\LICENSE
 Compression=lzma2
 SolidCompression=yes
@@ -40,7 +40,7 @@ Name: "pt"; MessagesFile: "compiler:Languages\Portuguese.isl"
 Name: "{app}"; Permissions: users-modify
 
 [Files]
-Source: "..\dist\VI Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\Julia's Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\victory.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\launcher-source.zip"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\SHA256SUMS.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -50,13 +50,13 @@ Source: "..\README.md"; DestDir: "{app}"
 Source: "..\README.pt.md"; DestDir: "{app}"
 
 [Icons]
-Name: "{autodesktop}\VI Launcher"; Filename: "{app}\VI Launcher.exe"
-Name: "{autoprograms}\VI Launcher"; Filename: "{app}\VI Launcher.exe"
+Name: "{autodesktop}\Julia's Launcher"; Filename: "{app}\Julia's Launcher.exe"
+Name: "{autoprograms}\Julia's Launcher"; Filename: "{app}\Julia's Launcher.exe"
 
 [Run]
-Filename: "{app}\VI Launcher.exe"; Parameters: "--admin-setup ""{app}"""; StatusMsg: "Setting up Windows for the game (power, virtual memory, graphics card)..."; Flags: waituntilterminated runhidden
-Filename: "{app}\VI Launcher.exe"; Description: "Open VI Launcher"; Flags: postinstall nowait runasoriginaluser
+Filename: "{app}\Julia's Launcher.exe"; Parameters: "--admin-setup ""{app}"""; StatusMsg: "Setting up Windows for the game (power, virtual memory, graphics card)..."; Flags: waituntilterminated runhidden
+Filename: "{app}\Julia's Launcher.exe"; Description: "Open Julia's Launcher"; Flags: postinstall nowait runasoriginaluser
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\tools"
-Type: files; Name: "{app}\VI Launcher.old.exe"
+Type: files; Name: "{app}\Julia's Launcher.old.exe"

@@ -1,4 +1,4 @@
-// VI Launcher: the PC's hardware, its permanent ID, the hardware-only report (opt-in, write-only),
+// Julia's Launcher: the PC's hardware, its permanent ID, the hardware-only report (opt-in, write-only),
 // the engine an AMD card plays with (Belobug's AMD fork), and frame generation for each card.
 using System;
 using System.Collections.Generic;
@@ -175,21 +175,28 @@ namespace VIctoryLauncher
         }
 
         // ---------------------------------------------------------------- frame generation, per card
-        string NvSmoothDll { get { return Path.Combine(root, "tools", "nvsmooth30", "version.dll"); } }
+        string NvSmoothDll { get { return Path.Combine(AppDir, "tools", "nvsmooth30", "version.dll"); } }
 
-        bool FrameGenAvailable { get { return rtxFrameGen || (rtx30 && File.Exists(NvSmoothDll)); } }
+        // Which frame generation this PC gets: NVIDIA Smooth Motion (RTX 40/50), NVSmooth30 (RTX 30,
+        // when the release brought it), else VIctory's own (VICTORY_FRAMEGEN, any card; this
+        // repository's engine only, the AMD engine does not have it yet).
+        bool NvSmoothHere { get { return rtx30 && File.Exists(NvSmoothDll); } }
+        bool OwnFrameGen { get { return !rtxFrameGen && !NvSmoothHere && !UseAmdEngine; } }
+        bool FrameGenAvailable { get { return rtxFrameGen || NvSmoothHere || OwnFrameGen; } }
 
         string FrameGenLine()
         {
             if (rtxFrameGen) return L("NVIDIA Smooth Motion (RTX 40/50, set up for you)", "NVIDIA Smooth Motion (RTX 40/50, configurado por ti)");
-            if (rtx30) return File.Exists(NvSmoothDll) ? L("NVSmooth30 for RTX 30 (experimental)", "NVSmooth30 para RTX 30 (experimental)") : L("RTX 30: NVSmooth30 comes with the next release", "RTX 30: o NVSmooth30 vem na proxima versao");
-            return L("Not for this card yet (FSR 3 frame generation is planned)", "Ainda nao para esta placa (geracao de frames FSR 3 em preparacao)");
+            if (NvSmoothHere) return L("NVSmooth30 for RTX 30 (experimental)", "NVSmooth30 para RTX 30 (experimental)");
+            if (OwnFrameGen) return L("VI frame generation: any card, a frame between each two (experimental)", "Geracao de frames VI: qualquer placa, um frame entre cada dois (experimental)");
+            return L("Not in the AMD engine yet (pick the edupode engine on Hardware & ID to try it)", "Ainda nao no motor AMD (escolhe o motor edupode em Hardware e ID para experimentar)");
         }
 
         string FrameGenChip()
         {
             if (rtxFrameGen) return "Smooth Motion " + (smoothState == "on" ? L("On", "ligado") : L("ready", "pronto"));
-            if (rtx30 && File.Exists(NvSmoothDll)) return "NVSmooth30 " + (smoothBox.Checked ? L("On", "ligado") : L("off", "desligado"));
+            if (NvSmoothHere) return "NVSmooth30 " + (smoothBox.Checked ? L("On", "ligado") : L("off", "desligado"));
+            if (OwnFrameGen) return L("VI frame gen ", "Geracao VI ") + (smoothBox.Checked ? L("On", "ligada") : L("off", "desligada"));
             return L("Frame gen n/a", "Geracao de frames n/d");
         }
 
@@ -408,7 +415,7 @@ namespace VIctoryLauncher
                     var req = (HttpWebRequest)WebRequest.Create(HardwareEndpoint);
                     req.Method = "POST";
                     req.ContentType = "application/json";
-                    req.UserAgent = "VI-Launcher";
+                    req.UserAgent = "Julias-Launcher";
                     req.Timeout = 15000;
                     req.Headers["X-VI-Secret"] = secret;
                     var body = Encoding.UTF8.GetBytes(HardwareJson(h));
@@ -419,6 +426,75 @@ namespace VIctoryLauncher
                 }
                 catch (Exception) { }
             }) { IsBackground = true }.Start();
+        }
+
+        // The question before each game while sharing is off: why it helps, what the list is, what
+        // goes and what never does. "Don't ask again" ends it; Hardware & ID changes it any time.
+        void AskToShare()
+        {
+            if (ReadSetting("share") == "1" || ReadSetting("share_ask") == "never") return;
+            var f = new Form { Text = L("Help the game run on more PCs", "Ajuda o jogo a correr em mais PCs"), ClientSize = new Size(660, 520), BackColor = Theme.Back, ForeColor = Theme.Text,
+                Font = Theme.Ui(9.75f), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, Icon = Icon };
+            f.Controls.Add(new Heading(L("Share your hardware?", "Partilhar o teu hardware?")) { Location = new Point(20, 16), Width = 620 });
+            var text = new Label { Location = new Point(20, 50), Size = new Size(620, 390), ForeColor = Theme.Text, BackColor = Theme.Back };
+            text.Text = string.Join("\r\n", Pt ? new[] {
+                "Podes deixar o Julia's Launcher enviar o hardware do teu PC ao edupode?",
+                "",
+                "PORQUE AJUDA",
+                "   Vemos em que placas graficas, processadores e quantidades de memoria as pessoas jogam de verdade.",
+                "   Isso decide que predefinicoes vem primeiro, que correcoes se fazem a seguir (por exemplo o Ultra baixo",
+                "   para PCs de 16 GB, o suporte AMD) e em que placas se testa a geracao de frames.",
+                "",
+                "A LISTA",
+                "   Cada PC que partilha e uma linha, sem nome. So o edupode ve a lista.",
+                "   Uma pagina publica mostra so as medias (quantos PCs, RAM e VRAM medias, as placas mais comuns),",
+                "   atualizada de 6 em 6 horas: docs/HARDWARE-STATS.md no GitHub.",
+                "",
+                "O QUE E ENVIADO",
+                "   Placa grafica e driver, VRAM, Resizable BAR, processador, RAM, modelo da placa-mae,",
+                "   versao do Windows, tipo de disco, se e portatil, e o teu ID VI. No maximo uma vez por dia.",
+                "",
+                "NUNCA E ENVIADO",
+                "   Logs, definicoes, caminhos de ficheiros, o teu nome, o teu IP.",
+                "",
+                "Podes desligar quando quiseres em Hardware e ID.",
+            } : new[] {
+                "Can Julia's Launcher send your PC's hardware to edupode?",
+                "",
+                "WHY IT HELPS",
+                "   We see which graphics cards, processors and amounts of memory people really play on. That decides",
+                "   which presets come first, which fixes come next (for example Ultra Low for 16 GB PCs, AMD support)",
+                "   and which cards frame generation is tested on.",
+                "",
+                "THE LIST",
+                "   Each PC that shares is one line, with no name. Only edupode sees the list.",
+                "   A public page shows only the averages (how many PCs, average RAM and video memory, the most",
+                "   common cards), updated every 6 hours: docs/HARDWARE-STATS.md on GitHub.",
+                "",
+                "WHAT IS SENT",
+                "   Graphics card and driver, video memory, Resizable BAR, processor, RAM, motherboard model,",
+                "   Windows version, disk type, laptop or not, and your VI ID. At most once a day.",
+                "",
+                "NEVER SENT",
+                "   Logs, settings, file paths, your name, your IP address.",
+                "",
+                "You can turn it off any time on Hardware & ID.",
+            });
+            f.Controls.Add(text);
+            var yes = new Pill { Main = true, Text = L("Yes, share my hardware", "Sim, partilhar o meu hardware"), Location = new Point(20, 456), Size = new Size(250, 42) };
+            var later = new Pill { Text = L("Not now", "Agora nao"), Location = new Point(280, 460), Size = new Size(140, 34) };
+            var never = new Pill { Text = L("Don't ask again", "Nao perguntar mais"), Location = new Point(430, 460), Size = new Size(190, 34) };
+            yes.Click += (s, e) => {
+                // The switch on Hardware & ID does the rest (its handler writes the setting and sends).
+                if (shareBox != null && !shareBox.Checked) shareBox.Checked = true;
+                else { WriteSetting("share", "1"); WriteSetting("share_sent", ""); StartHardwareShare(); }
+                Log(L("Hardware sharing is on. Thank you!", "Partilha de hardware ligada. Obrigado!"));
+                f.Close();
+            };
+            later.Click += (s, e) => f.Close();
+            never.Click += (s, e) => { WriteSetting("share_ask", "never"); f.Close(); };
+            f.Controls.Add(yes); f.Controls.Add(later); f.Controls.Add(never);
+            f.ShowDialog(this);
         }
 
         // ---------------------------------------------------------------- Hardware & ID page

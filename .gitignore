@@ -85,3 +85,5 @@ Thumbs.db
 /dist/
 /server/hardware-worker/node_modules/
 /server/hardware-worker/.wrangler/
+/Julia's Launcher.exe
+/Julia's Launcher.old.exe

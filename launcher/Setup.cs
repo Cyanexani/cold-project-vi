@@ -191,6 +191,14 @@ namespace VIctoryLauncher
                 Fix = () => { BeginInvoke(new Action(ShowRebarGuide)); return false; },
                 Auto = false,
             });
+            steps.Add(new Step {
+                Title = L("Resizable BAR in the NVIDIA driver", "Resizable BAR no driver da NVIDIA"),
+                Why = L("NVIDIA's driver uses Resizable BAR only for the games on its list: this puts victory.exe on it (rBAR Enable, Enable v2, Options in its profile).",
+                        "O driver da NVIDIA so usa o Resizable BAR nos jogos da lista dele: isto poe o victory.exe nessa lista (rBAR Enable, Enable v2, Options no perfil)."),
+                FixText = L("Turn on", "Ligar"),
+                Check = () => !hasNvidia || !rebarBios ? -1 : SmoothMotion.RebarSet() ? 1 : 0,
+                Fix = () => { var err = SmoothMotion.SetRebar(true); if (err != null) Log("rBAR: " + err); else Log(L("Resizable BAR is on in victory.exe's driver profile.", "Resizable BAR ligado no perfil do driver do victory.exe.")); return err == null; },
+            });
         }
 
         // ---------------------------------------------------------------- running steps
@@ -295,7 +303,7 @@ namespace VIctoryLauncher
         }
 
         // A ready-made emulator is here (a release, or the installer): nothing has to be compiled.
-        bool NothingToBuild { get { return !UseAmdEngine && File.Exists(Path.Combine(root, "victory.exe")); } }
+        bool NothingToBuild { get { return !UseAmdEngine && (File.Exists(Path.Combine(root, "victory.exe")) || File.Exists(Path.Combine(AppDir, "victory.exe"))); } }
 
         // Where this repository's source is: beside the launcher (or a folder above it), or the copy
         // the launcher downloaded. A launcher copied on its own to Downloads has none beside it
@@ -338,7 +346,7 @@ namespace VIctoryLauncher
             try
             {
                 System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072;
-                using (var web = new System.Net.WebClient()) { web.Headers["User-Agent"] = "VI-Launcher"; web.DownloadFile(url, zip); }
+                using (var web = new System.Net.WebClient()) { web.Headers["User-Agent"] = "Julias-Launcher"; web.DownloadFile(url, zip); }
                 var tmp = to + ".new";
                 if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
                 System.IO.Compression.ZipFile.ExtractToDirectory(zip, tmp);
@@ -412,7 +420,7 @@ namespace VIctoryLauncher
                     writer.Flush();
                     TellErrors(log, 0);
                     BeginInvoke(new Action(() => MessageBox.Show(this, L("The build failed. The reason is in the Activity box and in ", "A compilacao falhou. O motivo esta na caixa Atividade e em ") + log
-                        + L("\r\n\r\nHelp > Send errors to Discord makes a package with it.", "\r\n\r\nAjuda > Enviar erros no Discord faz um pacote com isto."), "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning)));
+                        + L("\r\n\r\nHelp > Send errors to Discord makes a package with it.", "\r\n\r\nAjuda > Enviar erros no Discord faz um pacote com isto."), "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning)));
                 }
                 return p.ExitCode == 0;
             }
@@ -751,7 +759,7 @@ namespace VIctoryLauncher
         }
     }
 
-    // The installer's one administrator pass (installer\VI.iss runs `VI Launcher.exe --admin-setup
+    // The installer's one administrator pass (installer\VI.iss runs `Julia's Launcher.exe --admin-setup
     // <install folder>`): the Windows settings the Setup page would ask for one by one.
     static class AdminTasks
     {
@@ -785,6 +793,8 @@ namespace VIctoryLauncher
             catch (Exception e) { log.Add("gpu preference: " + e.Message); }
             // Smooth Motion in the driver's profile (RTX 40/50; ignored elsewhere).
             try { var err = SmoothMotion.Set(true); log.Add("smooth motion: " + (err ?? "ok")); } catch (Exception e) { log.Add("smooth motion: " + e.Message); }
+            // Resizable BAR in victory.exe's driver profile (counts only where the BIOS has it on).
+            try { var err = SmoothMotion.SetRebar(true); log.Add("rbar profile: " + (err ?? "ok")); } catch (Exception e) { log.Add("rbar profile: " + e.Message); }
             try { File.WriteAllLines(Path.Combine(Path.GetTempPath(), "vi-admin-setup.txt"), log); } catch (Exception) { }
             return 0;
         }

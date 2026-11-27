@@ -1,6 +1,6 @@
 @echo off
-rem Builds "VI Launcher.exe" (the edupode launcher) in the repository's root with the C# compiler that ships with Windows.
-rem   build-launcher.cmd            -> "VI Launcher.exe" beside the repository
+rem Builds "Julia's Launcher.exe" (the edupode launcher) in the repository's root with the C# compiler that ships with Windows.
+rem   build-launcher.cmd            -> "Julia's Launcher.exe" beside the repository
 rem   build-launcher.cmd <out.exe>  -> that file instead (the release workflow, tests)
 rem /deterministic is not known to this compiler: the same sources give the same program apart
 rem from its time stamp and GUID, which scripts\compare-launcher.ps1 leaves out when it compares.
@@ -12,7 +12,7 @@ if not exist "%CSC%" (
   exit /b 1
 )
 set "OUT=%~1"
-if "%OUT%"=="" set "OUT=%~dp0..\VI Launcher.exe"
+if "%OUT%"=="" set "OUT=%~dp0..\Julia's Launcher.exe"
 "%CSC%" /nologo /target:winexe /optimize+ /win32icon:"%~dp0icon.ico" /out:"%OUT%" ^
   /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.VisualBasic.dll ^
   /reference:System.Core.dll /reference:System.Management.dll /reference:System.Web.Extensions.dll ^

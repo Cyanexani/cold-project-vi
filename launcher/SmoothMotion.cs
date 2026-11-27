@@ -160,6 +160,57 @@ namespace VIctoryLauncher
         // Writes Smooth Motion on (or off) for victory.exe; returns null when done, else what failed.
         public static string Set(bool on)
         {
+            return Write(on, (session, profile) => {
+                int r = SetDword(session, profile, EnableId, on ? 1u : 0u);
+                if (r != 0) return "the setting was refused (" + r + ")";
+                if (on) SetDword(session, profile, ApisId, 1u);
+                return null;
+            });
+        }
+
+        // Resizable BAR in victory.exe's profile, as NVIDIA's own list does for the games it allows
+        // it in (NVIDIA Profile Inspector's names): "rBAR - Enable" 0x000F00BA, "rBAR - Enable v2"
+        // 0x000BFA21 (driver 616.56+; 2 Enabled, 0 Disabled), "rBAR - Options" 0x000F00BB (1, the
+        // value NVIDIA's allowed games carry). Needs Resizable BAR on in the PC's BIOS.
+        const uint RebarEnableId = 0x000F00BA, RebarEnableV2Id = 0x000BFA21, RebarOptionsId = 0x000F00BB;
+
+        public static string SetRebar(bool on)
+        {
+            return Write(on, (session, profile) => {
+                int r = SetDword(session, profile, RebarEnableId, on ? 1u : 0u);
+                if (r != 0) return "rBAR - Enable was refused (" + r + ")";
+                // Older drivers do not know v2; that is not a failure.
+                SetDword(session, profile, RebarEnableV2Id, on ? 2u : 0u);
+                if (on) SetDword(session, profile, RebarOptionsId, 1u);
+                return null;
+            });
+        }
+
+        public static bool RebarSet()
+        {
+            try
+            {
+                if (!Load()) return false;
+                IntPtr session;
+                if (Fn<OutHandle>(0x0694D52E)(out session) != 0) return false;
+                try
+                {
+                    Fn<OneHandle>(0x375DBD6B)(session);
+                    IntPtr profile;
+                    if (!FindOurProfile(session, out profile)) return false;
+                    var setting = Buffer(SettingSize, 1);
+                    try { return GetSettingAny(session, profile, RebarEnableId, setting) == 0 && Marshal.ReadInt32(setting, 4 + Str + 20 + 4100) == 1; }
+                    finally { Marshal.FreeHGlobal(setting); }
+                }
+                finally { Fn<OneHandle>(0xDAD9CFF8)(session); }
+            }
+            catch (Exception) { return false; }
+        }
+
+        // Opens the driver's settings, finds (or with `create`, makes) victory.exe's profile, lets
+        // `write` change it and saves; null when done, else what failed.
+        static string Write(bool create, Func<IntPtr, IntPtr, string> write)
+        {
             try
             {
                 if (!Load()) return "no NVIDIA driver (nvapi64.dll)";
@@ -172,7 +223,7 @@ namespace VIctoryLauncher
                     IntPtr profile;
                     if (!FindOurProfile(session, out profile))
                     {
-                        if (!on) return null;
+                        if (!create) return null;
                         var info = Buffer(ProfileSize, 1);
                         PutString(info + 4, ProfileName);
                         try
@@ -191,9 +242,8 @@ namespace VIctoryLauncher
                         }
                         finally { Marshal.FreeHGlobal(app); }
                     }
-                    r = SetDword(session, profile, EnableId, on ? 1u : 0u);
-                    if (r != 0) return "the setting was refused (" + r + ")";
-                    if (on) SetDword(session, profile, ApisId, 1u);
+                    var refused = write(session, profile);
+                    if (refused != null) return refused;
                     r = Fn<OneHandle>(0xFCBC7E14)(session);
                     if (r != 0) return "the driver did not save (" + r + "): run the launcher as administrator once";
                     return null;

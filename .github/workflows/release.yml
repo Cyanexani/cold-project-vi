@@ -30,7 +30,7 @@ jobs:
         run: cargo build --locked --profile diag -p victory --features diagnostics
       - name: Launcher
         shell: cmd
-        run: launcher\build-launcher.cmd "%CD%\dist\VI Launcher.exe"
+        run: launcher\build-launcher.cmd "%CD%\dist\Julia's Launcher.exe"
       - name: NVSmooth30 (RTX 30, experimental; MIT, github.com/ItsAdeline/NVSmooth30)
         shell: pwsh
         continue-on-error: true
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/VI Launcher.exe
+            dist/Julia's Launcher.exe
             dist/victory.exe
             dist/VI-Setup-*.exe
       - name: Draft release
@@ -67,6 +67,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Copy-Item "dist/VI Launcher.exe" dist/VI-Launcher.exe
-          $files = Get-ChildItem dist -File | Where-Object { $_.Name -ne 'VI Launcher.exe' } | ForEach-Object { $_.FullName }
-          gh release create "${{ github.ref_name }}" --draft --target edupode --title "VI Launcher ${{ github.ref_name }}" --notes-file docs/RELEASE-NOTES.md $files
+          Copy-Item "dist/Julia's Launcher.exe" dist/Julias-Launcher.exe
+          $files = Get-ChildItem dist -File | Where-Object { $_.Name -ne "Julia's Launcher.exe" } | ForEach-Object { $_.FullName }
+          gh release create "${{ github.ref_name }}" --draft --target edupode --title "Julia's Launcher ${{ github.ref_name }}" --notes-file docs/RELEASE-NOTES.md $files

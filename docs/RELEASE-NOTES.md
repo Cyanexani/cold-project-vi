@@ -1,4 +1,4 @@
-VI Launcher 0.2.0: the big revamp.
+Julia's Launcher 0.2.0: the big revamp.
 
 - New look (Cold Project style). New pages: Shaders (live), Hardware & ID, Updates, Advanced Tweaks.
 - Installer: one administrator prompt, then Windows is set up in the background. Nothing to compile.

@@ -1,4 +1,4 @@
-// VI Launcher: the Shaders page. What the shader cache holds, read again every second while the
+// Julia's Launcher: the Shaders page. What the shader cache holds, read again every second while the
 // page is open (translated shaders, pipelines made, the ones that failed, disk room, the last errors),
 // and the ways to fix it: prepare, repair, rebuild.
 using System;
@@ -157,14 +157,14 @@ namespace VIctoryLauncher
         // the whole cache goes first.
         void RepairShaders(bool all)
         {
-            if (State() != GameState.None) { MessageBox.Show(this, L("Close the game first.", "Fecha o jogo primeiro."), "VI Launcher"); return; }
+            if (State() != GameState.None) { MessageBox.Show(this, L("Close the game first.", "Fecha o jogo primeiro."), "Julia's Launcher"); return; }
             var cache = ActiveCacheDir;
             try
             {
                 if (all)
                 {
                     if (MessageBox.Show(this, L("Delete the shader cache and prepare it again (about 5 minutes)?", "Apagar a cache de shaders e prepara-la de novo (cerca de 5 minutos)?"),
-                        "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                        "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                     foreach (var d in new[] { "shaders", "pipelines" })
                     {
                         var p = Path.Combine(cache, d);

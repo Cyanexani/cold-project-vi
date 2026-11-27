@@ -1,4 +1,4 @@
-// VI Launcher: the game session (what keeps PLAY on or off, a stuck session closed) and the
+// Julia's Launcher: the game session (what keeps PLAY on or off, a stuck session closed) and the
 // choice of the game's executable when a dump has more than one.
 using System;
 using System.Collections.Generic;
@@ -148,6 +148,83 @@ namespace VIctoryLauncher
             if (!gpuPrefOk) m.Add(L("the dedicated graphics card for VIctory", "a placa grafica dedicada para o VIctory"));
             if (!shadersOk) m.Add(L("prepared shaders", "shaders preparados"));
             return m;
+        }
+
+        // ---------------------------------------------------------------- memory, and a game that cannot start
+        // What Windows can still promise (RAM plus virtual memory not yet committed), in GB.
+        static double CommitFreeGb()
+        {
+            try
+            {
+                using (var s = new System.Management.ManagementObjectSearcher("SELECT FreeVirtualMemory FROM Win32_OperatingSystem"))
+                    foreach (System.Management.ManagementObject o in s.Get())
+                        return Convert.ToDouble(o["FreeVirtualMemory"]) / (1024.0 * 1024.0);
+            }
+            catch (Exception) { }
+            return -1;
+        }
+
+        // The game reserves about 24 GB as it starts: with less to promise, D3D12 refuses the device
+        // ("not enough memory resources", 0x8007000E) and the window stays white.
+        const double GameCommitGb = 24;
+
+        bool EnoughMemory()
+        {
+            var free = CommitFreeGb();
+            if (free < 0 || free >= GameCommitGb) return true;
+            var ask = string.Format(L("Windows can only promise {0:0.0} GB more memory (RAM plus virtual memory); the game needs about {1:0} GB as it starts. With less, its window stays white.\r\n\r\n" +
+                                      "•  Close apps (Performance page: what holds memory).\r\n•  Let Windows manage virtual memory (Setup), then restart the PC.\r\n\r\nPlay anyway?",
+                                      "O Windows so pode prometer mais {0:0.0} GB de memoria (RAM mais memoria virtual); o jogo precisa de cerca de {1:0} GB ao arrancar. Com menos, a janela fica branca.\r\n\r\n" +
+                                      "•  Fecha apps (pagina Desempenho: o que ocupa memoria).\r\n•  Deixa o Windows gerir a memoria virtual (Preparar) e reinicia o PC.\r\n\r\nJogar na mesma?"), free, GameCommitGb);
+            return MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        }
+
+        // Reads the session's log for the first minute: when the game cannot start (no D3D12 device,
+        // a broken game file, a crash) the player is told why instead of looking at a white window.
+        void WatchStart(string log, Process game)
+        {
+            new Thread(() => {
+                var until = DateTime.Now.AddSeconds(90);
+                while (DateTime.Now < until && !game.HasExited)
+                {
+                    Thread.Sleep(2000);
+                    string text;
+                    try
+                    {
+                        using (var f = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            if (f.Length > (8L << 20)) f.Seek(-(8L << 20), SeekOrigin.End);
+                            text = new StreamReader(f).ReadToEnd();
+                        }
+                    }
+                    catch (Exception) { continue; }
+                    if (text.Contains("presenting to a window")) return;
+                    string why = null;
+                    if (text.Contains("no host D3D12 device") && text.Contains("8007000E"))
+                        why = L("Windows ran out of memory to start the graphics (0x8007000E), so the window stays white.\r\n\r\nClose other apps, let Windows manage virtual memory (Setup) and restart the PC, then play again.",
+                                "O Windows ficou sem memoria para iniciar os graficos (0x8007000E), por isso a janela fica branca.\r\n\r\nFecha outras apps, deixa o Windows gerir a memoria virtual (Preparar) e reinicia o PC, depois joga de novo.");
+                    else if (text.Contains("no host D3D12 device"))
+                        why = L("The graphics card could not start D3D12, so the window stays white. Update the graphics driver and restart the PC.",
+                                "A placa grafica nao conseguiu iniciar o D3D12, por isso a janela fica branca. Atualiza o driver grafico e reinicia o PC.");
+                    else if (text.Contains("malformed image"))
+                        why = L("The game's files are damaged or incomplete (malformed image). Download or extract the dump again.",
+                                "Os ficheiros do jogo estao estragados ou incompletos (malformed image). Volta a descarregar ou extrair o dump.");
+                    if (why == null) continue;
+                    try
+                    {
+                        BeginInvoke(new Action(() => {
+                            Log(why.Replace("\r\n", " "));
+                            if (MessageBox.Show(this, why + L("\r\n\r\nClose the game now?", "\r\n\r\nFechar o jogo agora?"), "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
+                            {
+                                CloseGames();
+                                Refresh2();
+                            }
+                        }));
+                    }
+                    catch (Exception) { }
+                    return;
+                }
+            }) { IsBackground = true }.Start();
         }
 
         // ---------------------------------------------------------------- the game's executable

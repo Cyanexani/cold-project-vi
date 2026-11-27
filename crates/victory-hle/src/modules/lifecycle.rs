@@ -16,7 +16,7 @@ use std::time::Duration;
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
 use windows_sys::Win32::UI::WindowsAndMessaging::{self as wm, HMENU};
-use windows_sys::core::{PCSTR, PCWSTR, w};
+use windows_sys::core::{PCSTR, PCWSTR, s, w};
 
 use crate::{HleModule, hle_export};
 
@@ -111,6 +111,12 @@ pub extern "system" fn CreateWindowExW(
     param: *const c_void,
 ) -> HWND {
     let (ex_style, style, x, y, width, height) = place(parent, ex_style, style, x, y, width, height);
+    // SAFETY: the title's own name: NULL, a resource number, or a NUL-terminated text.
+    let name = if titles_name_w(parent, name) {
+        w!("Revamped Americas")
+    } else {
+        name
+    };
     // SAFETY: the title's own arguments, forwarded (the size fitted).
     let hwnd = unsafe {
         wm::CreateWindowExW(
@@ -119,6 +125,34 @@ pub extern "system" fn CreateWindowExW(
     };
     hook(hwnd);
     hwnd
+}
+
+/// The name the title gives its window, shown as "Revamped Americas" (this build's own).
+const TITLE_NAME: &str = "Americas";
+
+/// Whether a window made with this parent and name is the title's own top-level window
+/// (the name a NUL-terminated text, not a resource number).
+fn titles_name_w(parent: HWND, name: PCWSTR) -> bool {
+    if !parent.is_null() || (name as usize) <= 0xFFFF {
+        return false;
+    }
+    let mut n = 0;
+    // SAFETY: the title's NUL-terminated name; read up to its end (at most 64 units).
+    let text = unsafe {
+        while n < 64 && *name.add(n) != 0 {
+            n += 1;
+        }
+        std::slice::from_raw_parts(name, n)
+    };
+    String::from_utf16_lossy(text) == TITLE_NAME
+}
+
+/// [`titles_name_w`] for an 8-bit name.
+fn titles_name_a(parent: HWND, name: PCSTR) -> bool {
+    // SAFETY: as above, a NUL-terminated text.
+    parent.is_null()
+        && (name as usize) > 0xFFFF
+        && unsafe { std::ffi::CStr::from_ptr(name.cast()) }.to_bytes() == TITLE_NAME.as_bytes()
 }
 
 /// See [`CreateWindowExW`].
@@ -137,6 +171,12 @@ pub extern "system" fn CreateWindowExA(
     param: *const c_void,
 ) -> HWND {
     let (ex_style, style, x, y, width, height) = place(parent, ex_style, style, x, y, width, height);
+    // SAFETY: as in CreateWindowExW.
+    let name = if titles_name_a(parent, name) {
+        s!("Revamped Americas")
+    } else {
+        name
+    };
     // SAFETY: the title's own arguments, forwarded (the size fitted).
     let hwnd = unsafe {
         wm::CreateWindowExA(

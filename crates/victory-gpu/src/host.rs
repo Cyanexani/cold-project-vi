@@ -8640,6 +8640,9 @@ fn swap_format(format: DXGI_FORMAT) -> Option<DXGI_FORMAT> {
 
 const BUFFERS: u32 = 2;
 
+/// Frame generation could not be made once ([`crate::framegen`]): not tried again.
+static FRAMEGEN_FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 struct Presenter {
     swap_chain: IDXGISwapChain3,
     width: u32,
@@ -8656,6 +8659,8 @@ struct Presenter {
     hwnd: HWND,
     meter: Meter,
     composer: Option<crate::compose::Composer>,
+    /// `VICTORY_FRAMEGEN=1`: frames made between the title's ([`crate::framegen`]).
+    framegen: Option<crate::framegen::FrameGen>,
     #[cfg(feature = "diagnostics")]
     panel: panel::Panel,
 }
@@ -9051,6 +9056,8 @@ impl Host {
                     if p.format != format {
                         p.composer = None;
                     }
+                    // Made again for the new buffers when the next frame comes.
+                    p.framegen = None;
                     (p.width, p.height, p.format, p.out) = (width, height, format, out);
                     tracing::info!(
                         width,
@@ -9273,6 +9280,32 @@ impl Host {
             p.panel.draw(self, copy, &back, (width, height), format);
             #[cfg(not(feature = "diagnostics"))]
             let _ = frame;
+            // `VICTORY_FRAMEGEN=1`: the frame kept, and the one halfway to it from the last drawn
+            // over `back` (in COPY_DEST before and after); the real one is shown later by the pacer.
+            let generated = if crate::framegen::on() && !read_now {
+                if p.framegen.as_ref().is_some_and(|g| !g.fits(p.format, p.out)) {
+                    p.framegen = None;
+                }
+                if p.framegen.is_none() && !FRAMEGEN_FAILED.load(Ordering::Relaxed) {
+                    match crate::framegen::FrameGen::new(self, p.format, p.out) {
+                        Ok(g) => p.framegen = Some(g),
+                        Err(e) => {
+                            FRAMEGEN_FAILED.store(true, Ordering::Relaxed);
+                            tracing::warn!(error = %e, "no frame generation");
+                        }
+                    }
+                }
+                match p.framegen.as_mut().map(|g| g.record(self, slot.map_or(0, |i| i + 1), list, &back)) {
+                    Some(Ok(made)) => made,
+                    Some(Err(e)) => {
+                        tracing::warn!(error = %e, "a frame was not generated");
+                        false
+                    }
+                    None => false,
+                }
+            } else {
+                false
+            };
             if composed {
                 list.ResourceBarrier(&[transition(
                     &back,
@@ -9317,6 +9350,9 @@ impl Host {
             crate::replay::record::present(texture, state);
             let mut showing = crate::timeline::span("the host's Present");
             let _ = p.swap_chain.Present(0, DXGI_PRESENT(0));
+            if let Some(g) = p.framegen.as_mut() {
+                g.after_present(frame, generated);
+            }
             showing.next("the frame meter");
             #[cfg(feature = "diagnostics")]
             p.panel.frame(p.meter.line_due());
@@ -9326,6 +9362,50 @@ impl Host {
             return Some(probe.is_some_and(|b| crate::capture::black(&b)));
             #[cfg(not(feature = "diagnostics"))]
             Some(false)
+        }
+    }
+
+    /// The pacer's turn ([`crate::framegen`]): the real frame `number`, held while the one made
+    /// before it was shown, presented now; nothing if a newer frame came meanwhile.
+    pub(crate) fn show_held(&self, number: u64) {
+        let mut presenter = self.presenter.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(p) = presenter.as_mut() else {
+            return;
+        };
+        let Some(g) = p.framegen.as_mut() else {
+            return;
+        };
+        if g.held != number {
+            return;
+        }
+        if g.held_list.is_none() {
+            match self.new_list() {
+                Ok(list) => {
+                    list.close();
+                    g.held_list = Some(list);
+                }
+                Err(_) => return,
+            }
+        }
+        // SAFETY: our swap chain and list (its last run was waited for); the frame is ours.
+        unsafe {
+            let index = p.swap_chain.GetCurrentBackBufferIndex();
+            let Ok(back) = p.swap_chain.GetBuffer::<ID3D12Resource>(index) else {
+                return;
+            };
+            let Some(list) = g.held_list.as_ref() else {
+                return;
+            };
+            list.reset();
+            g.record_held(&list.list, &back);
+            list.close();
+            self.execute_sync_internal(list);
+            let _ = p.swap_chain.Present(0, DXGI_PRESENT(0));
+        }
+        g.held = 0;
+        let shown = crate::framegen::MADE[1].fetch_add(1, Ordering::Relaxed) + 1;
+        if shown % 600 == 0 {
+            tracing::info!(made = crate::framegen::MADE[0].load(Ordering::Relaxed), shown, "frame generation: frames made, real frames shown after them");
         }
     }
 
@@ -9376,6 +9456,7 @@ impl Host {
                 hwnd,
                 meter: Meter::new(),
                 composer: None,
+                framegen: None,
                 #[cfg(feature = "diagnostics")]
                 panel: panel::Panel::new(),
             })

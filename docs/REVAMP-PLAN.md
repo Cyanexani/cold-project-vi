@@ -1,4 +1,4 @@
-# VI Launcher: plano do grande revamp
+# Julia's Launcher: plano do grande revamp
 
 ## Estado (27/11/2026, launcher 0.2.0)
 
@@ -9,12 +9,13 @@
 | 2. Instalador | **Feito no código** (`installer/VI.iss` + `--admin-setup`). Ainda não foi compilado: o Inno Setup não está neste PC; o CI compila-o. |
 | 3. Saúde dos shaders | **Feito** (página Shaders ao vivo, Reparar, Refazer tudo). |
 | 4. Ultra baixo + Personalizado | **Feito** (códigos `VI1-` para copiar e colar). **Falta:** medir o Ultra baixo num PC fraco. |
-| 5. Resizable BAR | **Feito.** `victory gpu` vê o que o D3D12 dá ao jogo; o guia é por marca de placa-mãe e inclui o vBIOS das RTX 30 e o "não o consigo ligar". **Falta:** as flags rBAR no perfil do driver (IDs por confirmar). |
-| 6. Base de dados de hardware | **Feito no código** (`server/hardware-worker`, só escrita). **Falta:** criar a conta Cloudflare, publicar e pôr o URL em `HardwareEndpoint`. Até lá não se envia nada. |
+| 5. Resizable BAR | **Feito.** `victory gpu` vê o que o D3D12 dá ao jogo; o guia é por marca de placa-mãe e inclui o vBIOS das RTX 30 e o "não o consigo ligar". As flags rBAR vão para o perfil do driver: 0x000F00BA, 0x000BFA21 e 0x000F00BB, confirmados no código do NVIDIA Profile Inspector. |
+| 6. Base de dados de hardware | **Feito no código** e com 15 testes ao Worker:<br>- o Worker só recebe dados;<br>- `/v1/stats` só dá médias, com token;<br>- `hardware-stats.yml` publica as médias em `docs/HARDWARE-STATS.md`;<br>- o popup pede autorização antes de cada jogo.<br>**Falta:** conta Cloudflare, publicar o Worker, `HardwareEndpoint` e os segredos `VI_STATS_URL` / `VI_STATS_TOKEN`. |
 | 7. Erros para o Discord | **Feito.** |
-| 8. Geração de frames | **Feito:** NVSmooth30 para RTX 30, ligado no launcher e compilado no CI. **Falta:** FSR 3 FG para GTX 10/RTX 20/AMD (trabalho em Rust). |
+| 8. Geração de frames | **Feito:**<br>- NVSmooth30 para RTX 30;<br>- **geração de frames VI** no VIctory (`framegen.rs`, `VICTORY_FRAMEGEN=1`) para qualquer placa: block matching + frame intermédio + thread que dá o ritmo. Experimental e desligada por defeito.<br>**Falta testar no jogo:** os dois testes falharam antes do 1.º frame, porque a memória do PC estava a 50/65 GB de commit. O launcher agora avisa disto. |
 | 9. Interface | **Feito** (estilo Cold Project). |
-| AMD | **Feito:** deteção automática, motor do Belobug (commit `4eb6cfd`) e crédito. **Falta:** portar as melhorias deste ramo para o código do Belobug. |
+| AMD | **Feito:** deteção automática, motor do Belobug (commit `4eb6cfd`) e crédito. **Não feito:** portar as melhorias deste ramo para o código do Belobug. É outro código (839 commits à parte) e sem uma placa AMD para testar o risco de o estragar é grande. |
+| Extra | Janela "Revamped Americas"; aviso de memória insuficiente antes de jogar; deteção da janela branca (0x8007000E); `xtask policy` aceita o código do launcher e do Worker. |
 
 Estado de partida: `ba23f29` (ramo `edupode`). O launcher é um único exe em C# (.NET Framework 4,
 `launcher\*.cs`, compilado pelo `csc` do Windows). Hoje cada pessoa compila o VIctory no próprio PC
@@ -55,10 +56,10 @@ Estado de partida: `ba23f29` (ramo `edupode`). O launcher é um único exe em C#
 ## Fase 1: distribuição sem compilar no PC de ninguém + auto-update
 
 **1.1 Releases compiladas no GitHub Actions** (`.github/workflows/release.yml`, numa tag `v*` do ramo `edupode`)
-- Compila o `victory.exe` (perfil de release) e o `VI Launcher.exe` (com `csc /deterministic`).
+- Compila o `victory.exe` (perfil de release) e o `Julia's Launcher.exe` (com `csc /deterministic`).
 - Junta o instalador, o código-fonte do launcher (`launcher-source.zip`) e um `SHA256SUMS`.
 - Gera uma **atestação de origem** (`actions/attest-build-provenance`). Com
-  `gh attestation verify "VI Launcher.exe" -R edupode/cold-project-vi` qualquer pessoa prova que o
+  `gh attestation verify "Julia's Launcher.exe" -R edupode/cold-project-vi` qualquer pessoa prova que o
   exe saiu daquele código.
 - Põe o link do VirusTotal de cada exe nas notas da release.
 - Resultado: **acabam o Rust, o VS Build Tools e os 2-6 GB de download**. "Compilar a partir do

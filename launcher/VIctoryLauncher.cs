@@ -1,6 +1,6 @@
-// VI Launcher (edupode): one window to set up and play the edupode build of VIctory.
+// Julia's Launcher (edupode): one window to set up and play the edupode build of VIctory.
 // Built with the C# compiler that ships with Windows (.NET Framework 4.x):
-//   launcher\build-launcher.cmd   ->   "VI Launcher.exe" in the repository's root.
+//   launcher\build-launcher.cmd   ->   "Julia's Launcher.exe" in the repository's root.
 // No game files are included or downloaded; the player points it at their own dump.
 // English by default; the button in the side bar switches to Portuguese (saved in launcher.ini).
 using System;
@@ -30,7 +30,7 @@ namespace VIctoryLauncher
             };
             Application.ThreadException += (s, e) => {
                 try { File.AppendAllText(ErrorFile, DateTime.Now + "  " + e.Exception + Environment.NewLine); } catch (Exception) { }
-                MessageBox.Show("VI Launcher: " + e.Exception.Message + "\r\n\r\n(Help > Send errors to Discord)", "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Julia's Launcher: " + e.Exception.Message + "\r\n\r\n(Help > Send errors to Discord)", "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
             // The installer's one administrator step (installer\VI.iss): Windows settings, then out.
             if (args.Contains("--admin-setup")) return AdminTasks.Run(args);
@@ -175,7 +175,7 @@ namespace VIctoryLauncher
                     null, true, false) { Custom = true },
             };
 
-            Text = "VI Launcher";
+            Text = "Julia's Launcher";
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
             ClientSize = new Size(1200, 900);
             MinimumSize = new Size(1080, 720);
@@ -359,7 +359,7 @@ namespace VIctoryLauncher
             closeButton = new Pill { Text = L("Close game", "Fechar o jogo"), Size = new Size(158, 48), Visible = false };
             closeButton.Click += (s, e) => {
                 if (State() == GameState.Running && MessageBox.Show(this, L("Close the game now? What was not saved is lost.", "Fechar o jogo agora? O que nao foi guardado perde-se."),
-                    "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                    "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 CloseGames();
                 Refresh2();
             };
@@ -638,7 +638,7 @@ namespace VIctoryLauncher
             "dwm", "csrss", "explorer", "System", "Idle", "svchost", "winlogon", "services", "lsass", "smss", "wininit",
             "fontdrvhost", "sihost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "TextInputHost",
             "ctfmon", "RuntimeBroker", "audiodg", "Memory Compression", "Registry", "victory", "victory-ferramenta",
-            "edu-launcher", "Edu's Remake", "VI Launcher", "MsMpEng", "NVDisplay.Container", "nvcontainer", "claude", "msedgewebview2", "conhost",
+            "edu-launcher", "Edu's Remake", "Julia's Launcher", "MsMpEng", "NVDisplay.Container", "nvcontainer", "claude", "msedgewebview2", "conhost",
             "powershell", "pwsh", "cmd", "WindowsTerminal", "OpenConsole", "ApplicationFrameHost", "LockApp",
             "SecurityHealthSystray", "Taskmgr", "PredatorSense", "Secure System", "LsaIso", "spoolsv", "dllhost",
         };
@@ -750,7 +750,7 @@ namespace VIctoryLauncher
             var names = vramList.CheckedItems.Cast<ListViewItem>().Select(i => i.Tag as MemoryUser).Where(u => u != null && !u.Protected).Select(u => u.Name).ToList();
             if (names.Count == 0) { MessageBox.Show(this, L("Check the apps to close first.", "Marca primeiro as apps a fechar.")); return; }
             var ask = L("Close these apps? Unsaved work in them is lost.\r\n\r\n", "Fechar estas apps? O que nao estiver guardado nelas perde-se.\r\n\r\n") + string.Join("\r\n", names);
-            if (MessageBox.Show(this, ask, "VI Launcher", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            if (MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
             foreach (var n in names)
                 foreach (var p in Process.GetProcessesByName(n))
                 {
@@ -786,7 +786,7 @@ namespace VIctoryLauncher
                     if (err != null) Log("Smooth Motion: " + err);
                     else Log(on ? L("Smooth Motion is on for victory.exe (driver profile).", "Smooth Motion ligado para o victory.exe (perfil do driver).")
                                 : L("Smooth Motion is off for victory.exe.", "Smooth Motion desligado para o victory.exe."));
-                    if (loud && err != null) MessageBox.Show(this, "Smooth Motion: " + err, "VI Launcher");
+                    if (loud && err != null) MessageBox.Show(this, "Smooth Motion: " + err, "Julia's Launcher");
                 }));
             }) { IsBackground = true }.Start();
         }
@@ -871,7 +871,7 @@ namespace VIctoryLauncher
             page.Controls.Add(logs);
             y += 52;
             var text = new TextBox { Location = new Point(X, y), Size = new Size(W, 1180), Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.None, ForeColor = Theme.Text, BackColor = Theme.Back, Font = Theme.Ui(10f), ScrollBars = ScrollBars.None, TabStop = false };
-            text.Text = string.Join("\r\n", FunctionList().Concat(new[] { "", L("ABOUT", "SOBRE"), L("VI Launcher is edupode's remake, built on the work of:", "O VI Launcher e o remake do edupode, feito com o trabalho de:") }).Concat(Credits()).ToArray());
+            text.Text = string.Join("\r\n", FunctionList().Concat(new[] { "", L("ABOUT", "SOBRE"), L("Julia's Launcher is edupode's remake, built on the work of:", "O Julia's Launcher e o remake do edupode, feito com o trabalho de:") }).Concat(Credits()).ToArray());
             page.Controls.Add(text);
             page.Controls.Add(new Label { Location = new Point(X, y + 1190), Size = new Size(10, 10), BackColor = Theme.Back });
             return page;
@@ -922,7 +922,8 @@ namespace VIctoryLauncher
                 "      Nada e enviado sozinho: es tu que envias.",
                 "",
                 "PLACAS",
-                "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). RTX 20, GTX 10 e AMD: em preparacao (FSR 3).",
+                "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). Outras placas (GTX 10, RTX 20, AMD, Intel): geracao de frames VI",
+                "      (experimental, desligada por defeito): um frame entre cada dois do jogo, feito so com as imagens, com meio frame de atraso.",
                 "   •  AMD: o launcher deteta a placa e usa o motor AMD do Belobug (VIctory-Belobug-AMD).",
                 "",
                 "TECLAS NO JOGO",
@@ -970,7 +971,8 @@ namespace VIctoryLauncher
                 "      Nothing is sent on its own: you send it.",
                 "",
                 "GRAPHICS CARDS",
-                "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). RTX 20, GTX 10 and AMD: in the works (FSR 3).",
+                "   •  NVIDIA RTX 40/50: Smooth Motion. RTX 30: NVSmooth30 (experimental). Other cards (GTX 10, RTX 20, AMD, Intel): VI frame generation",
+                "      (experimental, off by default): a frame between each two of the game's, made from the pictures alone, half a frame later.",
                 "   •  AMD: the launcher detects the card and uses Belobug's AMD engine (VIctory-Belobug-AMD).",
                 "",
                 "KEYS IN THE GAME",
@@ -1023,7 +1025,22 @@ namespace VIctoryLauncher
                 if (src != null) list.Add(Path.Combine(src, "target", "diag", "victory.exe"));
                 list.Add(Path.Combine(root, "target", "diag", "victory.exe"));
                 list.Add(Path.Combine(root, "victory.exe"));
-                return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                list.Add(Path.Combine(AppDir, "victory.exe"));
+                // The newest first: a fresh build or a fresh update, whichever came last.
+                return list.Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(p => File.Exists(p) ? File.GetLastWriteTimeUtc(p) : DateTime.MinValue).ToList();
+            }
+        }
+
+        // Where updates put the emulator and tools: beside the launcher when it is installed (the
+        // installer's folder holds victory.exe), else %LOCALAPPDATA%\VIctory\app, so a launcher on the
+        // Desktop or in Downloads never fills that folder.
+        string AppDir
+        {
+            get
+            {
+                if (File.Exists(Path.Combine(root, "victory.exe")) || File.Exists(Path.Combine(root, "unins000.exe"))) return root;
+                return Path.Combine(Path.GetDirectoryName(dataRoot), "app");
             }
         }
 
@@ -1198,6 +1215,8 @@ namespace VIctoryLauncher
             DetectCards();
             rebar = rebarBios;
             if (!FrameGenAvailable) smoothBox.Checked = false;
+            // VIctory's own frame generation is experimental: off until the player turns it on.
+            else if (OwnFrameGen && ReadSetting("smooth") == null) smoothBox.Checked = false;
             if (modeIndex < 0)
                 SelectMode((ramGb > 0 && ramGb <= 16.5) || (vramGb > 0 && vramGb <= 6.5) ? ModeUltraLow
                     : (vramGb > 0 && vramGb < 10) || (ramGb > 0 && ramGb < 24) ? 2 : 0);
@@ -1235,7 +1254,7 @@ namespace VIctoryLauncher
             set("VICTORY_GAME_DIR", gameBox.Text.Trim());
             set("VICTORY_CACHE_DIR", cacheDir);
             set("VICTORY_DATA_DIR", dataDir);
-            set("VICTORY_LOG", "warn,victory_gpu::host=info,victory_gpu::copystat=info");
+            set("VICTORY_LOG", "warn,victory_gpu::host=info,victory_gpu::copystat=info,victory_gpu::framegen=info");
             // The cgbj base (Play-VIctory.cmd pareto-residency) for a 12 GB card.
             set("VICTORY_DISPLAY_MODE", "1920x1080");
             set("VICTORY_CARD_BUFFERS_MB", "1024");
@@ -1322,6 +1341,8 @@ namespace VIctoryLauncher
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
             if (fps60Box.Checked && !m.UltraLow) set("VICTORY_FPS_MAX", "60");
+            // VIctory's own frame generation, for cards without Smooth Motion or NVSmooth30.
+            if (smoothBox.Checked && OwnFrameGen) set("VICTORY_FRAMEGEN", "1");
             // Advanced Tweaks: the player's values over the preset they start from (Custom.cs).
             if (m.Custom) ApplyCustom(e);
             set("VICTORY_VRAM_RESERVE", reserveBox.Checked ? "max" : "0");
@@ -1371,7 +1392,7 @@ namespace VIctoryLauncher
             if (state == GameState.Running)
             {
                 if (MessageBox.Show(this, L("VIctory is already running. Close it and start again?", "O VIctory ja esta a correr. Fechar e arrancar de novo?"),
-                    "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                    "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 CloseGames();
             }
             else if (state == GameState.Stuck)
@@ -1387,7 +1408,7 @@ namespace VIctoryLauncher
             // instead of VIctory's "malformed image".
             if (exeProblem != null)
             {
-                MessageBox.Show(this, exeProblem, "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, exeProblem, "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             // What is missing (virtual memory, power, Resizable BAR...): asked once per launcher session.
@@ -1397,9 +1418,13 @@ namespace VIctoryLauncher
                 var ask = L("The game will run worse (or close) without these:\r\n\r\n", "O jogo vai correr pior (ou fechar) sem isto:\r\n\r\n")
                     + string.Join("\r\n", missing.Select(x => "  •  " + x).ToArray())
                     + L("\r\n\r\nYes: play anyway.   No: open Setup to fix them.", "\r\n\r\nSim: jogar na mesma.   Nao: abrir o Preparar para corrigir.");
-                if (MessageBox.Show(this, ask, "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { Show(PageSetup); return; }
+                if (MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { Show(PageSetup); return; }
                 warnedThisSession = true;
             }
+            // Too little memory to promise: the window would stay white (Session.cs).
+            if (!EnoughMemory()) { Show(PagePerf); return; }
+            // Asked on every PLAY until the player shares or says not to ask again (Hardware.cs).
+            AskToShare();
             long cardUsed;
             GpuUsers(out cardUsed);
             if (cardUsed > (2L << 30))
@@ -1417,6 +1442,7 @@ namespace VIctoryLauncher
                     if (warmFirst) WarmWithBar(log);
                     var p = Start("run \"" + game + "\" --console series-s --execute", log);
                     gameProc = p; gameHadWindow = false; windowGone = null;
+                    WatchStart(log, p);
                     // From here the game's own state keeps PLAY off (RUNNING), not the launcher's task,
                     // so a game that ends badly never leaves PLAY waiting.
                     Busy(false);

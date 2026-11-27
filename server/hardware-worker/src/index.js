@@ -37,9 +37,69 @@ function valid(r) {
   return r.schema === 1 && ID.test(r.id);
 }
 
+// Same length and every byte compared: how long it takes says nothing about the token.
+function sameToken(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length || a.length < 32) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+// The averages, never a row: GET /v1/stats with `Authorization: Bearer <STATS_TOKEN>` (a secret only
+// the GitHub workflow that publishes them holds, .github/workflows/hardware-stats.yml). No ID, no
+// single PC: groups of fewer than 3 PCs are folded into "other".
+async function stats(env) {
+  const rows = (await env.DB.prepare('SELECT report, last_seen FROM hardware').all()).results.map(r => ({ ...JSON.parse(r.report), last_seen: r.last_seen }));
+  const n = rows.length;
+  const avg = f => n ? Math.round(rows.reduce((s, r) => s + (Number(r[f]) || 0), 0) / n * 10) / 10 : 0;
+  const share = f => n ? Math.round(rows.filter(f).length / n * 1000) / 10 : 0;
+  const top = (key, extra) => {
+    const groups = new Map();
+    for (const r of rows) {
+      const k = key(r) || 'unknown';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    }
+    const out = [];
+    let other = 0;
+    for (const [k, list] of [...groups.entries()].sort((a, b) => b[1].length - a[1].length)) {
+      if (list.length < 3) { other += list.length; continue; }
+      out.push({ name: k, pcs: list.length, ...(extra ? extra(list) : {}) });
+    }
+    if (other) out.push({ name: 'other', pcs: other });
+    return out;
+  };
+  const mean = (list, f) => Math.round(list.reduce((s, r) => s + (Number(r[f]) || 0), 0) / list.length);
+  const month = Date.now() - 30 * 86400000;
+  return {
+    updated: new Date().toISOString(),
+    pcs: n,
+    active_30_days: rows.filter(r => Date.parse(r.last_seen + 'Z') > month).length,
+    average: { ram_gb: avg('ram_gb'), vram_gb: Math.round(avg('vram_mb') / 1024 * 10) / 10, cpu_threads: avg('cpu_threads') },
+    percent: {
+      rebar_in_bios: share(r => r.rebar_bios),
+      rebar_for_the_game: share(r => r.rebar_d3d12 === true),
+      laptops: share(r => r.laptop),
+      ssd: share(r => r.disk === 'SSD'),
+      ram_16_gb_or_less: share(r => r.ram_gb <= 16),
+      vram_8_gb_or_less: share(r => r.vram_mb <= 8 * 1024),
+    },
+    gpu_vendors: top(r => r.gpu_vendor),
+    gpus: top(r => r.gpu, list => ({ vram_gb: Math.round(mean(list, 'vram_mb') / 1024), rebar_percent: Math.round(list.filter(r => r.rebar_d3d12 === true).length / list.length * 100) })),
+    cpus: top(r => r.cpu, list => ({ threads: mean(list, 'cpu_threads') })),
+    ram_gb: top(r => String(r.ram_gb)),
+    windows: top(r => { const m = (r.os || '').match(/Windows (10|11)/); return m ? 'Windows ' + m[1] : 'other'; }),
+  };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/v1/stats') {
+      const auth = request.headers.get('Authorization') || '';
+      if (!env.STATS_TOKEN || !sameToken(auth.replace(/^Bearer /, ''), env.STATS_TOKEN)) return new Response(null, { status: 404 });
+      return new Response(JSON.stringify(await stats(env)), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+    }
     if (request.method !== 'POST' || url.pathname !== '/v1/hw') return new Response(null, { status: 404 });
     const secret = request.headers.get('X-VI-Secret') || '';
     if (!/^[0-9a-f]{64}$/.test(secret)) return new Response(null, { status: 400 });

@@ -1,4 +1,4 @@
-// VI Launcher: the Custom preset (Advanced Tweaks) and its profile codes. A code ("VI1-...") is the
+// Julia's Launcher: the Custom preset (Advanced Tweaks) and its profile codes. A code ("VI1-...") is the
 // profile's values, each held to the values the page offers, with a checksum: a pasted code can set
 // nothing else and runs nothing.
 using System;
@@ -259,7 +259,7 @@ namespace VIctoryLauncher
         {
             string why;
             var p = CustomProfile.FromCode(pasteBox.Text, out why);
-            if (p == null) { MessageBox.Show(this, L("This code cannot be used: ", "Este codigo nao serve: ") + why + ".", "VI Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (p == null) { MessageBox.Show(this, L("This code cannot be used: ", "Este codigo nao serve: ") + why + ".", "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             var changes = new List<string>();
             Action<string, string, string> diff = (what, a, b) => { if (a != b) changes.Add("  •  " + what + ": " + a + "  →  " + b); };
             diff(L("World resolution", "Resolucao do mundo"), custom.Scale, p.Scale);
@@ -270,9 +270,9 @@ namespace VIctoryLauncher
             diff(L("FPS clock", "Relogio de FPS"), custom.Fps.ToString(), p.Fps.ToString());
             diff(L("Memory guards", "Protecoes de memoria"), custom.Guards ? "on" : "off", p.Guards ? "on" : "off");
             diff(L("Texture levels on demand", "Niveis de texturas a pedido"), custom.LevelsOnDemand ? "on" : "off", p.LevelsOnDemand ? "on" : "off");
-            if (changes.Count == 0) { MessageBox.Show(this, L("This profile is the same as yours.", "Este perfil e igual ao teu."), "VI Launcher"); return; }
+            if (changes.Count == 0) { MessageBox.Show(this, L("This profile is the same as yours.", "Este perfil e igual ao teu."), "Julia's Launcher"); return; }
             var ask = L("This code changes:\r\n\r\n", "Este codigo muda:\r\n\r\n") + string.Join("\r\n", changes.ToArray()) + L("\r\n\r\nApply it and play with Custom?", "\r\n\r\nAplicar e jogar com Personalizado?");
-            if (MessageBox.Show(this, ask, "VI Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             custom = p;
             SaveCustom();
             RefreshCustom();
