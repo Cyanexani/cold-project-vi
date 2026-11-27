@@ -270,7 +270,8 @@ namespace VIctoryLauncher
 
         HardwareInfo hw;
         Label idLabel;
-        TextBox hwText, hwJson;
+        InfoCard hwText;
+        TextBox hwJson;
         CheckBox shareBox;
         Label shareStatus;
         ComboBox engineBox;
@@ -687,9 +688,9 @@ namespace VIctoryLauncher
 
             page.Controls.Add(new Heading(L("Hardware", "Hardware")) { Location = new Point(X, y), Width = W });
             y += 32;
-            hwText = new TextBox { Location = new Point(X, y), Size = new Size(W, 150), Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Theme.Card, ForeColor = Theme.Text, Font = Theme.Mono(9f) };
+            hwText = new InfoCard { Location = new Point(X, y), Size = new Size(W, 8 * 30 + 16) };
             page.Controls.Add(hwText);
-            y += 162;
+            y += hwText.Height + 12;
 
             page.Controls.Add(new Heading(L("Engine", "Motor")) { Location = new Point(X, y), Width = W });
             y += 32;
@@ -704,8 +705,17 @@ namespace VIctoryLauncher
                 Log(L("Engine: ", "Motor: ") + EngineName);
                 UpdateBanner(); Refresh2();
             };
+            // The choice shows as two pills (as on Play); the list stays, hidden, for the code that sets it.
+            engineBox.Visible = false;
             page.Controls.Add(engineBox);
-            y += 34;
+            var hwStd = new Pill { Text = L("edupode · recommended", "edupode · recomendado", "edupode · recommandé"), Location = new Point(X, y), Size = new Size(230, 36) };
+            var hwAmd = new Pill { Text = L("Belobug AMD · for Radeon", "Belobug AMD · para Radeon", "Belobug AMD · pour Radeon"), Location = new Point(X + 240, y), Size = new Size(230, 36) };
+            hwStd.Click += (s, e) => { if (UseAmdEngine) engineBox.SelectedIndex = 0; };
+            hwAmd.Click += (s, e) => { if (!UseAmdEngine) engineBox.SelectedIndex = 1; };
+            showEnginePills += () => { hwStd.Main = !UseAmdEngine; hwAmd.Main = UseAmdEngine; hwStd.Invalidate(); hwAmd.Invalidate(); };
+            hwStd.Main = !UseAmdEngine; hwAmd.Main = UseAmdEngine;
+            page.Controls.Add(hwStd); page.Controls.Add(hwAmd);
+            y += 46;
             page.Controls.Add(new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.Ui(9f),
                 Text = L("Every card plays with the edupode engine: video memory from ~12 GB down to 6-8 GB, ~4x more textures in it, the most stable. For Radeon cards there is also VIctory-Belobug-AMD, Belobug's fork tuned for Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0; all credit for it is Belobug's), which Setup builds once.",
                          "Todas as placas jogam com o motor edupode: VRAM de ~12 GB para 6-8 GB, ~4x mais texturas, o mais estavel. Para placas Radeon ha tambem o VIctory-Belobug-AMD, o fork do Belobug afinado para Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0; todo o credito e do Belobug), que o Preparar compila uma vez.") });
@@ -756,6 +766,7 @@ namespace VIctoryLauncher
                             L("System disk   ", "Disco         ") + ": " + h.Disk + (h.Laptop ? L("  ·  laptop", "  ·  portatil") : ""),
                             L("Engine        ", "Motor         ") + ": " + EngineName,
                         });
+                        GrowTo(hwText, hwText.Fit());
                         hwJson.Text = HardwareJson(h).Replace("\n", "\r\n");
                         shareStatus.Text = HardwareEndpoint.Length == 0
                             ? L("The database is not online yet: nothing is sent, even with sharing on.", "A base de dados ainda nao esta online: nada e enviado, mesmo com a partilha ligada.")

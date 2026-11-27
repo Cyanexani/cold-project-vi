@@ -12,21 +12,77 @@ namespace VIctoryLauncher
 {
     static class Theme
     {
-        public static readonly Color Back = Color.FromArgb(19, 23, 31);
-        public static readonly Color Side = Color.FromArgb(15, 19, 26);
-        public static readonly Color Card = Color.FromArgb(26, 31, 41);
-        public static readonly Color CardHover = Color.FromArgb(33, 40, 53);
-        public static readonly Color Selected = Color.FromArgb(24, 44, 58);
-        public static readonly Color Line = Color.FromArgb(44, 52, 66);
-        // The one accent (the names stay from the older theme: Pink is the accent, Violet its darker side).
-        public static readonly Color Pink = Color.FromArgb(56, 189, 248);
-        public static readonly Color Violet = Color.FromArgb(14, 145, 210);
-        public static readonly Color Cyan = Color.FromArgb(56, 189, 248);
-        public static readonly Color Text = Color.FromArgb(226, 232, 240);
-        public static readonly Color Dim = Color.FromArgb(136, 146, 162);
-        public static readonly Color Good = Color.FromArgb(74, 222, 128);
-        public static readonly Color Warn = Color.FromArgb(251, 191, 36);
-        public static readonly Color Bad = Color.FromArgb(248, 113, 113);
+        // PayDrop palette: deep plum, a magenta glow, butter yellow as the one accent (the main button,
+        // switches on), peach and hot pink beside it, white hairlines and orbit rings.
+        public static readonly Color Back = Color.FromArgb(36, 12, 32);
+        public static readonly Color Side = Color.FromArgb(28, 9, 25);
+        public static readonly Color Card = Color.FromArgb(52, 20, 46);
+        public static readonly Color CardHover = Color.FromArgb(66, 26, 58);
+        public static readonly Color Selected = Color.FromArgb(82, 26, 68);
+        public static readonly Color Line = Color.FromArgb(82, 55, 77);
+        // The one accent (the names stay from the older themes: Pink, Cyan are the accent, Violet its pressed side).
+        public static readonly Color Pink = Color.FromArgb(255, 244, 163);
+        public static readonly Color Violet = Color.FromArgb(236, 220, 120);
+        public static readonly Color Cyan = Color.FromArgb(255, 244, 163);
+        public static readonly Color AccentHover = Color.FromArgb(255, 249, 200);
+        // Text drawn on the accent.
+        public static readonly Color OnAccent = Color.FromArgb(42, 10, 36);
+        public static readonly Color Text = Color.FromArgb(255, 246, 252);
+        public static readonly Color Dim = Color.FromArgb(214, 186, 206);
+        // Text between the two: descriptions that still need to read well.
+        public static readonly Color Soft = Color.FromArgb(236, 220, 231);
+        public static readonly Color Good = Color.FromArgb(255, 244, 163);
+        public static readonly Color Warn = Color.FromArgb(255, 150, 136);
+        public static readonly Color Bad = Color.FromArgb(255, 110, 140);
+        // PayDrop's other colours: the hot pink and the peach of its milestone dots.
+        public static readonly Color HotPink = Color.FromArgb(255, 79, 184);
+        public static readonly Color Peach = Color.FromArgb(255, 178, 166);
+        public static readonly Color Plum = Color.FromArgb(106, 20, 80);
+        // Switches: the track when off, hovered, disabled; a disabled knob.
+        public static readonly Color TrackOff = Color.FromArgb(96, 58, 90);
+        public static readonly Color TrackHover = Color.FromArgb(116, 72, 108);
+        public static readonly Color TrackDisabled = Color.FromArgb(62, 34, 57);
+        public static readonly Color KnobDisabled = Color.FromArgb(124, 98, 118);
+        // A quiet fill (an unpicked pill, a segmented track) and a stronger hairline (hover, outlined buttons).
+        public static readonly Color Quiet = Color.FromArgb(74, 36, 66);
+        public static readonly Color LineStrong = Color.FromArgb(150, 112, 142);
+        // The "Tested" badge.
+        public static readonly Color BadgeBack = Color.FromArgb(92, 28, 76);
+        public static readonly Color BadgeText = Color.FromArgb(255, 168, 222);
+        // The badge an option tested by the developers shows (set to the form's language).
+        public static string TestedText = "Tested";
+
+        // PayDrop's backdrop inside `r` (a card's own rectangle): a magenta glow at the left, a peach one
+        // at the top right, two thin orbit rings at the right with its four milestone dots on them.
+        public static void DrawOrbits(Graphics g, RectangleF r)
+        {
+            Action<float, float, float, Color, int> glow = (cx, cy, radius, color, alpha) => {
+                using (var p = new GraphicsPath())
+                {
+                    p.AddEllipse(cx - radius, cy - radius, radius * 2, radius * 2);
+                    using (var b = new PathGradientBrush(p) { CenterColor = Color.FromArgb(alpha, color), SurroundColors = new[] { Color.FromArgb(0, color) } })
+                        g.FillPath(b, p);
+                }
+            };
+            glow(r.X + r.Width * 0.16f, r.Y + r.Height * 0.70f, r.Height * 2.2f, Color.FromArgb(224, 64, 168), 120);
+            glow(r.Right - r.Width * 0.04f, r.Y + r.Height * 0.05f, r.Height * 1.3f, Color.FromArgb(255, 170, 160), 80);
+            float ox = r.X + r.Width * 0.80f, oy = r.Y + r.Height * 0.62f;
+            float[] rings = { r.Height * 1.05f, r.Height * 0.66f };
+            using (var pen = new Pen(Color.FromArgb(150, 255, 255, 255), 1f))
+                foreach (var rr in rings) g.DrawEllipse(pen, ox - rr, oy - rr, rr * 2, rr * 2);
+            // The dots, as on PayDrop's milestone orbit: hot pink, plum, peach, butter.
+            var dots = new[] {
+                Tuple.Create(rings[0], 200f, HotPink), Tuple.Create(rings[1], 300f, Plum),
+                Tuple.Create(rings[1], 150f, Peach), Tuple.Create(rings[0], 330f, Cyan),
+            };
+            foreach (var d in dots)
+            {
+                double a = d.Item2 * Math.PI / 180.0;
+                float x = ox + (float)Math.Cos(a) * d.Item1, y = oy + (float)Math.Sin(a) * d.Item1;
+                using (var halo = new SolidBrush(Color.FromArgb(60, 255, 255, 255))) g.FillEllipse(halo, x - 9, y - 9, 18, 18);
+                using (var b = new SolidBrush(d.Item3)) g.FillEllipse(b, x - 6, y - 6, 12, 12);
+            }
+        }
 
         static string mono;
         // Cascadia Mono where Windows has it, Consolas otherwise.
@@ -70,9 +126,11 @@ namespace VIctoryLauncher
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
         }
 
-        public static void Panel(Graphics g, RectangleF r, Color fill, Color border)
+        public static void Panel(Graphics g, RectangleF r, Color fill, Color border) { Panel(g, r, fill, border, 10); }
+
+        public static void Panel(Graphics g, RectangleF r, Color fill, Color border, float radius)
         {
-            using (var path = Round(r, 5))
+            using (var path = Round(r, radius))
             {
                 using (var b = new SolidBrush(fill)) g.FillPath(b, path);
                 using (var p = new Pen(border)) g.DrawPath(p, path);
@@ -98,10 +156,10 @@ namespace VIctoryLauncher
         public static void DrawSwitch(Graphics g, RectangleF track, bool on, bool hover, bool enabled)
         {
             using (var path = Theme.Round(track, track.Height / 2))
-            using (var b = new SolidBrush(!enabled ? Theme.Line : on ? Theme.Cyan : hover ? Theme.CardHover : Theme.Line)) g.FillPath(b, path);
+            using (var b = new SolidBrush(!enabled ? Theme.TrackDisabled : on ? Theme.Cyan : hover ? Theme.TrackHover : Theme.TrackOff)) g.FillPath(b, path);
             float k = track.Height - 4;
             float kx = on ? track.Right - k - 2 : track.X + 2;
-            using (var b = new SolidBrush(on ? Color.White : Color.FromArgb(200, 206, 216))) g.FillEllipse(b, kx, track.Y + 2, k, k);
+            using (var b = new SolidBrush(!enabled ? Theme.KnobDisabled : on ? Theme.OnAccent : Color.White)) g.FillEllipse(b, kx, track.Y + 2, k, k);
         }
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -116,7 +174,8 @@ namespace VIctoryLauncher
         }
     }
 
-    // A launch option as in the reference: a bordered panel, the switch, a title and one line.
+    // A launch option: a panel with the title, a "Tested" badge (a title starting with "★ "), up to
+    // two lines saying what it does, and the switch at the right.
     class OptionCard : CheckBox
     {
         public string Line = "";
@@ -125,7 +184,7 @@ namespace VIctoryLauncher
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             AutoSize = false;
-            Size = new Size(400, 58);
+            Size = new Size(400, 66);
             Cursor = Cursors.Hand;
             Font = Theme.UiBold(10f);
             ForeColor = Theme.Text;
@@ -137,15 +196,36 @@ namespace VIctoryLauncher
             var g = e.Graphics;
             g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
             Theme.Smooth(g);
-            Theme.Panel(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), hover ? Theme.CardHover : Theme.Card, Theme.Line);
-            Toggle.DrawSwitch(g, new RectangleF(14, (Height - 20) / 2f, 34, 20), Checked, hover, Enabled);
+            Theme.Panel(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), hover && Enabled ? Theme.CardHover : Theme.Card, Checked && Enabled ? Color.FromArgb(150, 92, 134) : Theme.Line);
+            const int sw = 38;
+            Toggle.DrawSwitch(g, new RectangleF(Width - sw - 14, 12, sw, 22), Checked, hover, Enabled);
+            var title = Text ?? "";
+            bool tested = title.StartsWith("★");
+            if (tested) title = title.TrimStart('★', ' ');
+            float textW = Width - sw - 36;
             using (var b = new SolidBrush(Enabled ? Theme.Text : Theme.Dim))
             using (var f = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                g.DrawString(Text, Font, b, new RectangleF(60, 9, Width - 70, 20), f);
+            using (var bf = Theme.UiBold(7.5f))
+            {
+                var size = g.MeasureString(title, Font);
+                var ts = g.MeasureString(Theme.TestedText, bf);
+                float badgeW = tested ? ts.Width + 6 : 0;
+                float tw = Math.Min(size.Width, textW - (tested ? badgeW + 6 : 0));
+                g.DrawString(title, Font, b, new RectangleF(14, 10, tw + 2, 22), f);
+                if (tested)
+                    {
+                        var badge = new RectangleF(14 + tw + 4, 13, badgeW, 17);
+                        using (var path = Theme.Round(badge, 5))
+                        using (var bb = new SolidBrush(Theme.BadgeBack)) g.FillPath(bb, path);
+                        using (var tb = new SolidBrush(Theme.BadgeText))
+                        using (var cf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                            g.DrawString(Theme.TestedText, bf, tb, badge, cf);
+                    }
+            }
             using (var lf = Theme.Ui(8.75f))
             using (var b = new SolidBrush(Theme.Dim))
-            using (var f = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                g.DrawString(Line ?? "", lf, b, new RectangleF(60, 31, Width - 70, 18), f);
+            using (var f = new StringFormat { Trimming = StringTrimming.EllipsisWord })
+                g.DrawString(Line ?? "", lf, b, new RectangleF(14, 33, textW + sw - 4, Height - 38), f);
         }
     }
 
@@ -169,13 +249,29 @@ namespace VIctoryLauncher
             var g = e.Graphics;
             g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
             Theme.Smooth(g);
-            Theme.Panel(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), selected ? Theme.Selected : hover ? Theme.CardHover : Theme.Card, selected ? Theme.Cyan : Theme.Line);
+            var r = new RectangleF(0.75f, 0.75f, Width - 2f, Height - 2f);
+            using (var path = Theme.Round(r, 8))
+            {
+                using (var b = new SolidBrush(selected ? Theme.Selected : hover ? Theme.CardHover : Theme.Card)) g.FillPath(b, path);
+                using (var p = new Pen(selected ? Theme.Cyan : Theme.Line, selected ? 1.6f : 1f)) g.DrawPath(p, path);
+            }
             var nf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
             using (var tf = Theme.UiBold(10.5f))
-            using (var b = new SolidBrush(Theme.Text)) g.DrawString(Title ?? "", tf, b, new RectangleF(10, 8, Width - 16, 22), nf);
-            using (var b = new SolidBrush(Theme.Cyan)) g.DrawString(Tag2 ?? "", Font, b, new RectangleF(11, 31, Width - 16, 16), nf);
+            using (var b = new SolidBrush(Theme.Text)) g.DrawString(Title ?? "", tf, b, new RectangleF(10, 9, Width - 16, 22), nf);
+            // The resolution as a small pill: the accent when picked.
+            using (var pf = Theme.UiBold(8f))
+            {
+                var tag = Tag2 ?? "";
+                var ts = g.MeasureString(tag, pf);
+                var pill = new RectangleF(10, 32, Math.Min(ts.Width + 8, Width - 20), 18);
+                using (var path = Theme.Round(pill, 5))
+                using (var b = new SolidBrush(selected ? Theme.Cyan : Theme.Quiet)) g.FillPath(b, path);
+                using (var b = new SolidBrush(selected ? Theme.OnAccent : Theme.Text))
+                using (var cf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    g.DrawString(tag, pf, b, pill, cf);
+            }
             using (var lf = Theme.Ui(8.5f))
-            using (var b = new SolidBrush(Theme.Dim)) g.DrawString(Line ?? "", lf, b, new RectangleF(10, 49, Width - 14, 18), nf);
+            using (var b = new SolidBrush(Theme.Dim)) g.DrawString(Line ?? "", lf, b, new RectangleF(10, 54, Width - 14, 18), nf);
         }
     }
 
@@ -204,18 +300,20 @@ namespace VIctoryLauncher
             g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
             Theme.Smooth(g);
             var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
-            if (!Enabled) Theme.Panel(g, r, Theme.Card, Theme.Line);
+            // Nimbus's buttons are whole pills.
+            float pr = r.Height / 2f;
+            if (!Enabled) Theme.Panel(g, r, Theme.Card, Theme.Line, pr);
             else if (Main)
             {
-                var fill = down ? Theme.Violet : hover ? Color.FromArgb(110, 207, 250) : Theme.Cyan;
-                Theme.Panel(g, r, fill, fill);
+                var fill = down ? Theme.Violet : hover ? Theme.AccentHover : Theme.Cyan;
+                Theme.Panel(g, r, fill, fill, pr);
             }
-            else Theme.Panel(g, r, down ? Theme.Back : hover ? Theme.CardHover : Theme.Card, hover || down ? Theme.Cyan : Theme.Line);
+            else Theme.Panel(g, r, down ? Theme.Side : hover ? Theme.CardHover : (Parent != null ? Parent.BackColor : Theme.Back), hover || down ? Theme.Text : Theme.LineStrong, pr);
             // Keyboard focus (Tab): a ring inside the edge.
             if (Focused && ShowFocusCues && Enabled)
-                using (var p = new Pen(Main ? Color.FromArgb(8, 20, 30) : Theme.Cyan, 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot })
-                using (var path = Theme.Round(new RectangleF(3.5f, 3.5f, Width - 7.5f, Height - 7.5f), 4)) g.DrawPath(p, path);
-            using (var b = new SolidBrush(Enabled ? (Main ? Color.FromArgb(8, 20, 30) : ForeColor) : Theme.Dim))
+                using (var p = new Pen(Main ? Theme.OnAccent : Theme.Cyan, 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot })
+                using (var path = Theme.Round(new RectangleF(3.5f, 3.5f, Width - 7.5f, Height - 7.5f), 6)) g.DrawPath(p, path);
+            using (var b = new SolidBrush(Enabled ? (Main ? Theme.OnAccent : ForeColor) : Theme.Dim))
             using (var f = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, HotkeyPrefix = HotkeyPrefix.None })
             {
                 // A label longer than the button (Portuguese and French ones often are) gets a smaller font
@@ -305,12 +403,10 @@ namespace VIctoryLauncher
             Theme.Smooth(g);
             var r = new RectangleF(8, 2, Width - 16, Height - 4);
             if (active || hover)
-                using (var path = Theme.Round(r, 5))
-                using (var b = new SolidBrush(active ? Color.FromArgb(28, 36, 48) : Color.FromArgb(22, 28, 37))) g.FillPath(b, path);
-            if (active)
-                using (var b = new SolidBrush(Theme.Cyan)) g.FillRectangle(b, 8, 6, 3, Height - 12);
+                using (var path = Theme.Round(r, 8))
+                using (var b = new SolidBrush(active ? Theme.Selected : Color.FromArgb(44, 16, 40))) g.FillPath(b, path);
             using (var gf = new Font("Segoe MDL2 Assets", 11f))
-            using (var b = new SolidBrush(active ? Theme.Text : Theme.Dim))
+            using (var b = new SolidBrush(active ? Theme.Cyan : Theme.Dim))
                 g.DrawString(Glyph ?? "", gf, b, 22, Height / 2f - 8);
             using (var b = new SolidBrush(active ? Theme.Text : Theme.Dim))
             using (var f = new StringFormat { LineAlignment = StringAlignment.Center })
@@ -318,7 +414,7 @@ namespace VIctoryLauncher
         }
     }
 
-    // The head of the Play page: a drawn "VI" mark, a line about the project, the hardware chips.
+    // The head of the Play page: the page's name, one line under it, the hardware as rounded chips.
     class Banner : Control
     {
         public string Title = "", Subtitle = "", Accent = "";
@@ -327,59 +423,70 @@ namespace VIctoryLauncher
         public Banner()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            Height = 110;
+            Height = 116;
         }
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
             Theme.Smooth(g);
-            // The mark: "VI" in a sunset gradient over a dark tile.
-            var tile = new RectangleF(2, 4, 132, 96);
-            using (var path = Theme.Round(tile, 8))
-            using (var b = new LinearGradientBrush(tile, Color.FromArgb(34, 18, 52), Color.FromArgb(12, 34, 52), 60f)) g.FillPath(b, path);
-            using (var f = new Font("Segoe UI Black", 40f, FontStyle.Italic))
-            using (var b = new LinearGradientBrush(tile, Color.FromArgb(255, 92, 170), Color.FromArgb(70, 200, 255), 30f))
-            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                g.DrawString("VI", f, b, tile, sf);
-            float x = 160;
-            using (var tf = Theme.Ui(12f))
+            // A plum card with PayDrop's glow and orbit rings.
+            var card = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using (var path = Theme.Round(card, 16))
             {
-                // Three runs of text one after the other, measured without GDI+'s padding.
-                float tx = x;
-                var parts = new[] { Title, Accent, Subtitle };
-                var colors = new[] { Theme.Text, Theme.Cyan, Theme.Text };
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    if (string.IsNullOrEmpty(parts[i])) continue;
-                    using (var b = new SolidBrush(colors[i])) g.DrawString(parts[i], tf, b, tx, 22, StringFormat.GenericTypographic);
-                    tx += g.MeasureString(parts[i].Replace(' ', ' '), tf, 2000, StringFormat.GenericTypographic).Width;
-                }
+                using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
+                var clip = g.Clip;
+                g.SetClip(path);
+                Theme.DrawOrbits(g, card);
+                g.Clip = clip;
+                using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
             }
-            using (var cf = Theme.Mono(8.5f))
+            // PayDrop's headline: a heavy word, then an italic serif run in butter yellow.
+            using (var tf = new Font("Segoe UI Black", 22f))
+            using (var b = new SolidBrush(Theme.Text))
             {
-                float cx = x + 2;
+                g.DrawString(Title ?? "", tf, b, 16, 6);
+                var tw = g.MeasureString(Title ?? "", tf).Width;
+                if (!string.IsNullOrEmpty(Accent))
+                    using (var af = new Font("Georgia", 19f, FontStyle.Italic))
+                    using (var ab = new SolidBrush(Theme.Cyan)) g.DrawString(Accent, af, ab, 16 + tw - 4, 11);
+            }
+            using (var sf = Theme.Ui(9.75f))
+            using (var b = new SolidBrush(Theme.Soft)) g.DrawString(Subtitle ?? "", sf, b, 21, 52);
+            using (var cf = Theme.Ui(8.75f))
+            {
+                float cx = 21;
                 for (int i = 0; i < Chips.Length; i++)
                 {
+                    var text = Chips[i] ?? "";
+                    if (text.Length == 0) continue;
+                    var size = g.MeasureString(text, cf);
+                    var chip = new RectangleF(cx + 0.5f, 78.5f, size.Width + 16, 24);
+                    if (chip.Right > Width - 12) break;
                     var c = i < ChipColors.Length ? ChipColors[i] : Theme.Dim;
-                    using (var b = new SolidBrush(c)) g.DrawString(Chips[i], cf, b, cx, 58);
-                    cx += g.MeasureString(Chips[i], cf).Width + 6;
-                    if (i + 1 < Chips.Length)
+                    using (var path = Theme.Round(chip, 12))
                     {
-                        using (var b = new SolidBrush(Theme.Line)) g.DrawString("·", cf, b, cx, 58);
-                        cx += 16;
+                        using (var b = new SolidBrush(Color.FromArgb(34, 255, 255, 255))) g.FillPath(b, path);
+                        using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
                     }
+                    // Plain facts in light grey; a warning or the engine keeps its colour.
+                    using (var b = new SolidBrush(c == Theme.Dim ? Theme.Soft : c))
+                    using (var f = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                        g.DrawString(text, cf, b, chip, f);
+                    cx = chip.Right + 8;
                 }
             }
-            using (var p = new Pen(Theme.Line)) g.DrawLine(p, 0, Height - 1, Width, Height - 1);
         }
     }
 
-    // A row of checks ("✓ Dump verified  ✓ Binary ready ..."), drawn in a bordered panel.
+    // "Ready to play" and its checks ("✓ Dump verified  ✓ Binary ready ..."), drawn in a bordered panel.
     class StatusStrip : Control
     {
         public string[] Items = new string[0];
         public int[] States = new int[0];   // 1 good, 0 bad, -1 neutral
+        public string ReadyText = "Ready to play", NotReadyText = "Not ready yet";
+        // Room kept at the right for the strip's own buttons.
+        public int RightRoom = 232;
         public StatusStrip()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -391,17 +498,28 @@ namespace VIctoryLauncher
             g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
             Theme.Smooth(g);
             Theme.Panel(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Card, Theme.Line);
-            float x = 14;
-            using (var f = Theme.Mono(8.75f))
+            bool ready = Items.Length > 0;
+            for (int i = 0; i < Items.Length; i++) if ((i < States.Length ? States[i] : -1) != 1) ready = false;
+            using (var b = new SolidBrush(ready ? Theme.Good : Theme.Warn)) g.FillEllipse(b, 16, Height / 2f - 5, 10, 10);
+            float x = 34;
+            using (var tf = Theme.UiBold(10.5f))
+            using (var b = new SolidBrush(Theme.Text))
+            {
+                var title = ready ? ReadyText : NotReadyText;
+                g.DrawString(title, tf, b, x, Height / 2f - 10);
+                x += g.MeasureString(title, tf).Width + 16;
+            }
+            using (var f = Theme.Ui(9f))
                 for (int i = 0; i < Items.Length; i++)
                 {
                     int s = i < States.Length ? States[i] : -1;
-                    var mark = s == 1 ? "✓" : s == 0 ? "✗" : "•";
-                    using (var b = new SolidBrush(s == 1 ? Theme.Text : s == 0 ? Theme.Warn : Theme.Dim))
-                    {
-                        g.DrawString(mark + " " + Items[i], f, b, x, Height / 2f - 8);
-                        x += g.MeasureString(mark + " " + Items[i], f).Width + 14;
-                    }
+                    var mark = s == 1 ? "✓" : s == 0 ? "!" : "•";
+                    var text = mark + "  " + Items[i];
+                    var w = g.MeasureString(text, f).Width;
+                    if (x + w > Width - RightRoom) break;
+                    using (var b = new SolidBrush(s == 1 ? Theme.Soft : s == 0 ? Theme.Warn : Theme.Dim))
+                        g.DrawString(text, f, b, x, Height / 2f - 8);
+                    x += w + 12;
                 }
         }
     }
@@ -437,7 +555,7 @@ namespace VIctoryLauncher
         }
     }
 
-    // A section title in monospaced capitals ("RENDER PRESET"), with an optional grey note at the right.
+    // A section title ("Quality preset"), with an optional grey note at the right.
     class Heading : Control
     {
         public string Note = "";
@@ -446,16 +564,16 @@ namespace VIctoryLauncher
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             Text = text;
             Height = 26;
-            Font = Theme.Mono(10f);
+            Font = new Font("Segoe UI Semibold", 11.5f);
         }
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
             Theme.Smooth(g);
-            using (var b = new SolidBrush(Theme.Text)) g.DrawString((Text ?? "").ToUpperInvariant(), Font, b, 0, 3);
+            using (var b = new SolidBrush(Theme.Text)) g.DrawString(Text ?? "", Font, b, -1, 1);
             if (!string.IsNullOrEmpty(Note))
-                using (var nf = Theme.Mono(8.25f))
+                using (var nf = Theme.Ui(8.5f))
                 using (var b = new SolidBrush(Theme.Dim))
                 {
                     var size = g.MeasureString(Note, nf);

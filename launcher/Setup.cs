@@ -285,9 +285,16 @@ namespace VIctoryLauncher
         {
             if (InvokeRequired) { BeginInvoke(new Action<string, float>(Progress), text, part); return; }
             setupProgress = part;
+            // A hidden control is not moved when its page scrolls: placed again from a control that is
+            // always shown before it appears, or it lands on top of the first step after a scroll.
+            if (setupBar != null && everything != null && !setupBar.Visible) setupBar.Top = everything.Top + 52;
+            if (loadBar != null && loadBarAnchor != null && !loadBar.Visible) loadBar.Top = loadBarAnchor.Top + 42;
             foreach (var bar in new[] { setupBar, loadBar })
                 if (bar != null) { bar.Visible = true; bar.Set(part, text); }
         }
+
+        // The Play page's "Show activity" button, which the loading bar and the log sit under.
+        Control loadBarAnchor;
 
         // ---------------------------------------------------------------- the steps' work
         bool Winget(string id, string overrideArgs)
