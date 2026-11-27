@@ -13,6 +13,20 @@ on menus it goes from 30-32/33fps
 > 24-26 FPS no mundo aberto. Como montar, teclas e o que falta: [docs/LUZ-24FPS.md](docs/LUZ-24FPS.md)
 > (`Jogar-Luz.cmd`).
 > **English guide (setup and how to get close to 30 FPS): [docs/GUIDE-30FPS.md](docs/GUIDE-30FPS.md).**
+>
+> **Latest (2026-11-27), RTX 5070 Ti Laptop 12 GB, Core Ultra 9 275HX, 32 GB, Series S profile:**
+> - `Jogar-Luz.cmd 720p texturas`: open world **20-26 FPS** (was 14-15), cutscenes ~30. Video memory now
+>   **under** the system's budget (7.6 of 8.6 GB; was ~1 GB over), textures waiting ~130 (was 6,000-15,000).
+>   The big win: `VICTORY_LEVELS_ON_DEMAND=0` (host copies hold only the texture levels the game shows).
+> - `Jogar-Luz.cmd 720p texturas cpu`: the same plus 10 helper threads (`VICTORY_WIDE_THREADS`) and the write
+>   watch asked early (`VICTORY_ASK_EARLY=2`); under test. The CPU is the limit now (~27 ms preparing, ~10 ms
+>   copying back per frame; the card ~0 ms).
+> - Water fixed (only the `_LocalLights` volumetrics shader translated wave-wide); `_Tiled` still off (black
+>   squares), being debugged with a test of its tile-bounds part and the frame recorder.
+> - Borderless window for NVIDIA Smooth Motion exists (`VICTORY_BORDERLESS=1`) but is off: it dropped the game
+>   to 1-2 FPS on a 2560x1600 screen at 150 %.
+> - Keyboard/mouse: click to capture the mouse (Alt/F1 releases), F enters vehicles and switches W/S to the
+>   triggers (beep), full table in the guide.
 
 ## Run the codec_d Windows build
 
