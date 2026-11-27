@@ -32,6 +32,10 @@ if not defined VICTORY_DATA_DIR set "VICTORY_DATA_DIR=%RUN%\data"
 if not defined VICTORY_LOG set "VICTORY_LOG=warn,victory_gpu::host=info,victory_gpu::copystat=info,victory_hle::modules::gameinput=info"
 rem --- Placa de 12 GB: 1080p (o jogo julga ter uma TV 4K), 1 GB de buffers do jogo na placa ---
 set "VICTORY_DISPLAY_MODE=1920x1080"
+rem Painel de FPS e diagnostico (F3 esconde) e janela sem bordas sem mudar a escala do ecra (Smooth Motion).
+set "VICTORY_PANEL=1"
+set "VICTORY_BORDERLESS=1"
+set "VICTORY_BORDERLESS_DPI=0"
 set "VICTORY_CARD_BUFFERS_MB=1024"
 rem Regista os pipelines usados; ao fechar sao preparados para a proxima sessao.
 set "VICTORY_PIPELINE_BOOK=1"

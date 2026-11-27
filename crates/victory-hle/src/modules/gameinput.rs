@@ -165,7 +165,8 @@ fn fallback(keys: &[KeyState]) -> PadState {
         .fold(0, |all, (_, bit)| all | bit);
     let (look_x, look_y) = mouse_look();
     let further = |x: f32, y: f32| if y.abs() > x.abs() { y } else { x };
-    let (left_trigger, right_trigger) = if VEHICLE.load(Ordering::Relaxed) {
+    let vehicle = VEHICLE.load(Ordering::Relaxed);
+    let (left_trigger, right_trigger) = if vehicle {
         // Vehicles: the triggers brake and accelerate, RB shoots.
         if mouse & 1 != 0 {
             buttons |= RIGHT_SHOULDER;
@@ -174,14 +175,23 @@ fn fallback(keys: &[KeyState]) -> PadState {
     } else {
         (f32::max(on(b'Z'), button(2)), button(1))
     };
+    // In vehicles W/S are the throttle alone: on the stick they also pushed
+    // an aircraft's nose down, so it never left the ground. The nose goes up
+    // with K and down with I (the stick pulled and pushed); the camera keeps
+    // the mouse.
+    let (left_y, right_y) = if vehicle {
+        (on(b'I') - on(b'K'), look_y)
+    } else {
+        (on(b'W') - on(b'S'), further(on(b'I') - on(b'K'), look_y))
+    };
     PadState {
         buttons,
         left_trigger,
         right_trigger,
         left_x: on(b'D') - on(b'A'),
-        left_y: on(b'W') - on(b'S'),
+        left_y,
         right_x: further(on(b'L') - on(b'J'), look_x),
-        right_y: further(on(b'I') - on(b'K'), look_y),
+        right_y,
     }
 }
 

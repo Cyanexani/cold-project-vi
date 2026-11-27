@@ -75,7 +75,8 @@ abertas, o Windows passa memória para o disco e os FPS caem.
 
 | Tecla | Comando | A pé | Em veículos |
 |---|---|---|---|
-| W/A/S/D | analógico esquerdo | mover | W acelera (RT), S trava ou faz marcha-atrás (LT), A/D vira |
+| W/A/S/D | analógico esquerdo | mover | W acelera (RT), S trava ou faz marcha-atrás (LT), A/D vira ou inclina |
+| I / K | analógico esquerdo cima/baixo | (câmara) | avião: nariz para baixo (I) / para cima (K); para levantar voo segura W e K |
 | rato | analógico direito | olhar | olhar |
 | botão esquerdo | RT / RB | atirar | atirar (RB) |
 | botão direito | LT | mirar ou interagir | |

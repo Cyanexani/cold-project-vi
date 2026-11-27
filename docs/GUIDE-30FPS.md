@@ -29,6 +29,12 @@ doubled: 15 real FPS look like ~30.
 - Visual Studio Build Tools with the C++ workload and a Windows SDK.
 - Your own game dump: the folder that contains `game_scarlett_master.exe`.
 
+## 1b. Easiest: the edu launcher
+
+`launcheruild-launcher.cmd` builds `edu-launcher.exe` (with the C# compiler that ships with Windows). It
+builds VIctory, finds your game, checks the GPU, video memory and Resizable BAR, prepares the shaders, offers
+the modes below with check boxes, and shows the controls. The steps after this are the same by hand.
+
 ## 2. Build
 
 ```powershell
@@ -125,7 +131,8 @@ The game reads an Xbox controller; a connected controller replaces all of this.
 
 | Key | Button | On foot | In a vehicle |
 |---|---|---|---|
-| W/A/S/D | left stick | move | W accelerates (RT), S brakes/reverses (LT), A/D steer |
+| W/A/S/D | left stick | move | W accelerates (RT), S brakes/reverses (LT), A/D steer or roll |
+| I / K | left stick up/down | (camera) | aircraft nose down (I) / up (K): to take off hold W and K |
 | mouse | right stick | look | look |
 | left mouse button | RT / RB | shoot | shoot (RB) |
 | right mouse button | LT | aim / interact | |
