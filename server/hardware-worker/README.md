@@ -66,3 +66,17 @@ wrangler deploy
 wrangler deploy -c wrangler.admin.toml
 ```
 `schema.sql` only adds the `saves` table; the other tables and their rows stay as they are.
+
+## Public bug reports on GitHub
+
+When a player presses **Send** (not **Send privately**), the launcher adds `X-VI-Public: 1`: the report is kept in
+the box as always, and the Worker also opens an issue on `ISSUES_REPO` (wrangler.toml, felicienradio's repository)
+with the report's `summary.txt` only (no logs, no motherboard line; `@` and code fences made harmless), labelled
+`bug` and `game` or `launcher`. The launcher shows the issue's address. Without a token nothing changes.
+
+The token, once:
+1. felicienradio, on GitHub: Settings > Developer settings > Fine-grained tokens > Generate new token. Repository
+   access: only `felicienradio/cold-project-vi`; permissions: **Issues: Read and write**, nothing else; an expiry
+   date (renew it before then).
+2. `wrangler secret put GITHUB_TOKEN` (paste it when asked), then `wrangler deploy`.
+   The token can only open and edit issues on that one repository. Pass it privately, never in a channel.

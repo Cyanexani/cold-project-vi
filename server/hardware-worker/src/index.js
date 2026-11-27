@@ -12,6 +12,8 @@
 // database keeps the secret's SHA-256), so knowing someone's ID is not enough to change their row.
 // No IP address is stored; the rate limit keeps per-IP counts as a salted hash for one hour only.
 
+import { zipFile } from './zip.js';
+
 const FIELDS = {
   schema: 'number', id: 'string', gpu: 'string', gpu_vendor: 'string', gpu_driver: 'string',
   vram_mb: 'number', rebar_bios: 'boolean', rebar_d3d12: 'nullable-boolean', cpu: 'string',
@@ -125,7 +127,41 @@ async function report(request, env) {
   const n = await env.DB.prepare(
     "INSERT INTO reports (created, vi_id, kind, bytes, zip) VALUES (datetime('now'), ?, ?, ?, ?) RETURNING n"
   ).bind(id, kind, zip.length, zip).first('n');
-  return new Response(JSON.stringify({ n }), { status: 201, headers: { 'content-type': 'application/json' } });
+  // The player chose a public report (X-VI-Public: 1): a GitHub issue with the summary only; the zip stays here.
+  let issue = null;
+  if (!session && request.headers.get('X-VI-Public') === '1') {
+    try { issue = await openIssue(env, n, id, kind, zip); } catch { }
+  }
+  return new Response(JSON.stringify(issue ? { n, issue } : { n }), { status: 201, headers: { 'content-type': 'application/json' } });
+}
+
+// A public GitHub issue for report n on ISSUES_REPO (wrangler.toml), made with GITHUB_TOKEN (a fine-grained token
+// for that repository only, Issues: read and write; wrangler secret put GITHUB_TOKEN). It holds the summary.txt the
+// launcher wrote (PC parts, versions, preset, settings, what the player ticked and wrote; the user name is already
+// taken out), without the motherboard line, with @ and ``` made harmless so it pings nobody and stays one block.
+// The logs stay in the report box. Returns the issue's address, or null.
+async function openIssue(env, n, id, kind, zip) {
+  if (!env.GITHUB_TOKEN || !/^[\w.-]+\/[\w.-]+$/.test(env.ISSUES_REPO || '')) return null;
+  let summary = await zipFile(zip, 'summary.txt');
+  if (!summary) return null;
+  summary = summary.slice(0, 12000)
+    .replace(/(CPU: .*?RAM: [^\r\n]*?)\s+Board: [^\r\n]*/, '$1')
+    .replace(/```/g, "'''")
+    .replace(/@/g, '@​');
+  const line = (label) => { const m = summary.match(new RegExp(`^${label}: (.+)$`, 'm')); return m ? m[1].trim() : ''; };
+  let first = line('Ticked').split(';')[0] || line('In their words') || (kind === 'game' ? 'Game problem' : 'Launcher problem');
+  if (first.length > 80) first = first.slice(0, 80) + '...';
+  const body = `Report #${n} from \`${id}\`, sent from Julia's Launcher. The logs are kept private in the report box.\n\n\`\`\`text\n${summary.trim()}\n\`\`\``;
+  const r = await fetch(`https://api.github.com/repos/${env.ISSUES_REPO}/issues`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'vi-hardware-worker', 'content-type': 'application/json',
+    },
+    body: JSON.stringify({ title: `[${kind}] ${first}`, body, labels: ['bug', kind] }),
+  });
+  if (!r.ok) return null;
+  return (await r.json()).html_url || null;
 }
 
 // The save gallery. A player shares a save from the launcher (POST /v1/saves: headers X-VI-Id, X-VI-Title and
