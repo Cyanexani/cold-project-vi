@@ -41,6 +41,11 @@ mod book;
 mod framegen;
 #[cfg(windows)]
 mod host;
+
+/// Set while the game has taken the mouse (mouse look, `victory-hle`'s
+/// `gameinput`): the game window then shows no cursor. Without it the arrow
+/// stayed in the middle of the screen, where mouse look puts it back each poll.
+pub static HIDE_CURSOR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 #[cfg(windows)]
 mod indirect;
 #[cfg(windows)]

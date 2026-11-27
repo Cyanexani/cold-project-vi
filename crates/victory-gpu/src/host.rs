@@ -10055,6 +10055,15 @@ extern "system" fn window_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    // No cursor over the picture while the game has the mouse (crate::HIDE_CURSOR).
+    if message == WM_SETCURSOR
+        && (lparam.0 & 0xFFFF) as u32 == HTCLIENT
+        && crate::HIDE_CURSOR.load(std::sync::atomic::Ordering::Relaxed)
+    {
+        // SAFETY: plain call on this window's own thread.
+        unsafe { SetCursor(None) };
+        return LRESULT(1);
+    }
     // SAFETY: the default handling for our window.
     unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
 }

@@ -1428,6 +1428,8 @@ mod host {
         } else if !click {
             CLICK_HELD.store(false, Relaxed);
         }
+        // The game window hides the cursor while the mouse is taken (it is put back in the middle each poll).
+        victory_gpu::HIDE_CURSOR.store(on && placed && TAKEN.load(Relaxed), Relaxed);
         let (mut x, mut y) = unpack(SMOOTH.load(Relaxed));
         x *= 0.8;
         y *= 0.8;
