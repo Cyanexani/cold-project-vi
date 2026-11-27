@@ -80,6 +80,24 @@ lighting and many changes of our own). **No game files are included.**
 If Windows says "Access denied", Defender's ransomware rule blocked the new exe. In an administrator
 PowerShell: `Add-MpPreference -AttackSurfaceReductionOnlyExclusions "<repo folder>\target"`.
 
+### `git` is not recognized
+
+If PowerShell answers the `git clone` with:
+
+```text
+PS C:\Users\Will> git clone -b edupode https://github.com/edupode/cold-project-vi.git
+git : The term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program.
+```
+
+Git is not installed. Install it, **close and reopen PowerShell**, and run the `git clone` again:
+
+```powershell
+winget install --id Git.Git -e --source winget
+```
+
+No winget? Download Git from <https://git-scm.com/download/win>, or skip Git: on this page press
+**Code → Download ZIP**, extract it and run `launcher\build-launcher.cmd` inside the extracted folder.
+
 <p align="center"><img src="launcher/screenshot.png" alt="VI Launcher" width="760"/></p>
 
 The launcher checks your GPU, video memory, RAM, Resizable BAR and Smooth Motion support and sets everything
