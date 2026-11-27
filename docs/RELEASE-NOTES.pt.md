@@ -5,4 +5,6 @@ Julia's Launcher 0.2.1
 - Resolução de saída: 1080p, 1440p (2K) ou 2160p (4K), ao lado das predefinições. O 2K e o 4K são novos: conta-nos como correm.
 - Enviar erros: "Enviar ao edupode" manda o relatório num clique para uma caixa privada que só o edupode lê; "Abrir uma issue no GitHub" abre uma issue já preenchida; o Discord como antes.
 - Acabou o falso aviso de "memória insuficiente" antes de JOGAR: a memória virtual gerida pelo Windows que ainda pode crescer passa a contar.
+- Placas AMD: o JOGAR espera enquanto o Preparar ainda prepara os shaders (arrancar o jogo nessa altura fazia-o fechar ao arrancar), e os passos só para NVIDIA deixam de ser tentados.
+- Relatórios: depois de "Enviar ao edupode" o teu ID de hardware fica copiado; cola-o no Discord para o edupode encontrar os teus relatórios.
 - Atualizações: a release assinada mais recente do repositório é encontrada seja de que ramo for.

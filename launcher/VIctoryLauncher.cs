@@ -1100,7 +1100,7 @@ namespace VIctoryLauncher
             presetHeading.Invalidate();
             var state = State();
             // A stuck session never keeps PLAY off: PLAY closes it first.
-            bool ready = game && exe != null && state != GameState.Running && !busyNow;
+            bool ready = game && exe != null && state != GameState.Running && !busyNow && !setupBusy;
             playButton.Enabled = ready;
             if (prepareButton != null) { prepareButton.Enabled = ready && state == GameState.None; prepareButton.Invalidate(); }
             playButton.Text = state == GameState.Running ? L("RUNNING", "A CORRER") : busyNow ? L("WAIT...", "ESPERA...")
@@ -1419,6 +1419,14 @@ namespace VIctoryLauncher
         // ---------------------------------------------------------------- actions
         void Play()
         {
+            // Setup still at work (building, translating shaders): two VIctory processes on one cache. An AMD
+            // player started the game twice while shaders were being prepared and it ended at start (27/11/2026).
+            if (setupBusy)
+            {
+                MessageBox.Show(this, L("Setup is still working (building VIctory or preparing shaders). PLAY opens when it finishes.",
+                                        "O Preparar ainda esta a trabalhar (a compilar o VIctory ou a preparar shaders). O JOGAR abre quando acabar."), "Julia's Launcher");
+                return;
+            }
             SaveSettings();
             var state = State();
             if (state == GameState.Running)

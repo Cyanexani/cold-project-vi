@@ -170,8 +170,10 @@ namespace VIctoryLauncher
         void SendReport(string zip, bool game)
         {
             var dir = zip.Substring(0, zip.Length - 4);
+            var viId = (hw ?? ReadHardware()).Id;
             new Thread(() => {
                 string said;
+                bool sent = false;
                 try
                 {
                     byte[] data = null;
@@ -187,7 +189,7 @@ namespace VIctoryLauncher
                     req.ContentType = "application/zip";
                     req.UserAgent = "Julias-Launcher";
                     req.Timeout = 60000;
-                    req.Headers["X-VI-Id"] = (hw ?? ReadHardware()).Id;
+                    req.Headers["X-VI-Id"] = viId;
                     req.Headers["X-VI-Kind"] = game ? "game" : "launcher";
                     req.ContentLength = data.Length;
                     using (var s = req.GetRequestStream()) s.Write(data, 0, data.Length);
@@ -195,7 +197,9 @@ namespace VIctoryLauncher
                     using (var r = (HttpWebResponse)req.GetResponse())
                     using (var rd = new StreamReader(r.GetResponseStream())) answer = rd.ReadToEnd();
                     var n = System.Text.RegularExpressions.Regex.Match(answer, @"\d+").Value;
-                    said = string.Format(L("Sent to edupode: report #{0}. Mention the number on Discord if you talk about it.", "Enviado ao edupode: relatorio n.o {0}. Diz o numero no Discord se falares dele."), n);
+                    said = string.Format(L("Sent to edupode: report #{0}.\r\n\r\nYour hardware ID is {1} (copied). Paste it on Discord, in \"{2}\", so edupode can find your reports.",
+                                           "Enviado ao edupode: relatorio n.o {0}.\r\n\r\nO teu ID de hardware e {1} (copiado). Cola-o no Discord, em \"{2}\", para o edupode encontrar os teus relatorios."), n, viId, DiscordChannel);
+                    sent = true;
                 }
                 catch (WebException e)
                 {
@@ -206,7 +210,16 @@ namespace VIctoryLauncher
                 }
                 catch (Exception e) { said = L("Could not send the report: ", "Nao deu para enviar o relatorio: ") + e.Message; }
                 Log(said);
-                try { BeginInvoke(new Action(() => MessageBox.Show(this, said, "Julia's Launcher"))); } catch (Exception) { }
+                try
+                {
+                    BeginInvoke(new Action(() => {
+                        if (sent) { try { Clipboard.SetText(viId); } catch (Exception) { } }
+                        if (sent && MessageBox.Show(this, said + L("\r\n\r\nOpen Discord now?", "\r\n\r\nAbrir o Discord agora?"), "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                            OpenUrl(DiscordInvite);
+                        else if (!sent) MessageBox.Show(this, said, "Julia's Launcher");
+                    }));
+                }
+                catch (Exception) { }
             }) { IsBackground = true }.Start();
         }
 

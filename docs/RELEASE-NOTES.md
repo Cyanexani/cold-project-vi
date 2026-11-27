@@ -5,4 +5,6 @@ Julia's Launcher 0.2.1
 - Output resolution: 1080p, 1440p (2K) or 2160p (4K), beside the presets. 2K and 4K are new: tell us how they run.
 - Send errors: "Send to edupode" sends the report in one click to a private box only edupode can read; "Open a GitHub issue" opens an issue already filled in; Discord as before.
 - No more false "not enough memory" warning before PLAY: Windows-managed virtual memory that can still grow now counts.
+- AMD cards: PLAY waits while Setup is still preparing shaders (starting the game then made it end at start), and NVIDIA-only steps are no longer tried.
+- Bug reports: after "Send to edupode" your hardware ID is copied; paste it on Discord so edupode can find your reports.
 - Updates: the newest signed release of the repository is found whatever branch it comes from.
