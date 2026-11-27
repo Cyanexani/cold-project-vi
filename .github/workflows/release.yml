@@ -8,10 +8,9 @@ name: Release
 # and the webhook never reach GitHub. Every launcher installs the release within 5 minutes, and the
 # announcement (docs/ANNOUNCEMENT.md) goes to the Discord channel. scripts\sign-release.ps1 still signs by hand.
 
-# (felicienradio builds and signs his own releases on his PC with scripts\release-local.ps1; on the edupode
-# branch a pushed tag builds them here, and edupode signs them.)
-# On felicienradio's main a pushed tag starts nothing: he builds and signs on his PC (scripts\release-local.ps1).
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
