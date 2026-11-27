@@ -27,7 +27,8 @@ try {
     if (git status --porcelain) { throw 'There are uncommitted changes: commit and push them first.' }
     $dist = Join-Path $root 'dist'
     Remove-Item -Recurse -Force $dist -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory $dist | Out-Null
+    New-Item -ItemType Directory -Force $dist | Out-Null
+    if (Get-ChildItem $dist) { throw "dist could not be emptied (a file in it is open): close it and try again." }
 
     if (-not $NoBuild) {
         Write-Host 'Building victory.exe...'
