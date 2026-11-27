@@ -144,7 +144,8 @@ namespace VIctoryLauncher
             settingsFile = Path.Combine(Path.GetDirectoryName(dataRoot), "launcher.ini");
             Pt = ReadSetting("lang") == "pt";
             Fr = ReadSetting("lang") == "fr";
-            cacheDir = ReadSetting("cache") ?? Path.Combine(dataRoot, "cache");
+            cacheDir = ReadSetting("cache");
+            if (cacheDir == null || (!cacheDir.All(c => c < 128) && cacheDir == Path.Combine(dataRoot, "cache"))) cacheDir = DefaultCacheDir();
             dataDir = ReadSetting("data") ?? Path.Combine(dataRoot, "data");
             modes = new Mode[] {
                 new Mode(L("Recommended", "Recomendado"), "720p → 1080p", L("Balanced · edupode", "Equilibrado · edupode"),
@@ -1614,10 +1615,32 @@ namespace VIctoryLauncher
             {
                 if (!File.Exists(settingsFile)) return null;
                 foreach (var line in File.ReadAllLines(settingsFile))
-                    if (line.StartsWith(key + "=")) return line.Substring(key.Length + 1);
+                    if (line.StartsWith(key + "=")) return Unmangle(line.Substring(key.Length + 1));
             }
             catch (Exception) { }
             return null;
+        }
+
+        // A path like C:\Users\Ã©lÃ¨ve is UTF-8 read back as Windows-1252 (once or more): turn it back into
+        // C:\Users\élève, or the game cannot create its folders there (Access denied).
+        static string Unmangle(string s)
+        {
+            if (s == null) return null;
+            var w1252 = System.Text.Encoding.GetEncoding(1252);
+            for (int i = 0; i < 4 && (s.IndexOf('Ã') >= 0 || s.IndexOf('Â') >= 0); i++)
+            {
+                var t = System.Text.Encoding.UTF8.GetString(w1252.GetBytes(s));
+                if (t == s || t.IndexOf('\uFFFD') >= 0) break;
+                s = t;
+            }
+            return s;
+        }
+
+        // The cache's path must be plain (no accents): with a profile like C:\Users\élève it goes to C:\VIctory\cache.
+        string DefaultCacheDir()
+        {
+            var home = Path.Combine(dataRoot, "cache");
+            return home.All(c => c < 128) ? home : Path.Combine(Path.GetPathRoot(dataRoot), "VIctory", "cache");
         }
 
         void LoadSettings()
@@ -1629,7 +1652,7 @@ namespace VIctoryLauncher
                 {
                     var i = line.IndexOf('=');
                     if (i < 0) continue;
-                    var k = line.Substring(0, i); var v = line.Substring(i + 1);
+                    var k = line.Substring(0, i); var v = Unmangle(line.Substring(i + 1));
                     switch (k)
                     {
                         case "game": gameBox.Text = v; break;

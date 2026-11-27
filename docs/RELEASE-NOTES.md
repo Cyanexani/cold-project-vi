@@ -1,6 +1,5 @@
-Julia's Launcher 0.3.0: French, and updates from felicienradio/cold-project-vi.
+Julia's Launcher 0.3.1: the game starts again when the Windows user name has accents.
 
-- French: a new FR button next to EN and PT in the side bar. Every page, the Help page, the controls and the notices are translated.
-- Updates now come from github.com/felicienradio/cold-project-vi releases, signed with the project's new release key.
-  Coming from 0.2.x? Install this version once by hand; later versions install themselves.
-- The installer can be shown in French.
+- Fix: with a user name like "élève", a damaged cache path (C:\Users\Ã©lÃ¨ve...) in launcher.ini stopped the game at once ("Access denied"), whatever the preset. The launcher now repairs such paths on its own.
+- With accents in the user folder, the shader cache goes to C:\VIctory\cache (a plain path, as the game needs). Prepare the shaders once more after updating.
+- French: a new FR button next to EN and PT (since 0.3.0).

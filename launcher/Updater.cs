@@ -21,7 +21,7 @@ namespace VIctoryLauncher
     static class Updater
     {
         // This launcher's version; a release with a higher one is an update.
-        public const string Version = "0.3.0";
+        public const string Version = "0.3.1";
         public const string ManifestUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.json";
         public const string SignatureUrl = "https://github.com/felicienradio/cold-project-vi/releases/latest/download/manifest.sig";
         public const string DownloadPrefix = "https://github.com/felicienradio/cold-project-vi/releases/download/";
