@@ -35,7 +35,7 @@ namespace VIctoryLauncher
         public const string AmdCommit = "4eb6cfdf9e61cb112f1f811344ec0dd309eddd6c";
 
         // Beside the other data, so it never depends on where the launcher sits (Downloads, Program Files).
-        string AmdEngineDir { get { return Path.Combine(Path.GetDirectoryName(dataRoot), "engines", "amd"); } }
+        string AmdEngineDir { get { return Path.Combine(StorageRoot ?? Path.GetDirectoryName(dataRoot), "engines", "amd"); } }
 
         // launcher.ini's engine=: edupode (the default, every card: the least video memory and the most
         // stable), or amd (Belobug's AMD engine, the alternative for Radeon cards, chosen by the player).
@@ -132,7 +132,7 @@ namespace VIctoryLauncher
             {
                 using (var k = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences"))
                     foreach (var exe in OwnExeCandidates.Concat(new[] {
-                                                Path.Combine(AmdEngineDir, "target", "diag", "victory.exe"), Path.Combine(AmdEngineDir, "victory.exe") }))
+                                                Path.Combine(AmdEngineDir, "target", "diag", "victory.exe"), Path.Combine(BuildTarget(AmdEngineDir), "diag", "victory.exe"), Path.Combine(AmdEngineDir, "victory.exe") }))
                         k.SetValue(exe, "GpuPreference=2;");
                 Log(L("Windows now gives victory.exe the high-performance graphics card (restart the game to apply).", "O Windows da agora ao victory.exe a placa grafica de alto desempenho (reinicia o jogo para aplicar)."));
                 return true;

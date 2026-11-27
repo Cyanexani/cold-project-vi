@@ -42,6 +42,15 @@ jobs:
           cmake --build nvsmooth30/build --config Release
           Copy-Item nvsmooth30/build/Release/version.dll dist/nvsmooth30-version.dll
           Copy-Item nvsmooth30/LICENSE dist/nvsmooth30-LICENSE.txt
+      - name: D3D12 Agility SDK (Microsoft's redistributable; Windows 10 needs it)
+        shell: pwsh
+        run: |
+          # The version apps/victory/src/agility.rs asks for, and the SHA-256 launcher/Agility.cs checks.
+          $version = '1.620.2'; $sha = '70a6d47d335b4a15180544c01a35b84474522a369dc582d85fe057313a3aeaa0'
+          Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/microsoft.direct3d.d3d12/$version/microsoft.direct3d.d3d12.$version.nupkg" -OutFile agility.zip
+          Expand-Archive agility.zip agility -Force
+          Copy-Item agility/build/native/bin/x64/D3D12Core.dll dist/D3D12Core.dll
+          if ((Get-FileHash dist/D3D12Core.dll -Algorithm SHA256).Hash.ToLower() -ne $sha) { throw "D3D12Core.dll is not the one the launcher expects" }
       - name: Files of the release
         shell: pwsh
         run: |

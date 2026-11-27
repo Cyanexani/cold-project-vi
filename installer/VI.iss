@@ -43,6 +43,8 @@ Name: "{app}"; Permissions: users-modify
 [Files]
 Source: "..\dist\Julia's Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\victory.exe"; DestDir: "{app}"; Flags: ignoreversion
+; The D3D12 Agility SDK (Microsoft's redistributable): Windows 10 needs it to run the engine.
+Source: "..\dist\D3D12Core.dll"; DestDir: "{app}\D3D12"; Flags: ignoreversion
 Source: "..\dist\launcher-source.zip"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\SHA256SUMS.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\scripts\rt_off_hashes.txt"; DestDir: "{app}\scripts"; Flags: ignoreversion

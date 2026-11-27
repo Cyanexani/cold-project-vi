@@ -252,6 +252,8 @@ namespace VIctoryLauncher
                 try { BeginInvoke(new Action(() => { smoothState = s; UpdateBanner(); UpdateSmooth(); })); } catch (Exception) { }
             }) { IsBackground = true }.Start();
             ProbeGpu();
+            // Windows 10 needs the D3D12 Agility SDK beside victory.exe (Agility.cs).
+            EnsureAgility();
             StartChecks();
             // Once the window is up: the notices of new things to try (Hardware.cs).
             var later = new System.Windows.Forms.Timer { Interval = 1500 };
@@ -1131,7 +1133,7 @@ namespace VIctoryLauncher
             get
             {
                 var places = UseAmdEngine
-                    ? new[] { Path.Combine(AmdEngineDir, "target", "diag", "victory.exe"), Path.Combine(AmdEngineDir, "victory.exe") }
+                    ? new[] { Path.Combine(BuildTarget(AmdEngineDir), "diag", "victory.exe"), Path.Combine(AmdEngineDir, "target", "diag", "victory.exe"), Path.Combine(AmdEngineDir, "victory.exe") }
                     : OwnExeCandidates;
                 foreach (var p in places)
                     if (File.Exists(p)) return p;
@@ -1148,6 +1150,7 @@ namespace VIctoryLauncher
                 var list = new List<string>();
                 var src = SourceDir;
                 if (src != null) list.Add(Path.Combine(src, "target", "diag", "victory.exe"));
+                if (src != null && StorageRoot != null) list.Add(Path.Combine(BuildTarget(src), "diag", "victory.exe"));
                 list.Add(Path.Combine(root, "target", "diag", "victory.exe"));
                 list.Add(Path.Combine(root, "victory.exe"));
                 list.Add(Path.Combine(AppDir, "victory.exe"));

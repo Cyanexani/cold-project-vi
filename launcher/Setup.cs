@@ -396,6 +396,8 @@ namespace VIctoryLauncher
             var psi = new ProcessStartInfo(CargoExe, "build --locked --profile diag -p victory --features diagnostics") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = folder };
             var cargoBin = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo", "bin");
             psi.EnvironmentVariables["PATH"] = cargoBin + ";" + Environment.GetEnvironmentVariable("PATH");
+            // A storage folder on another drive (Storage.cs): the build goes there, not into the source folder.
+            if (StorageRoot != null) psi.EnvironmentVariables["CARGO_TARGET_DIR"] = BuildTarget(folder);
             Log(string.Format(L("Building {0}... Log: ", "A compilar {0}... Log: "), what) + log);
             using (var writer = new StreamWriter(log, false))
             {
@@ -417,6 +419,7 @@ namespace VIctoryLauncher
                 p.WaitForExit();
                 Log(p.ExitCode == 0 ? what + L(": built.", ": compilado.") : L("The build failed: see ", "A compilacao falhou: ve ") + log);
                 BeginInvoke(new Action(() => { Refresh2(); ProbeGpu(); }));
+                if (p.ExitCode == 0) EnsureAgility();
                 if (p.ExitCode != 0)
                 {
                     writer.Flush();

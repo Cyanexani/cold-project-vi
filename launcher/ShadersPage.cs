@@ -73,6 +73,7 @@ namespace VIctoryLauncher
                 Text = L("Repair: makes the missing shaders and retries the pipelines that failed. Rebuild everything: clears the cache and prepares it again (about 5 minutes).",
                          "Reparar: faz os shaders que faltam e tenta de novo as pipelines que falharam. Refazer tudo: limpa a cache e prepara-a de novo (cerca de 5 minutos).") });
             y += 42;
+            y = StorageSection(page, X, y, W);
             page.Controls.Add(new Heading(L("Last errors (prepare.log)", "Ultimos erros (prepare.log)")) { Location = new Point(X, y), Width = W });
             y += 30;
             shaderErrors = new TextBox { Location = new Point(X, y), Size = new Size(W, 150), Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Theme.Card, ForeColor = Theme.Dim, Font = Theme.Mono(8.5f), ScrollBars = ScrollBars.Vertical };

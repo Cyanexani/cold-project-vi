@@ -19,6 +19,14 @@ namespace VIctoryLauncher
     partial class LauncherForm
     {
         static readonly string[] NewEn = {
+            "IN 0.3.7",
+            "  •  Rainbow textures: a texture that had not been read yet showed another texture's leftover bytes",
+            "     (faces, shirts, walls full of coloured noise). Now it waits, empty, for a moment instead.",
+            "  •  Windows 10: the game starts. The D3D12 Agility SDK (Microsoft's) now comes with VIctory.",
+            "  •  Your fastest drive: Shaders > 'Move to another drive...' moves the shader cache, the game's data and",
+            "     saves, the AMD engine and builds from source to any drive.",
+            "",
+            "IN 0.3.6",
             "NEW",
             "  •  Output 720p: pick 720p or 1080p (or 2K, 4K) next to the presets. At 720p, Recommended draws",
             "     native 720p and the 540p presets are upscaled to 720p instead of 1080p: a sharper picture for less.",
@@ -49,6 +57,14 @@ namespace VIctoryLauncher
         };
 
         static readonly string[] NewPt = {
+            "NA 0.3.7",
+            "  •  Texturas arco-iris: uma textura ainda nao lida mostrava os restos de outra (caras, camisolas,",
+            "     paredes cheias de ruido colorido). Agora fica vazia um instante em vez disso.",
+            "  •  Windows 10: o jogo arranca. O D3D12 Agility SDK (da Microsoft) vem agora com o VIctory.",
+            "  •  O teu disco mais rapido: Shaders > 'Mudar para outro disco...' muda a cache de shaders, os dados e",
+            "     saves do jogo, o motor AMD e as compilacoes para qualquer disco.",
+            "",
+            "NA 0.3.6",
             "NOVO",
             "  •  Saida 720p: escolhe 720p ou 1080p (ou 2K, 4K) ao lado das predefinicoes. Em 720p, o Recomendado",
             "     desenha 720p nativo e as predefinicoes de 540p sao ampliadas para 720p em vez de 1080p: imagem mais nitida.",
@@ -79,6 +95,14 @@ namespace VIctoryLauncher
         };
 
         static readonly string[] NewFr = {
+            "DANS LA 0.3.7",
+            "  •  Textures arc-en-ciel : une texture pas encore lue montrait les restes d'une autre (visages, t-shirts,",
+            "     murs pleins de bruit coloré). Elle reste maintenant vide un instant à la place.",
+            "  •  Windows 10 : le jeu démarre. Le D3D12 Agility SDK (de Microsoft) est fourni avec VIctory.",
+            "  •  Ton disque le plus rapide : Shaders > 'Déplacer vers un autre disque...' déplace le cache de shaders,",
+            "     les données et sauvegardes, le moteur AMD et les compilations vers n'importe quel disque.",
+            "",
+            "DANS LA 0.3.6",
             "NOUVEAU",
             "  •  Sortie 720p : choisis 720p ou 1080p (ou 2K, 4K) à côté des préréglages. En 720p, Recommandé dessine",
             "     en 720p natif et les préréglages 540p sont agrandis en 720p au lieu de 1080p : une image plus nette.",

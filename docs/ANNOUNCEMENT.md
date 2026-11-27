@@ -1,16 +1,10 @@
 ## Julia's Launcher {tag} is out 🔧
-**New**
-🖥️ **720p or 1080p, your pick.** At 720p the 540p presets look sharper (upscaled to 720p, not 1080p) and Recommended runs native 720p.
-📊 **Game logs, if you say yes.** When the game closes, a standard log of that game can go to edupode (your user name taken out). Asked once, change it on Hardware & ID. This is how the next optimizations get picked: please say yes 🙏
-🎮 **Controls by what you are doing** (on foot, fighting, driving, flying, menus), and a **What's new** window after every update.
-📈 **Hardware & ID** shows the reference PC and everyone's PCs as charts, updated every 6 hours.
-
 **Fix**
-⚠️ No more endless **"Fix it"** for Resizable BAR on GTX / RTX 20 cards and Windows 10, or for shaders that are already prepared.
-🧹 Older copies of the launcher can go to the Recycle Bin. Your settings stay.
+🌈 **Rainbow textures are gone.** Faces, shirts and walls full of coloured noise were leftovers of *another* texture in reused memory. That memory is now emptied first: a texture is blank for a moment, then right. Worst on 8 GB cards / 16 GB of RAM, so tell us how it looks there.
+🪟 **Windows 10: the game starts.** No more "never gets past D3D12 init": VIctory now ships Microsoft's D3D12 Agility SDK, no patcher needed. Windows 11 is unchanged.
 
-**"Windows says it's a virus"** 🛡️ It isn't. The launcher no longer touches antivirus settings or runs hidden PowerShell (that is what looked suspicious). Everything is built by GitHub from the open source code, with SHA-256 sums and a provenance attestation. Check it yourself: https://github.com/felicienradio/cold-project-vi/blob/main/docs/SAFETY.md
-🦠 Also: removed the deadly virus from the game. (Like Herobrine, it was never there.)
+**New**
+💾 **Use your fastest drive:** Shaders > **Move to another drive...** moves the shader cache, game data and saves, the AMD engine and builds to any drive.
 
 **Install**
 🔄 On 0.3.x: nothing to do, it installs itself within 5 minutes while the game is closed.
