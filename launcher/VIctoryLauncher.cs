@@ -1736,6 +1736,8 @@ namespace VIctoryLauncher
             // Little RAM free: what holds it, once (Session.cs). The first game on an engine: how its pipelines get built.
             if (!HeavyAppsCheck()) return;
             PipelineHint();
+            // The saves as they are, before the game can change them (Saves.cs).
+            BackupSavesBeforePlay();
             long cardUsed;
             GpuUsers(out cardUsed);
             if (cardUsed > (2L << 30))

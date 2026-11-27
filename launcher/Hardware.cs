@@ -39,7 +39,8 @@ namespace VIctoryLauncher
 
         // launcher.ini's engine=: edupode (the default, every card: the least video memory and the most
         // stable), or amd (Belobug's AMD engine, the alternative for Radeon cards, chosen by the player).
-        string EngineChoice { get { return ReadSetting("engine") == "amd" ? "amd" : "edupode"; } }
+        // The AMD engine is for Radeon cards only: picked on an NVIDIA card it crashed at start (an RTX 4080 SUPER, 27/11/2026).
+        string EngineChoice { get { return ReadSetting("engine") == "amd" && !(hasNvidia && !hasRadeon) ? "amd" : "edupode"; } }
 
         bool UseAmdEngine { get { return EngineChoice == "amd"; } }
 
@@ -174,8 +175,11 @@ namespace VIctoryLauncher
             set("VICTORY_PORT_CBV", "1");
             set("VICTORY_PORT_GUARD", "1");
             set("VICTORY_PORT_JOURNAL", "1");
-            set("VICTORY_OUTPUT", DisplayWidth + "x" + DisplayHeight);
-            set("VICTORY_WINDOW_MAX", DisplayWidth + "x" + DisplayHeight);
+            // At most 1080p: Belobug's engine stops at start with a 1440p or 4K output (the game's fatal error at
+            // title+0x56a2afd, 7 sessions on RX 6800 and RTX 4080 SUPER, 27/11/2026).
+            int h = Math.Min(DisplayHeight, 1080), w = h * 16 / 9;
+            set("VICTORY_OUTPUT", w + "x" + h);
+            set("VICTORY_WINDOW_MAX", w + "x" + h);
             set("VICTORY_KBM_GTA", "1");
             // AMD cards run 64-lane waves natively: the wave-wide form is the console's own.
             set("VICTORY_WAVE_WIDE", "1");

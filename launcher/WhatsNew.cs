@@ -19,6 +19,12 @@ namespace VIctoryLauncher
     partial class LauncherForm
     {
         static readonly string[] NewEn = {
+            "IN 0.3.11",
+            "  •  Fewer crashes on 16 GB PCs: when Windows runs out of memory for a moment, VIctory lets go of the",
+            "     memory it keeps in reserve and tries again, instead of closing (seen on RX 9070 XT, RX 6600, RTX 4070).",
+            "  •  Your saves are copied before every game (the newest 15 are kept): Hardware & ID > Game saves >",
+            "     'Restore a backup...' brings any of them back.",
+            "",
             "IN 0.3.9",
             "  •  Rainbow textures: the fix announced in 0.3.7 was left out of that build by mistake. It is in now.",
             "  •  '720p' no longer closes the game at start. It is now 'World at 720p (lighter)': the screen stays 1080p",
@@ -63,6 +69,12 @@ namespace VIctoryLauncher
         };
 
         static readonly string[] NewPt = {
+            "NA 0.3.11",
+            "  •  Menos crashes em PCs de 16 GB: quando o Windows fica sem memoria por um momento, o VIctory liberta a",
+            "     memoria que guarda de reserva e tenta de novo, em vez de fechar (visto em RX 9070 XT, RX 6600, RTX 4070).",
+            "  •  Os teus saves sao copiados antes de cada jogo (ficam os 15 mais recentes): Hardware e ID > Saves do jogo >",
+            "     'Restaurar uma copia...' traz qualquer um de volta.",
+            "",
             "NA 0.3.9",
             "  •  Texturas arco-iris: a correcao anunciada na 0.3.7 ficou de fora dessa versao por engano. Agora esta.",
             "  •  O '720p' ja nao fecha o jogo ao arrancar. Passa a ser 'Mundo a 720p (mais leve)': o ecra fica a 1080p",
@@ -107,6 +119,12 @@ namespace VIctoryLauncher
         };
 
         static readonly string[] NewFr = {
+            "DANS LA 0.3.11",
+            "  •  Moins de plantages sur les PC de 16 Go : quand Windows manque de mémoire un instant, VIctory libère la",
+            "     mémoire qu'il garde en réserve et réessaie, au lieu de se fermer (vu sur RX 9070 XT, RX 6600, RTX 4070).",
+            "  •  Tes sauvegardes sont copiées avant chaque partie (les 15 plus récentes sont gardées) : Matériel et ID >",
+            "     Sauvegardes du jeu > 'Restaurer une copie...' en ramène n'importe laquelle.",
+            "",
             "DANS LA 0.3.9",
             "  •  Textures arc-en-ciel : le correctif annoncé dans la 0.3.7 avait été oublié dans cette version. Il y est.",
             "  •  Le '720p' ne ferme plus le jeu au démarrage. Il devient 'Monde en 720p (plus léger)' : l'écran reste en",

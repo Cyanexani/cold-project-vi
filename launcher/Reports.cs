@@ -79,21 +79,18 @@ namespace VIctoryLauncher
                             if (zip == null) { MessageBox.Show(this, L("The package could not be made: ", "Nao deu para criar o pacote: ") + error, "Julia's Launcher"); return; }
                             try { Clipboard.SetText(summary); } catch (Exception) { }
                             try { Process.Start("explorer.exe", "/select,\"" + zip + "\""); } catch (Exception) { }
-                            var body = string.Format(L("Done: {0} is on your Desktop.\r\n\r\nSend it to edupode:\r\n\r\n" +
-                                                       "•  Send to edupode: one click. A compact copy (summary, settings, the end of each log; your user name taken out) goes to edupode's private report box. Only edupode can read it.\r\n" +
-                                                       "•  GitHub issue: the page opens already filled in. Drag the zip into the text box, then press 'Submit new issue' (a free GitHub account is needed).\r\n" +
-                                                       "•  Discord: send the zip in the channel \"{1}\" and paste the summary (already copied).",
-                                                       "Feito: {0} esta no Ambiente de trabalho.\r\n\r\nEnvia-o ao edupode:\r\n\r\n" +
-                                                       "•  Enviar ao edupode: um clique. Uma copia compacta (resumo, definicoes, o fim de cada log; sem o teu nome de utilizador) vai para a caixa privada de relatorios do edupode. So o edupode a pode ler.\r\n" +
-                                                       "•  Issue no GitHub: a pagina abre ja preenchida. Arrasta o zip para a caixa de texto e carrega em 'Submit new issue' (precisa de uma conta GitHub gratuita).\r\n" +
-                                                       "•  Discord: envia o zip no canal \"{1}\" e cola o resumo (ja copiado).",
-                                                       "Terminé : {0} est sur ton Bureau.\r\n\r\nEnvoie-le à edupode :\r\n\r\n" +
-                                                       "•  Envoyer à edupode : un clic. Une copie compacte (résumé, réglages, la fin de chaque log ; sans ton nom d'utilisateur) part dans la boîte à rapports privée d'edupode. Seul edupode peut la lire.\r\n" +
-                                                       "•  Issue GitHub : la page s'ouvre déjà remplie. Glisse le zip dans la zone de texte, puis appuie sur 'Submit new issue' (il faut un compte GitHub gratuit).\r\n" +
-                                                       "•  Discord : envoie le zip dans le salon \"{1}\" et colle le résumé (déjà copié)."), Path.GetFileName(zip), DiscordChannel);
-                            var answer = Notice(L("Send the report", "Enviar o relatorio"), body, L("Send to edupode", "Enviar ao edupode"), L("Open a GitHub issue", "Abrir uma issue no GitHub"));
-                            if (answer == 1) SendReport(zip, game);
-                            if (answer == 2) OpenUrl(IssueUrl(game, ticked, said, summary, Path.GetFileName(zip)));
+                            var body = string.Format(L("Done: {0} is on your Desktop.\r\n\r\n" +
+                                                       "•  Send: one click, no account needed. The logs (the end of each one, settings; your user name taken out) go to the developers' private report box, and a public bug report opens on GitHub (felicienradio/cold-project-vi) with the summary only: your PC's parts, versions, preset, settings and what you ticked and wrote. You can follow it there.\r\n" +
+                                                       "•  Send privately: the same, without the public GitHub report.",
+                                                       "Feito: {0} esta no Ambiente de trabalho.\r\n\r\n" +
+                                                       "•  Enviar: um clique, sem conta. Os logs (o fim de cada um, definicoes; sem o teu nome de utilizador) vao para a caixa privada de relatorios dos programadores, e abre-se um relatorio publico no GitHub (felicienradio/cold-project-vi) so com o resumo: as pecas do PC, versoes, predefinicao, definicoes e o que marcaste e escreveste. Podes acompanha-lo la.\r\n" +
+                                                       "•  Enviar em privado: o mesmo, sem o relatorio publico no GitHub.",
+                                                       "Terminé : {0} est sur ton Bureau.\r\n\r\n" +
+                                                       "•  Envoyer : un clic, sans compte. Les logs (la fin de chacun, les réglages ; sans ton nom d'utilisateur) partent dans la boîte à rapports privée des développeurs, et un rapport de bug public s'ouvre sur GitHub (felicienradio/cold-project-vi) avec seulement le résumé : les composants de ton PC, les versions, le préréglage, les réglages et ce que tu as coché et écrit. Tu pourras le suivre là-bas.\r\n" +
+                                                       "•  Envoyer en privé : la même chose, sans le rapport public sur GitHub."), Path.GetFileName(zip));
+                            var answer = Notice(L("Send the report", "Enviar o relatorio"), body, L("Send", "Enviar", "Envoyer"), L("Send privately", "Enviar em privado", "Envoyer en privé"));
+                            if (answer == 1) SendReport(zip, game, true);
+                            if (answer == 2) SendReport(zip, game, false);
                         }));
                     }
                     catch (Exception) { }
@@ -172,12 +169,12 @@ namespace VIctoryLauncher
 
         // A compact copy of the package (text files whole, the last part of each log) sent to the
         // Worker, which keeps it for edupode only. Says the report's number, or why it failed.
-        void SendReport(string zip, bool game)
+        void SendReport(string zip, bool game, bool open)
         {
             var dir = zip.Substring(0, zip.Length - 4);
             var viId = (hw ?? ReadHardware()).Id;
             new Thread(() => {
-                string said;
+                string said, issue = null;
                 bool sent = false;
                 try
                 {
@@ -196,14 +193,22 @@ namespace VIctoryLauncher
                     req.Timeout = 60000;
                     req.Headers["X-VI-Id"] = viId;
                     req.Headers["X-VI-Kind"] = game ? "game" : "launcher";
+                    if (open) req.Headers["X-VI-Public"] = "1";
                     req.ContentLength = data.Length;
                     using (var s = req.GetRequestStream()) s.Write(data, 0, data.Length);
                     string answer;
                     using (var r = (HttpWebResponse)req.GetResponse())
                     using (var rd = new StreamReader(r.GetResponseStream())) answer = rd.ReadToEnd();
-                    var n = System.Text.RegularExpressions.Regex.Match(answer, @"\d+").Value;
-                    said = string.Format(L("Sent to edupode: report #{0}.\r\n\r\nYour hardware ID is {1} (copied). Paste it on Discord, in \"{2}\", so edupode can find your reports.",
-                                           "Enviado ao edupode: relatorio n.o {0}.\r\n\r\nO teu ID de hardware e {1} (copiado). Cola-o no Discord, em \"{2}\", para o edupode encontrar os teus relatorios."), n, viId, DiscordChannel);
+                    var n = System.Text.RegularExpressions.Regex.Match(answer, @"""n""\s*:\s*(\d+)").Groups[1].Value;
+                    // The public issue's address, when the box opened one (it answers {"n":…, "issue":"https://github.com/…"}).
+                    var m = System.Text.RegularExpressions.Regex.Match(answer, @"""issue""\s*:\s*""(https://github\.com/[^""]+)""");
+                    issue = m.Success ? m.Groups[1].Value : null;
+                    said = issue != null
+                        ? string.Format(L("Report #{0} sent. Its public bug report is on GitHub: {1}\r\n\r\nYour hardware ID is {2} (copied).",
+                                          "Relatorio n.o {0} enviado. O relatorio publico esta no GitHub: {1}\r\n\r\nO teu ID de hardware e {2} (copiado).",
+                                          "Rapport n° {0} envoyé. Son rapport public est sur GitHub : {1}\r\n\r\nTon ID matériel est {2} (copié)."), n, issue, viId)
+                        : string.Format(L("Sent to edupode: report #{0}.\r\n\r\nYour hardware ID is {1} (copied). Paste it on Discord, in \"{2}\", so edupode can find your reports.",
+                                          "Enviado ao edupode: relatorio n.o {0}.\r\n\r\nO teu ID de hardware e {1} (copiado). Cola-o no Discord, em \"{2}\", para o edupode encontrar os teus relatorios."), n, viId, DiscordChannel);
                     sent = true;
                 }
                 catch (WebException e)
@@ -219,7 +224,12 @@ namespace VIctoryLauncher
                 {
                     BeginInvoke(new Action(() => {
                         if (sent) { try { Clipboard.SetText(viId); } catch (Exception) { } }
-                        if (sent && MessageBox.Show(this, said + L("\r\n\r\nOpen Discord now?", "\r\n\r\nAbrir o Discord agora?"), "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                        if (sent && issue != null)
+                        {
+                            if (MessageBox.Show(this, said + L("\r\n\r\nOpen it now?", "\r\n\r\nAbrir agora?", "\r\n\r\nL'ouvrir maintenant ?"), "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                                OpenUrl(issue);
+                        }
+                        else if (sent && MessageBox.Show(this, said + L("\r\n\r\nOpen Discord now?", "\r\n\r\nAbrir o Discord agora?"), "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
                             OpenUrl(DiscordInvite);
                         else if (!sent) MessageBox.Show(this, said, "Julia's Launcher");
                     }));
