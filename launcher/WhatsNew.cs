@@ -19,7 +19,8 @@ namespace VIctoryLauncher
     partial class LauncherForm
     {
         static readonly string[] NewEn = {
-            "IN 0.3.8",
+            "IN 0.3.9",
+            "  •  Rainbow textures: the fix announced in 0.3.7 was left out of that build by mistake. It is in now.",
             "  •  '720p' no longer closes the game at start. It is now 'World at 720p (lighter)': the screen stays 1080p",
             "     and the world is drawn at 720p at most (the game itself refuses a 720p screen).",
             "  •  'Resizable BAR in the NVIDIA driver' now works: Windows asks for administrator rights once.",
@@ -62,7 +63,8 @@ namespace VIctoryLauncher
         };
 
         static readonly string[] NewPt = {
-            "NA 0.3.8",
+            "NA 0.3.9",
+            "  •  Texturas arco-iris: a correcao anunciada na 0.3.7 ficou de fora dessa versao por engano. Agora esta.",
             "  •  O '720p' ja nao fecha o jogo ao arrancar. Passa a ser 'Mundo a 720p (mais leve)': o ecra fica a 1080p",
             "     e o mundo e desenhado a 720p no maximo (o proprio jogo recusa um ecra de 720p).",
             "  •  'Resizable BAR no driver da NVIDIA' funciona: o Windows pede permissoes de administrador uma vez.",
@@ -105,7 +107,8 @@ namespace VIctoryLauncher
         };
 
         static readonly string[] NewFr = {
-            "DANS LA 0.3.8",
+            "DANS LA 0.3.9",
+            "  •  Textures arc-en-ciel : le correctif annoncé dans la 0.3.7 avait été oublié dans cette version. Il y est.",
             "  •  Le '720p' ne ferme plus le jeu au démarrage. Il devient 'Monde en 720p (plus léger)' : l'écran reste en",
             "     1080p et le monde est dessiné en 720p au plus (le jeu lui-même refuse un écran 720p).",
             "  •  'Resizable BAR dans le pilote NVIDIA' fonctionne : Windows demande une fois les droits administrateur.",

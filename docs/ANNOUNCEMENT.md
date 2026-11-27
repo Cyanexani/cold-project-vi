@@ -1,5 +1,6 @@
 ## Julia's Launcher {tag} is out 🔧
 **Fix**
+🌈 **Rainbow textures, for real this time.** The fix announced in 0.3.7 was left out of that build by mistake, sorry! It is in this one.
 🖥️ **The game closed at start with "720p" picked.** Sorry, that one was ours: the game refuses a 720p screen. The option is now **World at 720p (lighter)** (1080p screen, world at 720p). If it crashed for you, just press PLAY again.
 🟢 **"Resizable BAR in the NVIDIA driver" stayed red.** The driver wants administrator rights for it: Windows now asks once, and it turns on.
 
