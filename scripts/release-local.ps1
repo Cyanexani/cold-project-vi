@@ -59,8 +59,9 @@ try {
             size   = $f.Length
         }
     }
-    $notes = Get-Content 'docs\RELEASE-NOTES.md' -Raw -Encoding UTF8
-    $notesPt = if (Test-Path 'docs\RELEASE-NOTES.pt.md') { Get-Content 'docs\RELEASE-NOTES.pt.md' -Raw -Encoding UTF8 } else { '' }
+    # ReadAllText, not Get-Content: Windows PowerShell's Get-Content adds PSPath and other fields that ConvertTo-Json writes out.
+    $notes = [IO.File]::ReadAllText((Join-Path $root 'docs\RELEASE-NOTES.md'))
+    $notesPt = if (Test-Path 'docs\RELEASE-NOTES.pt.md') { [IO.File]::ReadAllText((Join-Path $root 'docs\RELEASE-NOTES.pt.md')) } else { '' }
     $manifest = [ordered]@{ version = $version; notes = $notes; notes_pt = $notesPt; files = @($files) } | ConvertTo-Json -Depth 4
     $manifestPath = Join-Path $dist 'manifest.json'
     [IO.File]::WriteAllText($manifestPath, $manifest, (New-Object Text.UTF8Encoding $false))
