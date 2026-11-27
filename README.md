@@ -191,7 +191,8 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 Options: ★ FPS overlay (F3), ★ borderless full screen (test A: 22-24 FPS on the author's PC; needed by Smooth
 Motion), ★ the 60 FPS clock, pipelines loaded before the game (new), NVIDIA Smooth Motion, the video memory
 reserve, crowds and fights (2 GB of the game's buffers on the card; 12 GB cards and up), anti-stretch (fewer
-stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental).
+stretched bodies, slower), rainbow-face fix (slower), fast loading (experimental), more CPU cores (a test: half the
+cores copy the game's memory; compare AVG 1M on F3 with it on and off).
 
 ## Controls
 

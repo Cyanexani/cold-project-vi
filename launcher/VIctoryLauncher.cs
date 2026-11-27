@@ -109,7 +109,7 @@ namespace VIctoryLauncher
         Heading presetHeading, gameHeading;
         readonly List<ModeCard> cards = new List<ModeCard>();
         int modeIndex = -1;
-        CheckBox panelBox, borderlessBox, fps60Box, reserveBox, smoothBox, qualityBox, facesBox, loadingBox, fightsBox, warmBox;
+        CheckBox panelBox, borderlessBox, fps60Box, reserveBox, smoothBox, qualityBox, facesBox, loadingBox, fightsBox, warmBox, cpuBox;
         LoadBar loadBar;
         TextBox logBox;
         Pill playButton, prepareButton, buildButton, closeButton;
@@ -477,7 +477,8 @@ namespace VIctoryLauncher
             facesBox = T(L("Rainbow-face fix", "Correcao das caras arco-iris"), L("Textures finish uploading first; costs FPS", "Texturas acabam de subir primeiro; custa FPS"), 1, 2, false);
             loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), L("Shorter loading pauses; untested", "Pausas de carregamento mais curtas; nao testado"), 1, 3, false);
             warmBox = T(L("Load pipelines before the game", "Carregar pipelines antes do jogo"), L("No stutter the first time you see a place", "Sem engasgos a primeira vez que ves um sitio"), 1, 4, true);
-            y += 5 * 66 + 2;
+            cpuBox = T(L("More CPU cores (test)", "Mais nucleos do processador (teste)"), L("Half the cores copy the game's memory", "Metade dos nucleos copia a memoria do jogo"), 0, 5, false);
+            y += 6 * 66 + 2;
             explain = new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Cyan, BackColor = Theme.Back, Font = Theme.Ui(9f),
                 Text = L("Point at an option to see what it does. ★ marks what was tested on edupode's PC (RTX 5070 Ti laptop).", "Passa o rato por uma opcao para ver o que faz. ★ marca o que foi testado no PC do edupode (portatil RTX 5070 Ti).") };
             page.Controls.Add(explain);
@@ -523,6 +524,8 @@ namespace VIctoryLauncher
                               "Espera por todas as copias dos buffers do jogo antes de desenhar: menos corpos esticados ('esparguete'), mas varios FPS mais lento.");
             d[facesBox] = L("Waits for textures to finish uploading before use: fixes rainbow faces, costs FPS.",
                             "Espera que as texturas acabem de subir antes de as usar: corrige as caras arco-iris, custa FPS.");
+            d[cpuBox] = L("Test: the CPU is the limit (the card waits ~0 ms a frame). By default 6 helper threads refresh the game's buffers and textures (~18 ms of a 44 ms frame); this gives them half your cores (up to 12) and asks Windows which pages changed on a thread of its own. Play 5 minutes with it on and 5 off and compare AVG 1M on F3; tell us on Discord which wins.",
+                          "Teste: o limite e o processador (a placa espera ~0 ms por frame). Por defeito, 6 ajudantes refrescam os buffers e as texturas do jogo (~18 ms de um frame de 44 ms); isto da-lhes metade dos teus nucleos (ate 12) e pergunta ao Windows que paginas mudaram numa thread a parte. Joga 5 minutos com e 5 sem e compara o AVG 1M no F3; conta no Discord qual ganha.");
             d[warmBox] = L("New: before the game starts, a loading bar makes every pipeline earlier sessions drew with, in separate processes, so the driver has them ready: no stutter the first time you see a place. Takes seconds once the cache is ready; after a VIctory or driver update it takes longer, once.",
                            "Novo: antes de o jogo arrancar, uma barra de carregamento prepara todas as pipelines usadas nas sessoes anteriores, em processos a parte, para o driver ja as ter: sem engasgos a primeira vez que ves um sitio. Demora segundos com a cache pronta; depois de atualizar o VIctory ou o driver demora mais, uma vez.");
             d[loadingBox] = L("Experimental: textures the game builds on the CPU no longer wait for the game's memory to settle. Shorter loading pauses; untested.",
@@ -1350,6 +1353,12 @@ namespace VIctoryLauncher
             // Advanced Tweaks: the player's values over the preset they start from (Custom.cs).
             if (m.Custom) ApplyCustom(e);
             set("VICTORY_VRAM_RESERVE", reserveBox.Checked ? "max" : "0");
+            if (cpuBox.Checked)
+            {
+                // Half the logical cores for the copy and refresh helpers (2-12), the write watch asked early.
+                set("VICTORY_WIDE_THREADS", Math.Max(2, Math.Min(12, Environment.ProcessorCount / 2)).ToString());
+                set("VICTORY_ASK_EARLY", "2");
+            }
             if (qualityBox.Checked) { set("VICTORY_RELAY", "1"); set("VICTORY_CARD_STEPS", "0"); }
             if (facesBox.Checked) set("VICTORY_TEXTURE_NO_WAIT", "0");
             if (loadingBox.Checked) set("VICTORY_BAKE_NO_WAIT", "1");
@@ -1560,6 +1569,7 @@ namespace VIctoryLauncher
                         case "loading": loadingBox.Checked = v == "1"; break;
                         case "fights": fightsBox.Checked = v == "1"; break;
                         case "warm": warmBox.Checked = v == "1"; break;
+                        case "cpu": cpuBox.Checked = v == "1"; break;
                     }
                 }
             }
@@ -1576,7 +1586,7 @@ namespace VIctoryLauncher
                     "lang=" + (Pt ? "pt" : "en"), "cache=" + cacheDir, "data=" + dataDir,
                     "game=" + gameBox.Text.Trim(), "exe=" + (exeChoice ?? ""), "mode=" + modeIndex,
                     "panel=" + b(panelBox), "borderless=" + b(borderlessBox), "fps60=" + b(fps60Box), "reserve=" + b(reserveBox),
-                    "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox),
+                    "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox), "cpu=" + b(cpuBox),
                 };
                 // The other keys (shaders=, engine=, custom=, source=...) are kept: this used to drop them.
                 var keys = new HashSet<string>(mine.Select(l => l.Substring(0, l.IndexOf('=') + 1)));
