@@ -128,10 +128,80 @@ async function report(request, env) {
   return new Response(JSON.stringify({ n }), { status: 201, headers: { 'content-type': 'application/json' } });
 }
 
+// The save gallery. A player shares a save from the launcher (POST /v1/saves: headers X-VI-Id, X-VI-Title and
+// X-VI-Note, URL-encoded; the body is the launcher's save zip). It waits as "pending" until edupode approves it
+// in the admin panel (admin.js): titles are the players' own words and the gallery is public. Approved saves are
+// listed at GET /saves (a page) and GET /v1/saves (JSON), and downloaded at GET /v1/saves/<n>.zip.
+const MAX_SAVE = 1024 * 1024;
+const SAVES_PER_HOUR = 3;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clean = (s, max) => {
+  let t = '';
+  try { t = decodeURIComponent(s || ''); } catch { return null; }
+  t = t.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  return t.length <= max ? t : null;
+};
+
+async function shareSave(request, env) {
+  const id = request.headers.get('X-VI-Id') || '';
+  const title = clean(request.headers.get('X-VI-Title'), 80);
+  const note = clean(request.headers.get('X-VI-Note'), 300);
+  if (!ID.test(id) || title === null || title.length < 3 || note === null) return new Response(null, { status: 400 });
+  if (Number(request.headers.get('content-length') || '0') > MAX_SAVE) return new Response(null, { status: 413 });
+  const hour = Math.floor(Date.now() / 3600000);
+  const who = await sha256(`${env.RATE_SALT}|save|${request.headers.get('CF-Connecting-IP') || ''}|${hour}`);
+  await env.DB.prepare('DELETE FROM rate WHERE hour < ?').bind(hour).run();
+  const seen = await env.DB.prepare('INSERT INTO rate (who, hour, n) VALUES (?, ?, 1) ON CONFLICT(who) DO UPDATE SET n = n + 1 RETURNING n')
+    .bind(who, hour).first('n');
+  if (seen > SAVES_PER_HOUR) return new Response(null, { status: 429 });
+  const zip = new Uint8Array(await request.arrayBuffer());
+  if (zip.length < 22 || zip.length > MAX_SAVE || zip[0] !== 0x50 || zip[1] !== 0x4b || zip[2] !== 3 || zip[3] !== 4)
+    return new Response(null, { status: 400 });
+  const n = await env.DB.prepare(
+    "INSERT INTO saves (created, vi_id, title, note, bytes, zip) VALUES (datetime('now'), ?, ?, ?, ?, ?) RETURNING n"
+  ).bind(id, title, note, zip.length, zip).first('n');
+  return new Response(JSON.stringify({ n, state: 'pending' }), { status: 201, headers: { 'content-type': 'application/json' } });
+}
+
+async function approvedSaves(env) {
+  return (await env.DB.prepare("SELECT n, created, title, note, bytes, downloads FROM saves WHERE state = 'approved' ORDER BY n DESC LIMIT 300").all()).results;
+}
+
+async function galleryPage(env) {
+  const rows = await approvedSaves(env);
+  const cards = rows.map(r => `<div class=card><h2>${esc(r.title)}</h2><p>${esc(r.note)}</p>` +
+    `<p class=dim>${esc(r.created.slice(0, 10))} · ${Math.max(1, Math.round(r.bytes / 1024))} KB · ${r.downloads} downloads</p>` +
+    `<a class=btn href="/v1/saves/${r.n}.zip">Download</a></div>`).join('') || '<p class=dim>No save shared yet.</p>';
+  return new Response(`<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Julia's Launcher · Save gallery</title>
+<style>body{font:15px system-ui;background:#13171f;color:#e2e8f0;margin:0;padding:24px;max-width:1000px;margin:auto}
+h1{font-size:24px}.dim{color:#8b95a7;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.card{background:#1c2230;border-radius:12px;padding:14px 16px}.card h2{font-size:17px;margin:0 0 6px}.card p{margin:4px 0;overflow-wrap:anywhere}
+.btn{display:inline-block;margin-top:8px;background:#ff5fa2;color:#fff;text-decoration:none;padding:7px 14px;border-radius:18px}</style>
+<h1>Save gallery</h1>
+<p class=dim>Saves shared by players. Download one, then in Julia's Launcher: Hardware &amp; ID &gt; Game saves &gt; Import a save... (yours are backed up first).
+Share yours from the same place. EN · <span lang=fr>Sauvegardes partagées par les joueurs : télécharge, puis Matériel et ID &gt; Sauvegardes du jeu &gt; Importer.</span>
+· <span lang=pt>Saves partilhados pelos jogadores: descarrega, depois Hardware e ID &gt; Saves do jogo &gt; Importar.</span></p>
+<div class=grid>${cards}</div></html>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=60' } });
+}
+
+async function downloadSave(env, n) {
+  const row = await env.DB.prepare("SELECT title, zip FROM saves WHERE n = ? AND state = 'approved'").bind(n).first();
+  if (!row) return new Response(null, { status: 404 });
+  await env.DB.prepare('UPDATE saves SET downloads = downloads + 1 WHERE n = ?').bind(n).run();
+  return new Response(row.zip, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="VI-save-${n}.zip"`, 'cache-control': 'no-store' } });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'POST' && url.pathname === '/v1/report') return report(request, env);
+    if (request.method === 'POST' && url.pathname === '/v1/saves') return shareSave(request, env);
+    if (request.method === 'GET' && (url.pathname === '/saves' || url.pathname === '/')) return galleryPage(env);
+    if (request.method === 'GET' && url.pathname === '/v1/saves')
+      return new Response(JSON.stringify(await approvedSaves(env)), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' } });
+    const dl = request.method === 'GET' && url.pathname.match(/^\/v1\/saves\/(\d{1,9})\.zip$/);
+    if (dl) return downloadSave(env, Number(dl[1]));
     if (request.method === 'GET' && url.pathname === '/v1/stats') {
       const auth = request.headers.get('Authorization') || '';
       if (!env.STATS_TOKEN || !sameToken(auth.replace(/^Bearer /, ''), env.STATS_TOKEN)) return new Response(null, { status: 404 });

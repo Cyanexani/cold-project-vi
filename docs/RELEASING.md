@@ -12,6 +12,10 @@ update. Nobody needs the release key or the Discord webhook: both live only in a
 3. Write what changed:
    - `docs/RELEASE-NOTES.md` (English) and `docs/RELEASE-NOTES.pt.md` (Portuguese): shown in the launcher's
      Updates page;
+   - `docs/ANNOUNCEMENT.fr.md` and `docs/ANNOUNCEMENT.pt.md`: the same announcement in French and Portuguese,
+     with the version written out (no `{tag}` here). They show as **🇫🇷 Français** and **🇵🇹 Português** link
+     buttons under the Discord message once the repository variable `ANNOUNCE_BUTTONS` is `1` (Settings >
+     Secrets and variables > Actions > Variables), which needs the release signer with buttons deployed;
    - `docs/ANNOUNCEMENT.md`: the Discord announcement (`{tag}` and `{version}` are filled in; keep it under
      ~1,800 characters, the donation note from `docs/ANNOUNCEMENT-FOOTER.md` is added on its own).
 4. Push the commit, then a tag equal to the version with a `v` in front:

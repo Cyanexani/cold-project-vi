@@ -44,3 +44,25 @@ Where the launcher's hardware reports go when a player turns **Hardware sharing*
    - `VI_STATS_TOKEN`: the `STATS_TOKEN` value from step 3.
 
    Then run **Actions > Hardware averages > Run workflow** once. GitHub runs scheduled workflows only from the repository's default branch, so for the 6-hour schedule keep `hardware-stats.yml` there too.
+
+## Bug reports panel and save gallery
+
+The admin Worker (`src/admin.js`, behind Cloudflare Access) is also the panel for everything players send:
+
+- **Hardware** (`/`): the PCs, searchable by `VI-XXXX-XXXX`; each ID links to that player's reports.
+- **Bug reports** (`/reports`): what "Send to edupode" sent, newest first. A report's page shows its
+  `summary.txt` and `launcher-activity.txt`; it can be downloaded as its zip or deleted.
+- **Save gallery** (`/saves`): saves players shared from the launcher (Hardware & ID > Game saves > Share in the
+  gallery). They wait as **pending**; **Approve** makes one public, **Hide** takes it back, **Delete** removes it.
+
+The public Worker serves the gallery itself: `GET /saves` (a page in EN/FR/PT), `GET /v1/saves` (JSON) and
+`GET /v1/saves/<n>.zip`, approved saves only. `POST /v1/saves` takes a save from the launcher: at most 1 MB, a
+title of 3-80 characters and a note of up to 300, 3 an hour per IP (the same salted-hash limit as reports).
+
+To turn it on (once):
+```
+wrangler d1 execute vi-hardware --remote --file schema.sql
+wrangler deploy
+wrangler deploy -c wrangler.admin.toml
+```
+`schema.sql` only adds the `saves` table; the other tables and their rows stay as they are.

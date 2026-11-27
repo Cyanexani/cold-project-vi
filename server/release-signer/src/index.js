@@ -88,14 +88,33 @@ export default {
       return json({ signature: await sign(env, bytes) });
     }
 
-    // /v1/announce: the release's announcement in the Discord channel.
-    const text = new TextDecoder().decode(bytes).trim();
+    // /v1/announce: the release's announcement in the Discord channel. The body is the text itself, or JSON
+    // {"text": ..., "buttons": [{"label": "Français", "url": ...}]}: link buttons under the message (the
+    // translations), at most 5, each to a page of this run's own repository on GitHub and nowhere else.
+    let text, buttons = [];
+    const raw = new TextDecoder().decode(bytes);
+    if ((request.headers.get('content-type') || '').startsWith('application/json')) {
+      let o;
+      try { o = JSON.parse(raw); } catch { return deny(400, 'not JSON'); }
+      text = typeof o.text === 'string' ? o.text.trim() : '';
+      const own = `https://github.com/${c.repository}/`;
+      if (o.buttons !== undefined) {
+        if (!Array.isArray(o.buttons) || o.buttons.length > 5
+          || !o.buttons.every(b => b && typeof b.label === 'string' && b.label.length > 0 && b.label.length <= 80 && typeof b.url === 'string' && b.url.startsWith(own) && b.url.length <= 512))
+          return deny(400, 'buttons: at most 5, each a label and a link to this repository');
+        buttons = o.buttons.map(b => ({ type: 2, style: 5, label: b.label, url: b.url }));
+      }
+    } else text = raw.trim();
     if (!text || text.length > MAX_ANNOUNCEMENT || !text.includes(tag)) return deny(400, 'the announcement is empty, too long, or not about this tag');
     if (!env.DISCORD_WEBHOOK) return deny(500, 'no webhook set');
-    const r = await fetch(env.DISCORD_WEBHOOK.trim(), {
+    const hook = env.DISCORD_WEBHOOK.trim();
+    const message = { content: text, username: "Julia's Launcher", allowed_mentions: { parse: ['everyone'] } };
+    // Link buttons from a channel webhook need ?with_components=true.
+    if (buttons.length) message.components = [{ type: 1, components: buttons }];
+    const r = await fetch(buttons.length ? hook + (hook.includes('?') ? '&' : '?') + 'with_components=true' : hook, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content: text, username: "Julia's Launcher", allowed_mentions: { parse: ['everyone'] } }),
+      body: JSON.stringify(message),
     });
     return json({ posted: r.ok, status: r.status }, r.ok ? 200 : 502);
   },
