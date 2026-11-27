@@ -453,6 +453,27 @@ namespace VIctoryLauncher
                 "   Logs, definicoes, caminhos de ficheiros, o teu nome, o teu IP.",
                 "",
                 "Podes desligar quando quiseres em Hardware e ID.",
+            } : Fr ? new[] {
+                "Julia's Launcher peut-il envoyer le matériel de ton PC à edupode ?",
+                "",
+                "POURQUOI ÇA AIDE",
+                "   On voit sur quelles cartes graphiques, quels processeurs et quelles quantités de mémoire les gens jouent vraiment.",
+                "   Ça décide quels préréglages passent en premier, quels correctifs viennent ensuite (par exemple Ultra bas pour",
+                "   les PC de 16 Go, le support AMD) et sur quelles cartes la génération d'images est testée.",
+                "",
+                "LA LISTE",
+                "   Chaque PC qui partage est une ligne, sans nom. Seul edupode voit la liste.",
+                "   Une page publique ne montre que les moyennes (combien de PC, RAM et VRAM moyennes, les cartes les plus",
+                "   courantes), mise à jour toutes les 6 heures : docs/HARDWARE-STATS.md sur GitHub.",
+                "",
+                "CE QUI EST ENVOYÉ",
+                "   Carte graphique et pilote, VRAM, Resizable BAR, processeur, RAM, modèle de carte mère,",
+                "   version de Windows, type de disque, portable ou non, et ton ID VI. Au plus une fois par jour.",
+                "",
+                "JAMAIS ENVOYÉ",
+                "   Logs, réglages, chemins de fichiers, ton nom, ton adresse IP.",
+                "",
+                "Tu peux le désactiver à tout moment dans Matériel et ID.",
             } : new[] {
                 "Can Julia's Launcher send your PC's hardware to edupode?",
                 "",
@@ -515,6 +536,21 @@ namespace VIctoryLauncher
                     "        'Teste da geracao de frames' e junta os logs.",
                     "",
                     "Se correr mal, desliga a opcao e fica tudo como antes.",
+                } : Fr ? new[] {
+                    "Ta carte (" + gpuName + ") n'a pas NVIDIA Smooth Motion. Julia's Launcher a maintenant sa propre",
+                    "génération d'images : il crée une image entre chaque paire d'images du jeu, à partir des images seules.",
+                    "",
+                    "CE QUI CHANGE",
+                    "   Le mouvement paraît plus fluide. Les vrais FPS du jeu n'augmentent pas, et il y a une demi-image de retard en plus.",
+                    "",
+                    "PERSONNE NE L'A ENCORE TESTÉE EN JEU : tu es parmi les premiers.",
+                    "   1.  Active 'Génération d'images' dans Options de lancement (ou appuie sur 'Activer maintenant').",
+                    "   2.  Joue quelques minutes avec F3 activé.",
+                    "   3.  Raconte-nous sur Discord, dans le salon \"" + DiscordChannel + "\" : ta carte, si c'est plus fluide,",
+                    "        s'il y a du scintillement ou des traînées, et si le jeu s'est fermé. 'Envoyer les erreurs sur Discord'",
+                    "        a une case 'Test de la génération d'images' et ajoute les logs.",
+                    "",
+                    "Si ça se passe mal, désactive l'option et tout redevient comme avant.",
                 } : new[] {
                     "Your card (" + gpuName + ") has no NVIDIA Smooth Motion. Julia's Launcher now has its own",
                     "frame generation: it makes a frame between each two of the game's, from the pictures alone.",
@@ -549,6 +585,16 @@ namespace VIctoryLauncher
                     "",
                     "Alternativa para Radeon: o VIctory-Belobug-AMD, o fork do Belobug afinado para AMD (o credito e dele).",
                     "Podes trocar quando quiseres em Hardware e ID > Motor.",
+                } : Fr ? new[] {
+                    "Carte AMD détectée (" + gpuName + "). Tu joues avec le moteur edupode, le moteur de ce projet et celui par défaut",
+                    "pour toutes les cartes :",
+                    "   •  VRAM de ~12 Go à 6-8 Go sur la carte de l'auteur, et ~4 fois plus de textures dans la même mémoire ;",
+                    "   •  longues sessions et missions sans plantage.",
+                    "",
+                    "Il a été réglé sur une carte NVIDIA : dis-nous sur Discord (\"" + DiscordChannel + "\") les FPS et la VRAM sur ta Radeon.",
+                    "",
+                    "Alternative pour Radeon : VIctory-Belobug-AMD, le fork de Belobug réglé pour AMD (le mérite lui revient).",
+                    "Tu peux changer à tout moment dans Matériel et ID > Moteur.",
                 } : new[] {
                     "AMD card found (" + gpuName + "). You play with the edupode engine, this project's engine and the default",
                     "for every card:",
@@ -560,8 +606,8 @@ namespace VIctoryLauncher
                     "Alternative for Radeon: VIctory-Belobug-AMD, Belobug's fork tuned for AMD (the credit is his).",
                     "You can switch any time in Hardware & ID > Engine.",
                 });
-                var answer = Notice(L("AMD card: you play with the edupode engine", "Placa AMD: jogas com o motor edupode"), body,
-                    L("Keep edupode", "Ficar com o edupode"), L("Try Belobug's instead", "Experimentar o do Belobug"));
+                var answer = Notice(L("AMD card: you play with the edupode engine", "Placa AMD: jogas com o motor edupode", "Carte AMD : tu joues avec le moteur edupode"), body,
+                    L("Keep edupode", "Ficar com o edupode", "Garder edupode"), L("Try Belobug's instead", "Experimentar o do Belobug", "Essayer celui de Belobug"));
                 if (answer == 2)
                 {
                     WriteSetting("engine", "amd");

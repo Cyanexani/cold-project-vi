@@ -6,6 +6,8 @@ name: Release
 # edupode then signs it on his own PC (scripts\sign-release.ps1 <tag>): the release key never
 # reaches GitHub, so the launchers out there only install what he signed.
 
+# (felicienradio builds and signs his own releases on his PC with scripts\release-local.ps1; on the edupode
+# branch a pushed tag builds them here, and edupode signs them.)
 on:
   push:
     tags: ['v*']

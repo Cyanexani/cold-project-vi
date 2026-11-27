@@ -2656,6 +2656,7 @@ struct Flight {
 }
 
 /// One thing in the line of what waits for the card, in order.
+#[allow(clippy::large_enum_variant)] // a flight inline: no allocation per flight
 enum Late {
     Run(Flight),
     /// A bottom-of-pipe write of the flight before it: address, what, bytes.
@@ -2882,7 +2883,7 @@ fn blame_stale(stale: &[(std::sync::Arc<crate::shadow::Shadow>, usize, usize)]) 
 /// title memory read, took `us`.
 #[cfg(feature = "diagnostics")]
 fn blamed(why: usize, us: u64) {
-    let (named, refused) = std::mem::replace(&mut *BLAMED.lock().unwrap_or_else(|e| e.into_inner()), (None, ""));
+    let (named, refused) = std::mem::take(&mut *BLAMED.lock().unwrap_or_else(|e| e.into_inner()));
     let (key, at) = match (why, named) {
         (WHY_READ | WHY_STALE, Some(named)) => named,
         (WHY_READ, None) => (("a host copy of what a copy done on the card wrote", refused, 0, 0, 0), 0),
@@ -3681,6 +3682,7 @@ fn late_line(frames: f64) {
 pub(crate) mod aside;
 pub(crate) mod awake;
 mod card_steps;
+#[cfg_attr(not(feature = "diagnostics"), allow(dead_code))]
 pub(crate) mod indirects;
 #[cfg(feature = "diagnostics")]
 mod panel;
@@ -4004,6 +4006,37 @@ impl Host {
             tracing::info!(supported, "host depth bounds support");
             supported
         })
+    }
+
+    /// Whether the host device is backed by a software adapter (WARP /
+    /// Microsoft Basic Render Driver), either via `VICTORY_D3D12_WARP` or
+    /// because the host has no hardware GPU (such as hosted CI runners).
+    #[cfg(test)]
+    pub(crate) fn on_warp(&self) -> bool {
+        if cfg!(feature = "diagnostics") && crate::switch::on("VICTORY_D3D12_WARP") {
+            return true;
+        }
+        let is_software = |desc: &DXGI_ADAPTER_DESC1| {
+            desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 || desc.VendorId == 0x1414
+        };
+        if let Some(adapter) = &self.adapter
+            // SAFETY: plain DXGI adapter descriptor query.
+            && let Ok(desc) = unsafe { adapter.GetDesc1() }
+        {
+            return is_software(&desc);
+        }
+        // Fallback when `EnumAdapterByLuid` did not match (for example on
+        // headless CI runners): inspect the default DXGI adapter 0.
+        // SAFETY: plain DXGI enumeration.
+        unsafe {
+            let Ok(factory) = CreateDXGIFactory2::<IDXGIFactory4>(DXGI_CREATE_FACTORY_FLAGS(0)) else {
+                return true;
+            };
+            let Ok(adapter) = factory.EnumAdapters1(0) else {
+                return true;
+            };
+            adapter.GetDesc1().map_or(true, |desc| is_software(&desc))
+        }
     }
 
     /// A new list, open for recording.
@@ -7753,6 +7786,7 @@ enum Touch {
     /// The copy is given to shaders.
     Write(usize),
     /// Title memory is written.
+    #[cfg_attr(not(test), allow(dead_code))] // only the tests write title memory as a step
     Title,
     Nothing,
     /// Another part of the submission begins.
@@ -9404,7 +9438,7 @@ impl Host {
         }
         g.held = 0;
         let shown = crate::framegen::MADE[1].fetch_add(1, Ordering::Relaxed) + 1;
-        if shown % 600 == 0 {
+        if shown.is_multiple_of(600) {
             tracing::info!(made = crate::framegen::MADE[0].load(Ordering::Relaxed), shown, "frame generation: frames made, real frames shown after them");
         }
     }

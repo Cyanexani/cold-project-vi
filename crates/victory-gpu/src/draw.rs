@@ -1681,7 +1681,7 @@ impl State {
                 } else {
                     crate::memory::Use::Reads
                 };
-                let Some(ready) = self.memory_ready(list, &t, compute, use_) else {
+                let Some(ready) = self.memory_ready(list, t, compute, use_) else {
                     once!("a shader that reads title memory by address without a view heap to hold its views: the draw is dropped");
                     return false;
                 };
@@ -3601,7 +3601,7 @@ impl State {
             let draws: u32 = census.1.values().sum();
             if draws > 0 {
                 let mut rects: Vec<([i32; 4], u32)> = census.1.iter().map(|(r, n)| (*r, *n)).collect();
-                rects.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+                rects.sort_unstable_by_key(|r| std::cmp::Reverse(r.1));
                 let scissors: Vec<String> = rects
                     .iter()
                     .take(5)
@@ -3657,6 +3657,7 @@ impl State {
     /// draws dropped. Their constants are read from the host copy, brought
     /// up to date for the list as other views' memory is (the fresh tables'
     /// constants are copied at submission too).
+    #[allow(dead_code)] // no caller since the edupode merge
     fn constants_in_place(&self, used: &[UsedResource], slot: u8, compute: bool) -> bool {
         static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
         if !*ON.get_or_init(|| std::env::var_os("VICTORY_CBV_IN_PLACE").is_some_and(|v| v == "1")) {

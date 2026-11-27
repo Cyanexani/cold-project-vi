@@ -215,7 +215,9 @@ namespace VIctoryLauncher
             var ask = string.Format(L("Windows can only promise {0:0.0} GB more memory (RAM plus virtual memory); the game needs about {1:0} GB as it starts. With less, its window stays white.\r\n\r\n" +
                                       "•  Close apps (Performance page: what holds memory).\r\n•  Let Windows manage virtual memory (Setup), then restart the PC.\r\n\r\nPlay anyway?",
                                       "O Windows so pode prometer mais {0:0.0} GB de memoria (RAM mais memoria virtual); o jogo precisa de cerca de {1:0} GB ao arrancar. Com menos, a janela fica branca.\r\n\r\n" +
-                                      "•  Fecha apps (pagina Desempenho: o que ocupa memoria).\r\n•  Deixa o Windows gerir a memoria virtual (Preparar) e reinicia o PC.\r\n\r\nJogar na mesma?"), free, GameCommitGb);
+                                      "•  Fecha apps (pagina Desempenho: o que ocupa memoria).\r\n•  Deixa o Windows gerir a memoria virtual (Preparar) e reinicia o PC.\r\n\r\nJogar na mesma?",
+                                      "Windows ne peut garantir que {0:0.0} Go de mémoire en plus (RAM et mémoire virtuelle) ; le jeu a besoin d'environ {1:0} Go au démarrage. Avec moins, sa fenêtre reste blanche.\r\n\r\n" +
+                                      "•  Ferme des applis (page Performances : ce qui occupe la mémoire).\r\n•  Laisse Windows gérer la mémoire virtuelle (Installation), puis redémarre le PC.\r\n\r\nJouer quand même ?"), free, GameCommitGb);
             return MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
         }
 

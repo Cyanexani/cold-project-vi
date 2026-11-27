@@ -340,8 +340,8 @@ namespace VIctoryLauncher
         {
             if (SourceDir != null) return true;
             var to = Path.Combine(Path.GetDirectoryName(dataRoot), "source", "cold-project-vi");
-            Log(L("The launcher is not inside the source folder: downloading the source (edupode branch)...", "O launcher nao esta dentro da pasta do codigo: a descarregar o codigo (ramo edupode)..."));
-            return DownloadZipInto("https://github.com/edupode/cold-project-vi/archive/refs/heads/edupode.zip", to, L("the source", "o codigo"));
+            Log(L("The launcher is not inside the source folder: downloading the source (main branch)...", "O launcher nao esta dentro da pasta do codigo: a descarregar o codigo (ramo main)..."));
+            return DownloadZipInto("https://github.com/felicienradio/cold-project-vi/archive/refs/heads/main.zip", to, L("the source", "o codigo"));
         }
 
         // A GitHub source zip (one folder inside) unpacked as `to`.
