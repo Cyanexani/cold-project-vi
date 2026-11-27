@@ -31,10 +31,12 @@
 </div>
 
 > [!NOTE]
-> **This is a remake by [@edupode](https://github.com/edupode)** of the Cold Project VI idea, built on
-> [VIctory](https://github.com/Marvisak/VIctory), the cgbj build (cputroll/cgbj-reupload) and the
-> VIctory-NVIDIA fork (trustno1-coder), tuned and extended for an NVIDIA laptop. It is not the upstream Cold
-> Project VI (felicienradio/cold-project-vi), whose page inspired this one.
+> **This is a remake by [@edupode](https://github.com/edupode)** of the Cold Project VI idea, internally
+> called **"luz"** (Portuguese for *light*, after the lighting work it started with). It combines
+> [VIctory](https://github.com/Marvisak/VIctory), the cgbj build (cputroll/cgbj-reupload), Leonidas's and
+> AnyXboxSeries's work, the VIctory-NVIDIA fork (trustno1-coder) and adaptations from an AMD fork
+> (avatarmanz/VIctory-7900XTX), tuned and extended for an NVIDIA laptop. It is not the upstream Cold Project
+> VI (felicienradio/cold-project-vi), whose page inspired this one.
 
 > [!IMPORTANT]
 > **This repository contains no game files**: no executable, data or extracted shaders. You need your own copy
@@ -96,6 +98,25 @@ Keyboard and mouse are mapped to the Xbox pad (a connected controller replaces t
 to capture the mouse (Alt/F1 releases it). **F** enters vehicles and switches W/S to accelerate/brake (high
 beep); in aircraft hold **W** (throttle) and **K** (nose up) to take off, **I** for nose down. Full table:
 the launcher's Controls tab or [docs/GUIDE-30FPS.md](docs/GUIDE-30FPS.md).
+
+## Before and after
+
+| | Before (cgbj on this laptop) | Now (edu launcher, Recommended) |
+|---|---|---|
+| Menus and map | 30-33 FPS | **60 FPS** |
+| Open world | 10-15 FPS | **22-26 FPS** |
+| Cutscenes | ~26 FPS | **35-38 FPS** |
+| Video memory | ~12 GB (over the system's budget) | **6-8 GB** |
+| RAM | 27-29 GB | **20-21 GB** |
+
+## FAQ
+
+**The first cutscene lags a lot.** On the first run the game draws everything for the first time: thousands of
+pipelines are made and the textures of the whole scene stream in. It runs at 7-15 FPS there, dropping to 2 now
+and then, and then settles at 21-25. Press *Prepare shaders* in the launcher first; each session also prepares
+the pipelines it used for the next one, so later runs start much faster.
+
+**Is a controller supported?** Yes, an Xbox controller connected to the PC replaces the keyboard and mouse.
 
 ## Where it stands
 
