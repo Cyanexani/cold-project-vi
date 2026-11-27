@@ -17,6 +17,6 @@ $hookFile = Join-Path $env:USERPROFILE '.vi-release\discord-webhook.txt'
 if (-not (Test-Path $hookFile)) { Write-Warning "No webhook at ${hookFile}: the announcement was not posted."; return }
 $hook = [IO.File]::ReadAllText($hookFile).Trim()
 if ($hook -notmatch '^https://(discord|discordapp)\.com/api/webhooks/\d+/[\w-]+$') { throw "${hookFile} does not hold a Discord webhook URL." }
-$body = @{ content = $text; username = "Julia's Launcher"; allowed_mentions = @{ parse = @() } } | ConvertTo-Json -Depth 3
+$body = @{ content = $text; username = "Julia's Launcher"; allowed_mentions = @{ parse = @("everyone") } } | ConvertTo-Json -Depth 3
 Invoke-RestMethod -Uri $hook -Method Post -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
 "Announcement posted on Discord."
