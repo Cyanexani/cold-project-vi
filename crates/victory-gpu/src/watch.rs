@@ -150,6 +150,21 @@ static JOURNAL: RwLock<Journal> = RwLock::new(Journal {
     kept: false,
 });
 
+/// Whether `[first, last)` (pages) lies inside one of `ahead`'s ranges.
+/// The ranges are kept in order of their starts ([`ask_ahead`] makes them
+/// so, [`ask_rest`] sorts what it adds): a binary search and a look at the
+/// few that start before. Every refresh of a submission asks this (7,000 a
+/// frame in the open world), against up to some thousand ranges: a scan of
+/// them all made that quadratic. A range missed here only costs a refresh
+/// that copies, never a copy left out.
+fn covered(ahead: &[(usize, usize)], first: usize, last: usize) -> bool {
+    if ahead.len() < 16 {
+        return ahead.iter().any(|&(a, b)| a <= first && last <= b);
+    }
+    let at = ahead.partition_point(|r| r.0 <= first);
+    ahead[..at].iter().rev().take(8).any(|&(a, b)| a <= first && last <= b)
+}
+
 fn journal() -> std::sync::RwLockReadGuard<'static, Journal> {
     if let Ok(j) = JOURNAL.try_read() {
         return j;
@@ -349,6 +364,7 @@ pub(crate) fn ask_ahead(ranges: &[(usize, usize)]) {
     note_hot(&written);
     let mut j = journal_mut();
     j.ahead_asked = next_asking();
+    asked.sort_unstable();
     j.ahead = asked;
     let now = j.ahead_asked;
     for (page, parts) in written {
@@ -555,7 +571,7 @@ fn ask_rest(ranges: &[(usize, usize)]) {
             continue;
         }
         let (first, last) = (start / PAGE, end.div_ceil(PAGE));
-        if !ahead.iter().any(|&(a, b)| a <= first && last <= b)
+        if !covered(&ahead, first, last)
             && let Some(pages) = kernel_written(first, last)
         {
             written.extend(pages);
@@ -574,6 +590,7 @@ fn ask_rest(ranges: &[(usize, usize)]) {
         j.note(page, parts, now);
     }
     j.kept = !ahead.is_empty();
+    ahead.sort_unstable();
     j.ahead = ahead;
 }
 
@@ -662,7 +679,7 @@ pub(crate) fn writes(start: usize, end: usize, guarded: bool) -> Option<(u64, Ve
     let (first, last) = (start / PAGE, end.div_ceil(PAGE));
     let of = |j: &Journal| -> Vec<(usize, u64)> { j.written.range(first..last).map(|(&p, &w)| (p, w)).collect() };
     // Asked ahead with the submission's other ranges: the journal has it.
-    let ahead = |j: &Journal| j.ahead.iter().any(|&(a, b)| a <= first && last <= b).then(|| (j.ahead_asked, of(j)));
+    let ahead = |j: &Journal| covered(&j.ahead, first, last).then(|| (j.ahead_asked, of(j)));
     if let Some(known) = ahead(&journal()) {
         return Some(known);
     }
@@ -746,7 +763,7 @@ pub(crate) fn nothing_new(start: usize, end: usize, base: usize, copied: &[u64],
         crate::faultbook::note(crate::faultbook::What::Known, first, last, 1);
     }
     let j = journal();
-    if !known && !j.ahead.iter().any(|&(a, b)| a <= first && last <= b) {
+    if !known && !covered(&j.ahead, first, last) {
         return false;
     }
     let Some(taken) = first.checked_sub(base).and_then(|from| copied.get(from..last - base)) else {
