@@ -900,7 +900,10 @@ fn create() -> windows::core::Result<Host> {
             D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_12_0, &mut device)?;
             tracing::info!("host device on the software adapter (WARP)");
         } else {
-            D3D12CreateDevice(None, D3D_FEATURE_LEVEL_12_0, &mut device)?;
+            match run_adapter() {
+                Some(adapter) => D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_12_0, &mut device)?,
+                None => D3D12CreateDevice(None, D3D_FEATURE_LEVEL_12_0, &mut device)?,
+            }
             // Whether a GPU hang ends the run or freezes the PC (#1054).
             crate::tdr::log();
         }
@@ -999,6 +1002,30 @@ impl Host {
 
 /// DXGI may return hardware for `EnumWarpAdapter` (notably under Proton).
 /// Reject it before creating a device in diagnostics' software-only mode.
+/// The card a run (and `victory gpu`) makes its device on: the high-performance
+/// hardware adapter, as DXGI ranks them. The default adapter (`None`) is the
+/// one Windows lists first, which on a desktop with a Ryzen or Intel processor
+/// whose graphics are on is often those integrated graphics, not the card: the
+/// launcher then said "AMD card" on an NVIDIA PC and tested Resizable BAR on the
+/// wrong adapter. `VICTORY_DEFAULT_ADAPTER=1` goes back to the default.
+pub(crate) fn run_adapter() -> Option<IDXGIAdapter1> {
+    if crate::switch::on("VICTORY_DEFAULT_ADAPTER") {
+        return None;
+    }
+    // SAFETY: plain DXGI adapter queries.
+    unsafe {
+        let factory: IDXGIFactory6 = CreateDXGIFactory2(DXGI_CREATE_FACTORY_FLAGS(0)).ok()?;
+        let adapter: IDXGIAdapter1 = factory
+            .EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE)
+            .ok()?;
+        let desc = adapter.GetDesc1().ok()?;
+        if desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 {
+            return None;
+        }
+        Some(adapter)
+    }
+}
+
 pub(crate) fn warp_adapter() -> windows::core::Result<IDXGIAdapter> {
     // SAFETY: plain DXGI adapter queries.
     unsafe {

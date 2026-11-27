@@ -92,6 +92,16 @@ namespace VIctoryLauncher
         // French comes from French.cs (looked up by the English text), or from fr when a call passes it.
         static string L(string en, string pt, string fr = null) { return Fr ? (fr ?? Fr_(en)) : Pt ? pt : en; }
 
+        // Opens the launcher again (a new language). Application.Restart started the new one while this one
+        // still held the one-launcher lock, so the new one saw "already running" and quit: nothing reopened.
+        // --wait-pid makes it wait until this one has ended.
+        static void RestartLauncher()
+        {
+            try { Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--wait-pid " + Process.GetCurrentProcess().Id) { UseShellExecute = false }); }
+            catch (Exception) { }
+            Application.Exit();
+        }
+
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
         readonly string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
@@ -319,9 +329,9 @@ namespace VIctoryLauncher
             var en = new Pill { Text = "EN", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = !Pt && !Fr };
             var pt = new Pill { Text = "PT", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = Pt };
             var fr = new Pill { Text = "FR", Size = new Size(58, 30), BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Main = Fr };
-            en.Click += (s, e) => { if (Pt || Fr) { Pt = false; Fr = false; SaveSettings(); Application.Restart(); } };
-            pt.Click += (s, e) => { if (!Pt) { Pt = true; Fr = false; SaveSettings(); Application.Restart(); } };
-            fr.Click += (s, e) => { if (!Fr) { Fr = true; Pt = false; SaveSettings(); Application.Restart(); } };
+            en.Click += (s, e) => { if (Pt || Fr) { Pt = false; Fr = false; SaveSettings(); RestartLauncher(); } };
+            pt.Click += (s, e) => { if (!Pt) { Pt = true; Fr = false; SaveSettings(); RestartLauncher(); } };
+            fr.Click += (s, e) => { if (!Fr) { Fr = true; Pt = false; SaveSettings(); RestartLauncher(); } };
             side.Controls.Add(en); side.Controls.Add(pt); side.Controls.Add(fr);
             var tech = new Label { Text = "D3D12 · SM 6.6", Font = Theme.Mono(8f), ForeColor = Theme.Dim, AutoSize = true, BackColor = Theme.Side, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
             side.Controls.Add(tech);

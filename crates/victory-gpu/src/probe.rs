@@ -16,7 +16,13 @@ pub fn report() -> Vec<String> {
     // with its own size.
     unsafe {
         let mut device: Option<ID3D12Device> = None;
-        if let Err(e) = D3D12CreateDevice(None, D3D_FEATURE_LEVEL_12_0, &mut device) {
+        // The same card a run gets (the high-performance one), so the launcher names it and tests its
+        // Resizable BAR, not integrated graphics Windows happens to list first.
+        let made = match crate::host::run_adapter() {
+            Some(adapter) => D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_12_0, &mut device),
+            None => D3D12CreateDevice(None, D3D_FEATURE_LEVEL_12_0, &mut device),
+        };
+        if let Err(e) = made {
             out.push("device=none".to_owned());
             out.push(format!("error={e}"));
             return out;
