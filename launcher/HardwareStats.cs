@@ -26,7 +26,8 @@ namespace VIctoryLauncher
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             Font = Theme.Ui(9f);
         }
-        static readonly Color[] Colours = { Theme.HotPink, Theme.Peach, Theme.Cyan, Color.FromArgb(206, 164, 255) };
+        static readonly Color[] Colours = { Theme.HotPink, Theme.Peach, Theme.Cyan, Theme.Lilac };
+        const int line = 28;
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
@@ -35,44 +36,52 @@ namespace VIctoryLauncher
             Theme.Panel(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Card, Theme.Line, 14);
             if (Items.Count == 0)
             {
-                using (var b = new SolidBrush(Theme.Dim)) g.DrawString(Empty, Font, b, 16, 12);
+                // Loading ("...") or nothing to show: in the card's first line.
+                using (var b = new SolidBrush(Theme.Dim))
+                using (var f = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    g.DrawString(Empty ?? "", Font, b, new RectangleF(16, 10, Math.Max(10, Width - 32), line), f);
                 return;
             }
             double most = Math.Max(1e-9, Items.Max(i => i.Item2));
-            const int line = 28, nameW = 210, numW = 130;
+            // The columns follow the card's width: the names take up to 210 px, the numbers what they measure.
+            float nameW = Math.Min(210, Width * 0.3f);
+            float numW = 0;
+            foreach (var it in Items) numW = Math.Max(numW, g.MeasureString(it.Item3 ?? "", Font).Width);
+            float youW;
+            using (var tf = Theme.UiBold(7.5f)) youW = (float)Math.Ceiling(g.MeasureString(YouText ?? "", tf).Width) + 8;
+            numW = Math.Min(numW + 4 + youW + 6, Width * 0.4f);
+            float full = Math.Max(20, Width - nameW - numW - 28);
             int y = 10;
             int k = 0;
+            const int bh = line - 18;
             foreach (var it in Items)
             {
                 bool mine = Mine != null && Mine(it.Item1);
                 using (var b = new SolidBrush(mine ? Theme.Text : Theme.Soft))
                 using (var nf = mine ? Theme.UiBold(9f) : Theme.Ui(9f))
                 using (var f = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center })
-                    g.DrawString(it.Item1, nf, b, new RectangleF(16, y, nameW - 22, line), f);
-                float full = Width - nameW - numW - 24;
+                    g.DrawString(it.Item1 ?? "", nf, b, new RectangleF(16, y, nameW - 22, line), f);
                 float w = (float)(full * it.Item2 / most);
-                // The track, then the bar over it.
-                using (var path = Theme.Round(new RectangleF(nameW, y + 9, full, line - 18), (line - 18) / 2f))
+                // The track, then the bar over it (never shorter than a round end).
+                using (var path = Theme.Round(new RectangleF(nameW, y + 9, full, bh), bh / 2f))
                 using (var b = new SolidBrush(Theme.Quiet)) g.FillPath(b, path);
-                using (var path = Theme.Round(new RectangleF(nameW, y + 9, Math.Max(line - 18, w), line - 18), (line - 18) / 2f))
+                using (var path = Theme.Round(new RectangleF(nameW, y + 9, Math.Min(full, Math.Max(bh, w)), bh), bh / 2f))
                 using (var b = new SolidBrush(Colours[k % Colours.Length])) g.FillPath(b, path);
-                float tx = nameW + full + 10;
+                float tx = nameW + full + 12;
+                float textW = (float)Math.Ceiling(g.MeasureString(it.Item3 ?? "", Font).Width);
                 using (var b = new SolidBrush(Theme.Dim))
-                using (var f = new StringFormat { LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
-                {
-                    g.DrawString(it.Item3, Font, b, new RectangleF(tx, y, numW, line), f);
-                    tx += g.MeasureString(it.Item3, Font).Width + 4;
-                }
+                using (var f = new StringFormat { LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap, Trimming = StringTrimming.EllipsisCharacter })
+                    g.DrawString(it.Item3 ?? "", Font, b, new RectangleF(tx, y, Math.Max(10, Math.Min(textW + 2, Width - tx - 8)), line), f);
                 if (mine)
                     using (var tf = Theme.UiBold(7.5f))
                     {
-                        var ts = g.MeasureString(YouText, tf);
-                        var tag = new RectangleF(Math.Min(tx, Width - ts.Width - 20), y + 6, ts.Width + 8, line - 12);
+                        float tagW = (float)Math.Ceiling(g.MeasureString(YouText ?? "", tf).Width) + 8;
+                        var tag = new RectangleF(Math.Min(tx + textW + 4, Width - tagW - 12), y + 6, tagW, line - 12);
                         using (var path = Theme.Round(tag, tag.Height / 2f))
                         using (var b = new SolidBrush(Theme.Cyan)) g.FillPath(b, path);
                         using (var b = new SolidBrush(Theme.OnAccent))
-                        using (var cf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                            g.DrawString(YouText, tf, b, tag, cf);
+                        using (var cf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+                            g.DrawString(YouText ?? "", tf, b, tag, cf);
                     }
                 y += line;
                 k++;
@@ -85,6 +94,8 @@ namespace VIctoryLauncher
     // long values wrapped, a hairline between lines.
     class InfoCard : Control
     {
+        // Shown while there are no lines yet (reading the hardware, say).
+        public string Empty = "";
         public InfoCard()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -103,6 +114,7 @@ namespace VIctoryLauncher
             var heights = new List<float>();
             labelW = 0;
             var lines = Lines();
+            if (lines.Length == 0) return heights;
             using (var lf = Theme.Ui(9f))
             using (var vf = Theme.UiBold(9.5f))
             {
@@ -124,7 +136,8 @@ namespace VIctoryLauncher
             using (var g = Graphics.FromImage(bmp))
             {
                 float labelW;
-                return (int)Math.Ceiling(MeasureRows(g, out labelW).Sum() + 16);
+                var rows = MeasureRows(g, out labelW);
+                return rows.Count == 0 ? 52 : (int)Math.Ceiling(rows.Sum() + 16);
             }
         }
         protected override void OnPaint(PaintEventArgs e)
@@ -136,6 +149,13 @@ namespace VIctoryLauncher
             float labelW;
             var heights = MeasureRows(g, out labelW);
             var lines = Lines();
+            if (lines.Length == 0)
+            {
+                using (var b = new SolidBrush(Theme.Dim))
+                using (var f = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    g.DrawString(Empty ?? "", Font, b, new RectangleF(16, 0, Math.Max(10, Width - 32), Height), f);
+                return;
+            }
             float y = 8;
             using (var lf = Theme.Ui(9f))
             using (var vf = Theme.UiBold(9.5f))
@@ -148,7 +168,7 @@ namespace VIctoryLauncher
                 {
                     string k, v; Split(lines[n], out k, out v);
                     float h = heights[n];
-                    if (n > 0) g.DrawLine(pen, 16, y, Width - 16, y);
+                    if (n > 0) g.DrawLine(pen, 16, (float)Math.Round(y) + 0.5f, Width - 16, (float)Math.Round(y) + 0.5f);
                     g.DrawString(k, lf, lb, new RectangleF(16, y, labelW - 8, h), kf);
                     g.DrawString(v, vf, vb, new RectangleF(16 + labelW, y, Width - 32 - labelW, h), wf);
                     y += h;
@@ -165,6 +185,8 @@ namespace VIctoryLauncher
         public float[] Parts = new float[0];
         public List<string[]> Rows = new List<string[]>();
         public int Highlight = -1;
+        // Columns whose text sits at the right (numbers).
+        public bool[] RightAlign = new bool[0];
         public string Empty = "";
         const int RowH = 30, HeadH = 34;
         public StatsTable()
@@ -186,15 +208,17 @@ namespace VIctoryLauncher
             float total = Math.Max(1e-6f, Parts.Sum());
             for (int i = 0; i < Parts.Length; i++) xs[i + 1] = xs[i] + inner * Parts[i] / total;
             using (var f = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center })
+            using (var far = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Far })
             {
+                Func<int, StringFormat> fmt = i => i < RightAlign.Length && RightAlign[i] ? far : f;
                 using (var hf = Theme.UiBold(8f))
                 using (var b = new SolidBrush(Theme.Dim))
                     for (int i = 0; i < Headers.Length && i < Parts.Length; i++)
-                        g.DrawString(Headers[i].ToUpperInvariant(), hf, b, new RectangleF(xs[i], 0, xs[i + 1] - xs[i] - 8, HeadH), f);
-                using (var p = new Pen(Theme.Line)) g.DrawLine(p, 12, HeadH, Width - 12, HeadH);
+                        g.DrawString((Headers[i] ?? "").ToUpperInvariant(), hf, b, new RectangleF(xs[i], 0, xs[i + 1] - xs[i] - 8, HeadH), fmt(i));
+                using (var p = new Pen(Theme.Line)) g.DrawLine(p, 14, HeadH + 0.5f, Width - 14, HeadH + 0.5f);
                 if (Rows.Count == 0)
                 {
-                    using (var b = new SolidBrush(Theme.Dim)) g.DrawString(Empty, Font, b, new RectangleF(16, HeadH, inner, RowH), f);
+                    using (var b = new SolidBrush(Theme.Dim)) g.DrawString(Empty ?? "", Font, b, new RectangleF(16, HeadH, inner, RowH), f);
                     return;
                 }
                 float y = HeadH + 2;
@@ -207,14 +231,32 @@ namespace VIctoryLauncher
                         using (var b = new SolidBrush(Theme.Selected)) g.FillPath(b, path);
                     else if (r % 2 == 1)
                         using (var path = Theme.Round(rowRect, 10))
-                        using (var b = new SolidBrush(Color.FromArgb(14, 255, 255, 255))) g.FillPath(b, path);
+                        using (var b = new SolidBrush(Theme.Stripe)) g.FillPath(b, path);
                     using (var font = mine ? Theme.UiBold(9.5f) : Theme.Ui(9.5f))
                         for (int i = 0; i < Rows[r].Length && i < Parts.Length; i++)
                             using (var b = new SolidBrush(mine ? Theme.Cyan : i == 0 ? Theme.Text : Theme.Soft))
-                                g.DrawString(Rows[r][i], font, b, new RectangleF(xs[i], y, xs[i + 1] - xs[i] - 8, RowH), f);
+                                g.DrawString(Rows[r][i] ?? "", font, b, new RectangleF(xs[i], y, xs[i + 1] - xs[i] - 8, RowH), fmt(i));
                     y += RowH;
                 }
             }
+        }
+    }
+
+    // A rounded card that holds one control (a read-only text box, say) so it sits in the theme
+    // instead of in a stock Windows frame.
+    class CardPanel : Panel
+    {
+        public CardPanel()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            Padding = new Padding(14, 10, 8, 10);
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
+            Theme.Smooth(g);
+            Theme.Panel(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Card, Theme.Line, 14);
         }
     }
 
@@ -232,6 +274,13 @@ namespace VIctoryLauncher
             c.Height = height;
             foreach (Control other in c.Parent.Controls)
                 if (other != c && other.Top > top) other.Top += grow;
+        }
+
+        // A wrapping label takes the height its text needs at its width (at least what it has); what is below moves down.
+        static void FitLabel(Label l)
+        {
+            var need = TextRenderer.MeasureText(l.Text ?? "", l.Font, new Size(l.Width, 0), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + 4;
+            if (need > l.Height) GrowTo(l, need);
         }
 
         // The laptop every preset is measured on (edupode's), for players to compare their PC with.
@@ -269,7 +318,7 @@ namespace VIctoryLauncher
             BarChart.YouText = L("you", "tu", "toi");
             var table = new StatsTable { Location = new Point(X, y), Size = new Size(W, 72), Empty = "...",
                 Headers = new[] { L("Graphics card", "Placa grafica", "Carte graphique"), L("PCs", "PCs", "PC"), L("Video memory", "VRAM", "VRAM"), L("Resizable BAR for the game", "Resizable BAR para o jogo", "Resizable BAR pour le jeu") },
-                Parts = new[] { 4.2f, 1f, 1.6f, 2.6f } };
+                Parts = new[] { 4.2f, 1f, 1.6f, 2.6f }, RightAlign = new[] { false, true, true, true } };
             page.Controls.Add(table);
             y += table.Height + 16;
             var charts = new List<Tuple<string, BarChart>>();
@@ -298,7 +347,15 @@ namespace VIctoryLauncher
                     }
                 }
                 catch (Exception) { }
-                try { BeginInvoke(new Action(() => FillStats(s, head, table, charts))); } catch (Exception) { }
+                try
+                {
+                    BeginInvoke(new Action(() => {
+                        // An answer that is not what was expected shows the same "could not be read" state.
+                        try { FillStats(s, head, table, charts); }
+                        catch (Exception) { if (s != null) FillStats(null, head, table, charts); }
+                    }));
+                }
+                catch (Exception) { }
             }) { IsBackground = true }.Start();
             return bottom;
         }
@@ -334,11 +391,15 @@ namespace VIctoryLauncher
         {
             if (s == null)
             {
+                head.ForeColor = Theme.Warn;
                 head.Text = L("GitHub could not be reached: the averages show when it can.", "Sem ligacao ao GitHub: as medias aparecem quando houver.", "GitHub injoignable : les moyennes s'afficheront plus tard.");
-                table.Empty = "—"; table.Invalidate();
-                foreach (var c in charts) { c.Item2.Empty = "—"; c.Item2.Invalidate(); }
+                FitLabel(head);
+                var none = L("No data yet", "Sem dados ainda", "Pas encore de données");
+                table.Empty = none; table.Invalidate();
+                foreach (var c in charts) { c.Item2.Empty = none; c.Item2.Invalidate(); }
                 return;
             }
+            head.ForeColor = Theme.Dim;
             var avg = Obj(s, "average");
             var pct = Obj(s, "percent");
             object updated;
@@ -349,6 +410,9 @@ namespace VIctoryLauncher
                                         "{0:N0} PCs partilham o hardware. Em media: {1:0.#} GB de RAM, {2:0.#} GB de VRAM, {3:0} threads de CPU. Atualizado a {4}.",
                                         "{0:N0} PC partagent leur matériel. En moyenne : {1:0.#} Go de RAM, {2:0.#} Go de VRAM, {3:0} threads CPU. Mis à jour le {4}."),
                 pcs, Num(avg, "ram_gb"), Num(avg, "vram_gb"), Num(avg, "cpu_threads"), at);
+            FitLabel(head);
+            table.Empty = L("No data yet", "Sem dados ainda", "Pas encore de données");
+            foreach (var c in charts) c.Item2.Empty = table.Empty;
             table.Rows.Clear();
             table.Highlight = -1;
             var mine = CardKey(gpuName);

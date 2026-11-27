@@ -31,11 +31,13 @@ namespace VIctoryLauncher
         GameState State()
         {
             var state = GameState.None;
+            // (gameProc is set to null by another thread when the game ends: read once.)
+            var gp = gameProc;
             foreach (var p in Process.GetProcessesByName("victory"))
             {
                 try
                 {
-                    bool ours = gameProc != null && !gameProc.HasExited && p.Id == gameProc.Id;
+                    bool ours = gp != null && !gp.HasExited && p.Id == gp.Id;
                     var window = p.MainWindowHandle;
                     if (ours)
                     {
@@ -65,20 +67,39 @@ namespace VIctoryLauncher
             lock (tools) return tools.Any(same);
         }
 
+        // A log line from a worker thread that never throws: the window may be closed by then (Log posts to it).
+        void SafeLog(string line)
+        {
+            try { Log(line); } catch (Exception) { }
+        }
+
         // VIctory preparations (shaders, warm, precompile) this window did not start: most often one a launcher
-        // window left running when it closed. Read from each process's command line.
+        // window left running when it closed. Read from each process's command line. A helper that one of this
+        // window's own processes started is ours too (its parent is), never "another window's".
         List<int> OtherPreparations()
         {
             var ids = new List<int>();
             try
             {
-                using (var q = new System.Management.ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'victory.exe'"))
-                    foreach (System.Management.ManagementObject o in q.Get())
+                var rows = new List<Tuple<int, int, string>>();
+                using (var q = new System.Management.ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, CommandLine FROM Win32_Process WHERE Name = 'victory.exe'"))
+                using (var found = q.Get())
+                    foreach (System.Management.ManagementObject o in found)
+                        using (o)
+                            rows.Add(Tuple.Create(Convert.ToInt32(o["ProcessId"]), Convert.ToInt32(o["ParentProcessId"]), o["CommandLine"] as string ?? ""));
+                Func<int, bool> ownTree = id =>
+                {
+                    for (int hops = 0; hops < 16; hops++)
                     {
-                        int id = Convert.ToInt32(o["ProcessId"]);
-                        var cmd = o["CommandLine"] as string ?? "";
-                        if (!Ours(id) && System.Text.RegularExpressions.Regex.IsMatch(cmd, @"\s(shaders|warm|precompile)(\s|$)")) ids.Add(id);
+                        if (Ours(id)) return true;
+                        var row = rows.FirstOrDefault(r => r.Item1 == id);
+                        if (row == null) return false;
+                        id = row.Item2;
                     }
+                    return false;
+                };
+                foreach (var r in rows)
+                    if (System.Text.RegularExpressions.Regex.IsMatch(r.Item3, @"\s(shaders|warm|precompile)(\s|$)") && !ownTree(r.Item1)) ids.Add(r.Item1);
             }
             catch (Exception) { }
             return ids;
@@ -94,7 +115,10 @@ namespace VIctoryLauncher
                          "Os shaders ainda estao a ser preparados por outra janela do launcher (ou uma que foi fechada). Dois ao mesmo tempo correm devagar e podem estragar a cache.\r\n\r\nParar e continuar? Nada se perde: o que ja foi traduzido fica na cache.",
                          "Les shaders sont encore en préparation par une autre fenêtre du launcher (ou une fenêtre fermée). Deux à la fois sont lents et peuvent abîmer le cache.\r\n\r\nL'arrêter et continuer ? Rien n'est perdu : ce qui est déjà traduit reste dans le cache.");
             if (MessageBox.Show(this, text, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return false;
-            foreach (var id in others) try { RunWait("taskkill", "/PID " + id + " /T /F", false); } catch (Exception) { }
+            // The question may have stood open for minutes: only what is still the same kind of process is stopped
+            // (a number freed in the meantime may belong to something else now).
+            var still = OtherPreparations();
+            foreach (var id in others) if (still.Contains(id)) try { RunWait("taskkill", "/PID " + id + " /T /F", false); } catch (Exception) { }
             Log(L("Stopped a preparation left running by another launcher window.", "Parada uma preparacao deixada a correr por outra janela do launcher."));
             return true;
         }
@@ -113,7 +137,8 @@ namespace VIctoryLauncher
                                         "Os shaders ou as pipelines ainda estao a ser preparados. Parar e fechar? Continua onde parou da proxima vez.",
                                         "Les shaders ou les pipelines sont encore en préparation. Arrêter et fermer ? Ça reprend là où ça s'est arrêté la prochaine fois."),
                     "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) { e.Cancel = true; return; }
-            foreach (var t in running) try { RunWait("taskkill", "/PID " + t.Id + " /T /F", false); } catch (Exception) { }
+            foreach (var t in running)
+                try { if (!t.HasExited) RunWait("taskkill", "/PID " + t.Id + " /T /F", false); } catch (Exception) { }
         }
 
         // ---------------------------------------------------------------- before PLAY: pipelines and memory
@@ -180,23 +205,27 @@ namespace VIctoryLauncher
         void CloseGames()
         {
             var ids = new List<int>();
+            var gp = gameProc; var aw = afterWarm;
             foreach (var p in Process.GetProcessesByName("victory"))
             {
                 try
                 {
-                    bool ours = gameProc != null && !gameProc.HasExited && p.Id == gameProc.Id;
-                    bool tool = afterWarm != null && !afterWarm.HasExited && p.Id == afterWarm.Id;
+                    bool ours = gp != null && !gp.HasExited && p.Id == gp.Id;
+                    bool tool = aw != null && !aw.HasExited && p.Id == aw.Id;
                     if (ours || tool || p.MainWindowHandle != IntPtr.Zero) ids.Add(p.Id);
                 }
                 catch (Exception) { }
                 finally { p.Dispose(); }
             }
+            // Forgotten first: the thread waiting on the game checks gameProc/afterWarm the moment the process
+            // dies, and must see "closed from the launcher" (not start the next pipelines, and not have its new
+            // afterWarm wiped by this method afterwards).
+            gameProc = null; afterWarm = null; windowGone = null; gameHadWindow = false;
             foreach (var id in ids)
             {
                 RunWait("taskkill", "/PID " + id + " /T /F", false);
                 Log(string.Format(L("Closed VIctory (process {0}).", "VIctory fechado (processo {0})."), id));
             }
-            gameProc = null; afterWarm = null; windowGone = null; gameHadWindow = false;
         }
 
         // ---------------------------------------------------------------- what is ready
@@ -209,7 +238,7 @@ namespace VIctoryLauncher
         void StartChecks()
         {
             new Thread(() => {
-                while (true)
+                while (!IsDisposed)
                 {
                     try { RunChecks(); } catch (Exception) { }
                     try { BeginInvoke(new Action(Refresh2)); } catch (Exception) { return; }
@@ -346,6 +375,9 @@ namespace VIctoryLauncher
         void WatchStart(string log, Process game)
         {
             new Thread(() => {
+              // Nothing here may throw: an unhandled exception on this thread ends the launcher.
+              try
+              {
                 var until = DateTime.Now.AddSeconds(90);
                 while (DateTime.Now < until && !game.HasExited)
                 {
@@ -376,6 +408,10 @@ namespace VIctoryLauncher
                     {
                         BeginInvoke(new Action(() => {
                             Log(why.Replace("\r\n", " "));
+                            // The game may have closed on its own while this was posted: nothing left to ask.
+                            bool gone;
+                            try { gone = game.HasExited; } catch (Exception) { gone = true; }
+                            if (gone) return;
                             if (MessageBox.Show(this, why + L("\r\n\r\nClose the game now?", "\r\n\r\nFechar o jogo agora?"), "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
                             {
                                 CloseGames();
@@ -386,6 +422,8 @@ namespace VIctoryLauncher
                     catch (Exception) { }
                     return;
                 }
+              }
+              catch (Exception) { }
             }) { IsBackground = true }.Start();
         }
 
@@ -426,9 +464,9 @@ namespace VIctoryLauncher
 
         ComboBox ExeBox(int x, int y, int width)
         {
-            exeBox = new ComboBox {
-                Location = new Point(x, y), Width = width, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat,
-                BackColor = Theme.Card, ForeColor = Theme.Text, Visible = false,
+            exeBox = new Dropdown {
+                Location = new Point(x, y), Width = width,
+                Visible = false,
             };
             exeBox.SelectedIndexChanged += (s, e) => {
                 if (fillingExes || exeBox.SelectedItem == null) return;
