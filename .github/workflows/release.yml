@@ -112,6 +112,11 @@ jobs:
           if (Test-Path docs/ANNOUNCEMENT.md) {
             $version = $tag.TrimStart('v') -replace '-.*$', ''
             $text = [IO.File]::ReadAllText('docs/ANNOUNCEMENT.md').Replace('{tag}', $tag).Replace('{version}', $version).Trim()
+            # Every announcement ends with docs/ANNOUNCEMENT-FOOTER.md, before the @everyone line.
+            if (Test-Path docs/ANNOUNCEMENT-FOOTER.md) {
+              $footer = [IO.File]::ReadAllText('docs/ANNOUNCEMENT-FOOTER.md').Trim()
+              if ($text.EndsWith('@everyone')) { $text = $text.Substring(0, $text.Length - 9).TrimEnd() + "`n`n" + $footer + "`n`n@everyone" } else { $text = $text + "`n`n" + $footer }
+            }
             $token = (Invoke-RestMethod -Headers @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=vi-release-signer").value
             $r = Invoke-RestMethod -Method Post -Uri "$signer/v1/announce" -Headers @{ Authorization = "Bearer $token" } -ContentType 'text/plain; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($text))
             "Announcement posted: $($r.posted)"
