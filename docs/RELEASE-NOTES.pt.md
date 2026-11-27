@@ -1,16 +1,6 @@
-Julia's Launcher 0.2.0: a grande renovação.
+Julia's Launcher 0.3.0: francês, e atualizações a partir de felicienradio/cold-project-vi.
 
-- Visual novo (estilo Cold Project). Páginas novas: Shaders (ao vivo), Hardware e ID, Atualizações, Ajustes avançados.
-- Instalador: um pedido de administrador e o Windows fica configurado em segundo plano. Nada para compilar.
-- Atualizações: verificadas no GitHub de 5 em 5 minutos, assinadas, instaladas sozinhas com o jogo fechado.
-- Correções:
-  - O JOGAR já não fica preso atrás de um jogo que crashou: aparece FECHAR E JOGAR.
-  - O "could not find Cargo.toml" deixa de aparecer quando o launcher está fora da pasta do código.
-  - O Resizable BAR é detetado como o jogo o vê.
-  - A memória virtual liga sempre.
-  - Dumps com vários executáveis funcionam.
-  - As definições já não se perdem.
-- Predefinições novas: Ultra baixo (muito pouca memória) e Personalizado, com códigos de perfil para copiar e colar.
-- Placas AMD: detetadas sozinhas; jogam com o VIctory-Belobug-AMD do Belobug (todo o crédito ao Belobug).
-- Enviar erros no Discord: cria o pacote para o canal "Send bugs here please".
-- Partilha de hardware (desligada por defeito): só hardware, para uma base de dados que só o edupode lê.
+- Francês: um botão FR novo ao lado de EN e PT na barra lateral. Todas as páginas, a Ajuda, os controlos e os avisos estão traduzidos.
+- As atualizações passam a vir das versões de github.com/felicienradio/cold-project-vi, assinadas com a nova chave do projeto.
+  Vens da 0.2.x? Instala esta versão uma vez à mão; as seguintes instalam-se sozinhas.
+- O instalador pode aparecer em francês.

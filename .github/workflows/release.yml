@@ -6,9 +6,9 @@ name: Release
 # edupode then signs it on his own PC (scripts\sign-release.ps1 <tag>): the release key never
 # reaches GitHub, so the launchers out there only install what he signed.
 
+# Releases are now built and signed on felicienradio's PC (scripts\release-local.ps1): a pushed tag no longer
+# starts this workflow. It still runs by hand (Actions > Release > Run workflow) to check a build.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:

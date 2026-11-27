@@ -34,6 +34,7 @@ WizardStyle=modern
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "pt"; MessagesFile: "compiler:Languages\Portuguese.isl"
+Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
 
 [Dirs]
 ; The player may write here: updates replace the programs while the launcher runs without admin.
