@@ -1489,8 +1489,20 @@ fn spin(there: impl Fn() -> bool) {
 }
 
 /// How many threads are kept for [`wide`].
+/// Helper threads for work spread over threads (refreshes of copies,
+/// snapshots): a quarter of the logical cores, 2 to 6, or
+/// `VICTORY_WIDE_THREADS` (1 to 32). The refreshes are most of the
+/// submitting thread's time in the open world (9.4 of ~27 ms a frame, 7,435
+/// of them on a 24-core laptop that had 6 helpers).
 fn wide_threads() -> usize {
-    std::thread::available_parallelism().map_or(4, |n| n.get() / 4).clamp(2, 6)
+    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *N.get_or_init(|| {
+        std::env::var("VICTORY_WIDE_THREADS")
+            .ok()
+            .and_then(|v| v.trim().parse::<usize>().ok())
+            .map(|n| n.clamp(1, 32))
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get() / 4).clamp(2, 6))
+    })
 }
 
 fn workers() -> &'static Workers {

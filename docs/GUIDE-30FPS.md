@@ -95,12 +95,26 @@ used in that session for the next one.
      Motion does not engage yet.
    - Also in the NVIDIA App for that program: **Power management mode: Prefer
      maximum performance**, **Low latency mode: On**.
-4. **Plug the laptop in** and use the vendor's performance mode.
-5. **Windows virtual memory: "System managed"** (System → About → Advanced
+4. **Turn off "levels on demand"** (`VICTORY_LEVELS_ON_DEMAND=0`, what
+   `Jogar-Luz.cmd ... texturas` does). The host copies of textures then hold
+   only the levels the game shows: on the test laptop video memory went from
+   ~1 GB over the system's budget to 0.8 GB under it, 40,000 textures fit in
+   3.6 GB instead of 10,000 in 4.5 GB, textures waiting fell from 6,000-15,000
+   to ~130, and the open world went from 14-15 to 20-26 FPS at 720p. The same
+   mode compares 1.5 GB of game buffers on the card (`VICTORY_CARD_BUFFERS_MB`)
+   and caps textures at 2048 texels (`VICTORY_TEXTURE_MAX`, few are larger on
+   Series S).
+5. **More helper threads on many-core CPUs** (`VICTORY_WIDE_THREADS`, default
+   a quarter of the cores up to 6; the `cpu` switch uses 10) and the write
+   watch asked early by a thread of its own (`VICTORY_ASK_EARLY=2`): the
+   submitting thread spends ~5 ms a frame asking which pages the game wrote and
+   ~9 ms refreshing copies. Under test.
+6. **Plug the laptop in** and use the vendor's performance mode.
+7. **Windows virtual memory: "System managed"** (System → About → Advanced
    system settings → Performance → Virtual memory). VIctory's memory grows over
    a long session (we saw 23 GB → 33 GB in 50 minutes); with a small page file
    the game can run out of memory.
-6. **Restart the game about every 45 minutes** for the same reason.
+8. **Restart the game about every 45 minutes** for the same reason.
 
 ## 6. Controls (keyboard and mouse)
 
@@ -162,7 +176,7 @@ Details, measurements and the full list of changes: [LUZ-24FPS.md](LUZ-24FPS.md)
   blocks (the `qualidade` mode reduces it).
 - Video memory above the system's budget in the open world; textures reload
   ("blinking" in the distance).
-- Memory grows during long sessions (see 5.5 and 5.6).
+- Memory grows during long sessions (see 5.7 and 5.8).
 - No ray tracing: its structure builder uses wave64 programs NVIDIA refuses.
 - Two wave64 shaders still untranslated (`DefragHeap`, `CollectTriangles_Meshlets`).
 
