@@ -389,6 +389,17 @@ pub(crate) fn alias(list: &HostList, placed: This, source: This) -> bool {
 /// is remapping may show a frame later. A staging buffer that holds nothing
 /// yet is filled with what is there all the same ([`fill_unlocked`]): a list
 /// has recorded the upload from it by then.
+/// Whether the refreshes of one-shot decoration bakes do not wait for title
+/// memory to hold still either (`VICTORY_BAKE_NO_WAIT=1`; off by default):
+/// while the world streams in, those waits were 40-55 ms a frame of
+/// texture refreshes (laptop, 2026-11-27). Such a refresh then reads through
+/// the kernel while the runtime remaps, as the others do; a bake made from
+/// a texture caught in the middle of a change keeps that picture.
+fn bake_no_wait() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_BAKE_NO_WAIT").is_some_and(|v| v == "1"))
+}
+
 fn no_wait() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_NO_WAIT").is_some_and(|v| v == "1"))
@@ -1359,7 +1370,7 @@ impl Staging {
         // stays mapped (see `crate::watch::title_memory_reading`; without
         // it a page went between the asking and the read in runs 71 and
         // 74).
-        let _mapped = if no_wait() && !exact {
+        let _mapped = if no_wait() && (!exact || bake_no_wait()) {
             // Not waited for: while the runtime remaps title memory the
             // texture is read through the kernel instead, whole or not at
             // all (`no_wait`).

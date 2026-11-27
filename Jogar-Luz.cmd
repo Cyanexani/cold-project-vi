@@ -86,6 +86,7 @@ for %%m in ("%~1" "%~2" "%~3" "%~4") do (
   if /i %%m=="cpu" (set "VICTORY_ASK_EARLY=2" & set "VICTORY_WIDE_THREADS=10")
   if /i %%m=="60" set "VICTORY_FPS_MAX=60"
   if /i %%m=="caras" set "VICTORY_TEXTURE_NO_WAIT=0"
+  if /i %%m=="carregar" set "VICTORY_BAKE_NO_WAIT=1"
   if /i %%m=="tudo" (set "VICTORY_RENDER_SCALE=0.6666667" & set "VICTORY_OWN_UPSCALER=1" & set "VICTORY_TEXTURE_MAX=2048" & set "VICTORY_LEVELS_ON_DEMAND=0" & set "VICTORY_CARD_BUFFERS_MB=1536" & set "VICTORY_WINDOWS_BAR_MB=1024" & set "VICTORY_FPS_MAX=60" & set "VICTORY_POOL_FULLEST=1" & set "VICTORY_TEXTURE_STAGE_MB=384")
 )
 tasklist /FI "IMAGENAME eq victory.exe" | find /I "victory.exe" >nul && (

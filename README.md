@@ -20,7 +20,9 @@ on menus it goes from 30-32/33fps
 >   packing, up to 384 MB of textures staged a frame instead of 192 so they load sooner). **Measured: cutscenes
 >   35-38 FPS** (above the game's 30 thanks to the 60 FPS clock), open world 14-22 while new areas stream in.
 >   While streaming, texture refreshes wait 40-55 ms a frame for the game's memory remaps, and the pass over the
->   descriptor heap takes ~9 ms a frame: the next targets. `caras` adds waiting for memory remaps against rainbow faces (costs some FPS).
+>   descriptor heap takes ~9 ms a frame: the next targets. Those waits are the refreshes of the game's one-shot
+>   decoration bakes (the others already read around a remap); `carregar` (`VICTORY_BAKE_NO_WAIT=1`, experimental)
+>   lets them read around it too. `caras` adds waiting for memory remaps against rainbow faces (costs some FPS).
 > - `Jogar-Luz.cmd 720p texturas`: open world **20-26 FPS** (was 14-15), cutscenes ~30. Video memory now
 >   **under** the system's budget (7.6 of 8.6 GB; was ~1 GB over), textures waiting ~130 (was 6,000-15,000).
 >   The big win: `VICTORY_LEVELS_ON_DEMAND=0` (host copies hold only the texture levels the game shows).
