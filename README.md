@@ -203,6 +203,26 @@ English by default, **Português** and **Français** in the side bar; this page 
 
   Nothing is sent by the launcher itself.
 
+## Which PCs can play
+
+From the smallest PC to the biggest, with what we have actually seen on each one. The **processor** and the
+**RAM** limit the game more than the graphics card does. A **dedicated graphics card** is needed: integrated
+graphics do not run it.
+
+| PC (smallest → biggest) | Preset | What we saw | State |
+|---|---|---|---|
+| Integrated graphics only: Intel Iris Xe, Core i5-1334U, 16 GB RAM (laptop) | Ultra Low, heavy options off | The game closes after about a minute: out of video memory, then the GPU stops ("device removed"); the Intel driver refuses many of the game's shaders. Tested 27/11/2026 | ❌ does not run |
+| 4-6 GB card, 8-16 GB RAM | Ultra Low (540p, 30 FPS clock) | No report yet | ❓ not tested |
+| 6-8 GB card, 16 GB RAM | Modest PC (540p, light) | 8 GB cards ran at about 3 FPS while "Crowds and fights" overfilled video memory; fixed in 0.3.2, not measured since | ⚠️ to measure |
+| RTX 3060, 16 GB RAM | Modest PC | 4.6-4.7 FPS in the prison cell (26/11/2026, before the edupode engine); 16 GB of RAM is the limit | ⚠️ very slow |
+| RTX 3070 Ti, Core i5-14400F, 16 GB RAM | Modest PC | 4.8 FPS on its first test, 3 in a heavier scene (26/11/2026, before the edupode engine); the card was only busy 60 ms a frame | ⚠️ very slow |
+| Radeon RX 6800 (16 GB) | Recommended | The edupode engine stopped at start ("device removed"); the launcher switches to Belobug's AMD engine on its own | ⚠️ with Belobug's engine |
+| RTX 5070 Ti laptop (12 GB, 145 W), Core Ultra 9 275HX, 32 GB DDR5 | ★ Recommended (720p → 1080p) | Open world 22-26 FPS, crowds and fights 14-17, cutscenes 35-38, menus 60; 6-8 GB of video memory and ~20 GB of RAM used. Long sessions without a crash | ✅ plays well |
+| 12 GB+ card, strong CPU, 32 GB RAM | Sharp (1080p) | No report yet | ❓ not tested |
+
+Some players report a steady 30 FPS, on PCs not named yet. Your PC is not in the table? Turn on **Hardware
+sharing** (Hardware & ID) and tell us your FPS on Discord: each report fills a line.
+
 ## Modes
 
 | Mode | What it does | RTX 5070 Ti laptop |

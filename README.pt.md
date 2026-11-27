@@ -171,6 +171,25 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
   3. O launcher junta os ficheiros certos num zip no Ambiente de trabalho, sem o teu nome de utilizador nos caminhos. Abre a pasta e copia um resumo curto.
   4. Envia o zip no canal **"Send bugs here please"** do [Discord](https://discord.gg/648WEXCAsZ). O launcher não envia nada sozinho.
 
+## Que PCs podem jogar
+
+Do PC mais pequeno ao maior, com o que vimos mesmo em cada um. O **processador** e a **RAM** limitam o jogo mais do que
+a placa gráfica. É preciso uma **placa gráfica dedicada**: as gráficas integradas não correm o jogo.
+
+| PC (do mais pequeno ao maior) | Predefinição | O que vimos | Estado |
+|---|---|---|---|
+| Só gráfica integrada: Intel Iris Xe, Core i5-1334U, 16 GB de RAM (portátil) | Ultra baixo, opções pesadas desligadas | O jogo fecha ao fim de cerca de um minuto: sem memória de vídeo, depois a GPU para ("device removed"); o driver Intel recusa muitos shaders do jogo. Testado a 27/11/2026 | ❌ não corre |
+| Placa de 4-6 GB, 8-16 GB de RAM | Ultra baixo (540p, relógio de 30 FPS) | Ainda sem relatos | ❓ não testado |
+| Placa de 6-8 GB, 16 GB de RAM | PC modesto (540p, leve) | As placas de 8 GB corriam a cerca de 3 FPS enquanto "Multidões e lutas" enchia a memória de vídeo; corrigido na 0.3.2, ainda não medido | ⚠️ por medir |
+| RTX 3060, 16 GB de RAM | PC modesto | 4,6-4,7 FPS na cela da prisão (26/11/2026, antes do motor edupode); os 16 GB de RAM são o limite | ⚠️ muito lento |
+| RTX 3070 Ti, Core i5-14400F, 16 GB de RAM | PC modesto | 4,8 FPS no primeiro teste, 3 numa cena mais pesada (26/11/2026, antes do motor edupode); a placa só trabalhava 60 ms por frame | ⚠️ muito lento |
+| Radeon RX 6800 (16 GB) | Recomendado | O motor edupode parou ao arrancar ("device removed"); o launcher passa sozinho para o motor AMD do Belobug | ⚠️ com o motor do Belobug |
+| Portátil RTX 5070 Ti (12 GB, 145 W), Core Ultra 9 275HX, 32 GB DDR5 | ★ Recomendado (720p → 1080p) | Mundo aberto 22-26 FPS, multidões e lutas 14-17, cutscenes 35-38, menus 60; 6-8 GB de memória de vídeo e ~20 GB de RAM usados. Sessões longas sem crash | ✅ joga bem |
+| Placa de 12 GB+, processador forte, 32 GB de RAM | Nítido (1080p) | Ainda sem relatos | ❓ não testado |
+
+Alguns jogadores relatam 30 FPS estáveis, em PCs ainda sem nome. O teu PC não está na tabela? Liga a **Partilha de
+hardware** (Hardware e ID) e diz-nos os teus FPS no Discord: cada relato preenche uma linha.
+
 ## Modos
 
 | Modo | O que faz | Portátil RTX 5070 Ti |

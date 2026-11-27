@@ -190,6 +190,26 @@ Le launcher est en anglais par défaut, avec le **portugais** et le **français*
 
   Le launcher n'envoie rien lui-même.
 
+## Quels PC peuvent jouer
+
+Du plus petit PC au plus gros, avec ce qu'on a vraiment vu sur chacun. Le **processeur** et la **RAM** limitent le jeu
+plus que la carte graphique. Il faut une **carte graphique dédiée** : les puces graphiques intégrées ne le font pas
+tourner.
+
+| PC (du plus petit au plus gros) | Préréglage | Ce qu'on a vu | État |
+|---|---|---|---|
+| Puce intégrée seule : Intel Iris Xe, Core i5-1334U, 16 Go de RAM (portable) | Ultra bas, options lourdes coupées | Le jeu se ferme au bout d'une minute environ : plus de mémoire vidéo, puis la carte s'arrête (« device removed ») ; le pilote Intel refuse beaucoup de shaders du jeu. Testé le 27/11/2026 | ❌ ne tourne pas |
+| Carte de 4-6 Go, 8-16 Go de RAM | Ultra bas (540p, horloge à 30 FPS) | Pas encore de retour | ❓ non testé |
+| Carte de 6-8 Go, 16 Go de RAM | PC modeste (540p, léger) | Les cartes de 8 Go tournaient à environ 3 FPS quand « Foules et combats » remplissait la mémoire vidéo ; corrigé en 0.3.2, pas encore remesuré | ⚠️ à mesurer |
+| RTX 3060, 16 Go de RAM | PC modeste | 4,6-4,7 FPS dans la cellule de la prison (26/11/2026, avant le moteur edupode) ; les 16 Go de RAM sont la limite | ⚠️ très lent |
+| RTX 3070 Ti, Core i5-14400F, 16 Go de RAM | PC modeste | 4,8 FPS au premier test, 3 dans une scène plus lourde (26/11/2026, avant le moteur edupode) ; la carte ne travaillait que 60 ms par image | ⚠️ très lent |
+| Radeon RX 6800 (16 Go) | Recommandé | Le moteur edupode s'arrête au démarrage (« device removed ») ; le launcher passe tout seul au moteur AMD de Belobug | ⚠️ avec le moteur de Belobug |
+| Portable RTX 5070 Ti (12 Go, 145 W), Core Ultra 9 275HX, 32 Go DDR5 | ★ Recommandé (720p → 1080p) | Monde ouvert 22-26 FPS, foules et combats 14-17, cinématiques 35-38, menus 60 ; 6-8 Go de mémoire vidéo et ~20 Go de RAM utilisés. Longues sessions sans plantage | ✅ joue bien |
+| Carte de 12 Go+, processeur puissant, 32 Go de RAM | Net (1080p) | Pas encore de retour | ❓ non testé |
+
+Des joueurs disent tenir 30 FPS stables, sur des PC pas encore identifiés. Ton PC n'est pas dans le tableau ? Active
+le **Partage du matériel** (Matériel et ID) et donne-nous tes FPS sur Discord : chaque retour remplit une ligne.
+
 ## Modes
 
 | Mode | Ce qu'il fait | Portable RTX 5070 Ti |
