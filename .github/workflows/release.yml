@@ -107,7 +107,9 @@ jobs:
           gh release upload $tag -R $repo --clobber signed/manifest.json signed/manifest.sig
           gh release edit $tag -R $repo --draft=false --latest
           "Published $tag."
-          if (Test-Path docs/ANNOUNCEMENT.md) {
+          # One announcement per version: from felicienradio's repository, the channel every launcher from 0.3.3 on
+          # follows. A release on edupode's repository only carries its launchers (0.3.2-edupode and older) over.
+          if ('${{ github.repository }}' -eq 'felicienradio/cold-project-vi' -and (Test-Path docs/ANNOUNCEMENT.md)) {
             $version = $tag.TrimStart('v') -replace '-.*$', ''
             $text = [IO.File]::ReadAllText('docs/ANNOUNCEMENT.md').Replace('{tag}', $tag).Replace('{version}', $version).Trim()
             # Every announcement ends with docs/ANNOUNCEMENT-FOOTER.md, before the @everyone line.
