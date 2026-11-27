@@ -116,6 +116,66 @@ namespace VIctoryLauncher
             foreach (var t in running) try { RunWait("taskkill", "/PID " + t.Id + " /T /F", false); } catch (Exception) { }
         }
 
+        // ---------------------------------------------------------------- before PLAY: pipelines and memory
+
+        bool pipelineHintShown, heavyAppsAsked;
+
+        // The first game on an engine whose pipelines were never built ahead: the driver compiles each one
+        // during play (hundreds of draws missing a frame for the first minutes). This run writes them down,
+        // so the next one can build them before it opens: said once, with what to do.
+        void PipelineHint()
+        {
+            if (pipelineHintShown || !warmBox.Checked) return;
+            var pdir = Path.Combine(ActiveCacheDir, "pipelines");
+            if (Lines(Path.Combine(pdir, "warm-done.txt")) > 0) return;
+            pipelineHintShown = true;
+            MessageBox.Show(this, L("First game on this engine: its pipelines are not built yet, so the first minutes stutter and some objects are missing while your graphics driver compiles them.\r\n\r\n"
+                                  + "This game writes them down. To have them built before the game opens:\r\n"
+                                  + "  1.  Play 5-10 minutes in the world, then close the game.\r\n"
+                                  + "  2.  Wait until Activity says \"Done\" (the launcher builds them).\r\n"
+                                  + "  3.  Start the game again.",
+                                    "Primeiro jogo neste motor: as pipelines ainda nao foram feitas, por isso os primeiros minutos engasgam e faltam objetos enquanto o driver as compila.\r\n\r\n"
+                                  + "Este jogo regista-as. Para serem feitas antes do jogo abrir:\r\n"
+                                  + "  1.  Joga 5-10 minutos no mundo e fecha o jogo.\r\n"
+                                  + "  2.  Espera que a Atividade diga \"Feito\" (o launcher fa-las).\r\n"
+                                  + "  3.  Abre o jogo outra vez.",
+                                    "Premier jeu sur ce moteur : ses pipelines ne sont pas encore faites, donc les premières minutes saccadent et des objets manquent pendant que ton pilote les compile.\r\n\r\n"
+                                  + "Ce jeu les note. Pour qu'elles soient faites avant l'ouverture du jeu :\r\n"
+                                  + "  1.  Joue 5-10 minutes dans le monde, puis ferme le jeu.\r\n"
+                                  + "  2.  Attends que l'Activité dise « Terminé » (le launcher les fait).\r\n"
+                                  + "  3.  Relance le jeu."),
+                "Julia's Launcher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // Apps that hold a lot of RAM and are easy to close for a game (browsers, chat, music).
+        static readonly string[] HeavyApps = { "firefox", "chrome", "msedge", "opera", "brave", "vivaldi", "Discord", "Spotify", "Teams", "ms-teams", "slack", "steamwebhelper", "EpicGamesLauncher" };
+
+        // Little RAM free: the game (about 20 GB in the world) and Windows swap to disk and textures
+        // arrive slowly. Names what holds memory and how much, once per launcher window; false to cancel.
+        bool HeavyAppsCheck()
+        {
+            if (heavyAppsAsked) return true;
+            double freeGb;
+            try { freeGb = new Microsoft.VisualBasic.Devices.ComputerInfo().AvailablePhysicalMemory / 1073741824.0; } catch (Exception) { return true; }
+            if (freeGb >= 10) return true;
+            var held = new List<Tuple<string, double>>();
+            foreach (var name in HeavyApps)
+            {
+                long bytes = 0; string title = null;
+                foreach (var p in Process.GetProcessesByName(name))
+                    try { bytes += p.PrivateMemorySize64; if (title == null) title = p.ProcessName; } catch (Exception) { } finally { p.Dispose(); }
+                if (bytes > (512L << 20)) held.Add(Tuple.Create(title ?? name, bytes / 1073741824.0));
+            }
+            if (held.Count == 0) return true;
+            heavyAppsAsked = true;
+            var list = string.Join("\r\n", held.OrderByDescending(h => h.Item2).Select(h => string.Format("  •  {0}: {1:0.0} GB", h.Item1, h.Item2)).ToArray());
+            var ask = string.Format(L("Only {0:0.0} GB of RAM is free, and the game uses about 20 GB in the world. Short of RAM, Windows swaps to disk and textures load slowly.\r\n\r\nThese apps hold memory:\r\n{1}\r\n\r\nClose them first for a smoother game. Play anyway?",
+                                      "So ha {0:0.0} GB de RAM livre e o jogo usa cerca de 20 GB no mundo. Sem RAM, o Windows usa o disco e as texturas carregam devagar.\r\n\r\nEstas apps ocupam memoria:\r\n{1}\r\n\r\nFecha-as primeiro para um jogo mais fluido. Jogar na mesma?",
+                                      "Seulement {0:0.0} Go de RAM libre, et le jeu en utilise environ 20 Go dans le monde. À court de RAM, Windows passe par le disque et les textures arrivent lentement.\r\n\r\nCes applis occupent de la mémoire :\r\n{1}\r\n\r\nFerme-les d'abord pour un jeu plus fluide. Jouer quand même ?"),
+                freeGb, list);
+            return MessageBox.Show(this, ask, "Julia's Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        }
+
         // Ends every game (and what it started) and the pipelines being made after a session.
         void CloseGames()
         {

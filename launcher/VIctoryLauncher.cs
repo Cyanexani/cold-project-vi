@@ -1636,6 +1636,7 @@ namespace VIctoryLauncher
 
 
 
+
         Process Start(string args, string logFile) { return Start(args, logFile, null); }
 
         Process Start(string args, string logFile, Action<string> onLine)
@@ -1732,6 +1733,9 @@ namespace VIctoryLauncher
             AskToShare();
             // Once: a log of each game sent when it closes (SessionLogs.cs).
             AskSessionLogs();
+            // Little RAM free: what holds it, once (Session.cs). The first game on an engine: how its pipelines get built.
+            if (!HeavyAppsCheck()) return;
+            PipelineHint();
             long cardUsed;
             GpuUsers(out cardUsed);
             if (cardUsed > (2L << 30))
