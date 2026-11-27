@@ -5,6 +5,8 @@ From 0.3.1 (felicienradio):
 - French: an FR button next to EN and PT.
 
 edupode's fixes from players' reports:
+- Integrated graphics (Intel Iris Xe / UHD, AMD Radeon Graphics): every adapter is now read through DXGI, not only NVIDIA's. A PC with only integrated graphics gets Ultra Low with Crowds and fights, frame generation and the 60 FPS clock off, a warning before PLAY (play anyway / cancel) and a yellow line on the Play page; Hardware & ID and bug reports show the graphics type. (Unknown memory used to be read as a 12 GB card.)
+- Game saves: export yours to a zip on the Desktop, or import a friend's (yours are backed up first). Hardware & ID > Game saves.
 - 8 GB cards: "Crowds and fights" no longer puts 2 GB of the game's buffers on cards under 11 GB. It overfilled video memory and the game ran at about 3 FPS.
 - A game folder with only the executable (not the ~100 GB of game data) is named before PLAY; the game used to close at once.
 - Shaders count as prepared only when the game's shaders really were (a folder with 12 showed "ready").

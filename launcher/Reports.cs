@@ -121,6 +121,7 @@ namespace VIctoryLauncher
             sb.AppendLine("Kind: " + (game ? "game errors" : "launcher errors"));
             sb.AppendLine("Launcher: v" + Updater.Version + "   Engine: " + EngineName + "   Preset: " + Selected.Name);
             sb.AppendLine("GPU: " + h.Gpu + " (" + h.VramMb / 1024 + " GB, driver " + h.Driver + ")   " + RebarText() + "   VIctory runs on: " + probeAdapter);
+            sb.AppendLine("GPU type: " + (integratedOnly ? "integrated only" : "dedicated") + "   Adapters: " + string.Join("; ", adapters.ConvertAll(a => a.VendorName + " " + a.Name + " (" + a.DedicatedMb + " MB own, " + a.SharedMb + " MB shared" + (a.Integrated ? ", integrated" : "") + ")").ToArray()));
             sb.AppendLine("CPU: " + h.Cpu + "   RAM: " + h.RamGb + " GB   Board: " + h.BoardMaker + " " + h.Board);
             sb.AppendLine("Windows: " + h.Os + "   Disk: " + h.Disk + (h.Laptop ? "   laptop" : ""));
             sb.AppendLine("Missing: " + (missing.Count == 0 ? "nothing" : string.Join(", ", missing.ToArray())));

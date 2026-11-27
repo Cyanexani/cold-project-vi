@@ -5,6 +5,8 @@ Da 0.3.1 (felicienradio):
 - Francês: um botão FR ao lado de EN e PT.
 
 Correções do edupode a partir dos relatórios dos jogadores:
+- Gráficas integradas (Intel Iris Xe / UHD, AMD Radeon Graphics): todas as placas passam a ser lidas por DXGI, não só as NVIDIA. Um PC só com gráfica integrada fica em Ultra baixo com Multidões e lutas, geração de frames e relógio de 60 FPS desligados, um aviso antes de JOGAR (jogar na mesma / cancelar) e uma linha amarela na página Jogar; Hardware e ID e os relatórios mostram o tipo de gráfica. (A memória desconhecida era lida como uma placa de 12 GB.)
+- Saves do jogo: exporta o teu para um zip no Ambiente de trabalho, ou importa o de um amigo (o teu fica primeiro numa cópia de segurança). Hardware e ID > Saves do jogo.
 - Placas de 8 GB: o "Multidões e lutas" deixa de pôr 2 GB de buffers do jogo em placas com menos de 11 GB. Enchia a VRAM e o jogo corria a cerca de 3 FPS.
 - Uma pasta do jogo só com o executável (sem os ~100 GB de dados) é indicada antes de JOGAR; o jogo fechava logo.
 - Os shaders só contam como preparados quando os do jogo foram mesmo preparados (uma pasta com 12 aparecia "pronta").

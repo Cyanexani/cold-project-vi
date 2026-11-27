@@ -4,6 +4,8 @@
 📁 **A game folder with only the `.exe`** (without the ~100 GB of game data) is flagged before PLAY, instead of the game closing at once.
 🎮 **Radeon:** if the edupode engine fails to start twice in a row, the launcher switches to Belobug's AMD engine on its own.
 ✅ **PLAY waits while shaders are being prepared**, and shaders only show *ready* when they really are.
+💻 **Integrated graphics** (Intel Iris Xe / UHD): the launcher now sees them, picks Ultra Low with heavy options off and warns before PLAY (they need a 4 GB+ graphics card to run well).
+💾 **Share game saves:** Hardware & ID > Game saves exports yours to a zip or imports a friend's (yours are backed up first).
 📨 **Send errors > Send to edupode** sends your report in one click; then paste your hardware ID here (it is copied for you).
 ➕ Everything from **v0.3.1** too: accented Windows user names, French.
 

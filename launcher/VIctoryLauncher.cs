@@ -558,10 +558,12 @@ namespace VIctoryLauncher
             SelectMode(0);
             panelBox.Checked = true; borderlessBox.Checked = true; fps60Box.Checked = true; reserveBox.Checked = true;
             smoothBox.Checked = rtxFrameGen;
-            fightsBox.Checked = vramGb == 0 || vramGb >= 11; cpuBox.Checked = true; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
+            fightsBox.Checked = !integratedOnly && vramGb >= 11; cpuBox.Checked = true; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
             Log(L("Recommended setup (= the TUDO + lutas shortcut): Recommended 720p, overlay, borderless, 60 FPS clock, 2 GB of buffers for crowds, video memory reserve" + (rtxFrameGen ? ", Smooth Motion." : "."),
                   "Configuracao recomendada (= atalho TUDO + lutas): Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, 2 GB de buffers para multidoes, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : "."),
                   "Réglages recommandés (= raccourci TUDO + lutas) : Recommandé 720p, overlay, sans bordure, horloge à 60 FPS, 2 Go de buffers pour les foules, réserve de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
+            // Integrated graphics: the lightest setup, nothing that costs memory it does not have.
+            if (integratedOnly) { SelectMode(ModeUltraLow); fps60Box.Checked = false; smoothBox.Checked = false; fightsBox.Checked = false; }
         }
 
         void SelectMode(int k)
@@ -1364,10 +1366,18 @@ namespace VIctoryLauncher
             DetectCards();
             rebar = rebarBios;
             if (!FrameGenAvailable) smoothBox.Checked = false;
+            // Integrated graphics, once: the lightest options whatever an earlier launcher saved (it had read the
+            // memory as unknown and turned on Crowds and fights and frame generation).
+            if (integratedOnly && ReadSetting("igpu_defaults") != "1")
+            {
+                fightsBox.Checked = false; smoothBox.Checked = false; fps60Box.Checked = false;
+                SelectMode(ModeUltraLow);
+                WriteSetting("igpu_defaults", "1");
+            }
             // VIctory's own frame generation is experimental: off until the player turns it on.
             else if (OwnFrameGen && ReadSetting("smooth") == null) smoothBox.Checked = false;
             if (modeIndex < 0)
-                SelectMode((ramGb > 0 && ramGb <= 16.5) || (vramGb > 0 && vramGb <= 6.5) ? ModeUltraLow
+                SelectMode(integratedOnly || (ramGb > 0 && ramGb <= 16.5) || (vramGb > 0 && vramGb <= 6.5) ? ModeUltraLow
                     : (vramGb > 0 && vramGb < 10) || (ramGb > 0 && ramGb < 24) ? 2 : 0);
             UpdateBanner();
             UpdateSmooth();
@@ -1456,7 +1466,7 @@ namespace VIctoryLauncher
                 set("VICTORY_TEXTURE_STAGE_MB", "384");
                 if (rebar) set("VICTORY_WINDOWS_BAR_MB", "1024");
             }
-            if (m.Modest || (vramGb > 0 && vramGb < 10))
+            if (m.Modest || integratedOnly || (vramGb > 0 && vramGb < 10))
             {
                 // 6-8 GB cards: less of the game's buffers on the card, smaller textures and batches.
                 set("VICTORY_CARD_BUFFERS_MB", "768");
@@ -1488,7 +1498,7 @@ namespace VIctoryLauncher
             }
             // 2 GB of the game's buffers only on cards of 11 GB and more: on 8 GB cards it overfilled video
             // memory (6.9 of 7.0 GB, 7 GB spilled to RAM) and the game ran at 3 FPS (players, 27/11/2026).
-            if (fightsBox.Checked && !m.Modest && !m.UltraLow && !(vramGb > 0 && vramGb < 11)) set("VICTORY_CARD_BUFFERS_MB", "2048");
+            if (fightsBox.Checked && !m.Modest && !m.UltraLow && !integratedOnly && vramGb >= 11) set("VICTORY_CARD_BUFFERS_MB", "2048");
             if (panelBox.Checked) set("VICTORY_PANEL", "1");
             if (borderlessBox.Checked) { set("VICTORY_BORDERLESS", "1"); set("VICTORY_BORDERLESS_DPI", "0"); }
             if (fps60Box.Checked && !m.UltraLow) set("VICTORY_FPS_MAX", "60");
@@ -1546,6 +1556,17 @@ namespace VIctoryLauncher
         {
             // Setup still at work (building, translating shaders): two VIctory processes on one cache. An AMD
             // player started the game twice while shaders were being prepared and it ended at start (27/11/2026).
+            // Integrated graphics only: asked once, the player decides.
+            if (integratedOnly && ReadSetting("igpu_ack") != "1")
+            {
+                var body = L("Integrated graphics (Intel Iris Xe / UHD, AMD Radeon Graphics) found, and no graphics card of its own.\r\n\r\nThe game is very likely to crash or miss graphics: integrated graphics borrow the PC's RAM, which the game already needs, and the driver refuses some of its shaders. A graphics card with 4 GB or more of its own memory is needed.\r\n\r\nThe launcher has picked Ultra Low with the heavy options off. You can still try.",
+                             "Foi encontrada uma grafica integrada (Intel Iris Xe / UHD, AMD Radeon Graphics) e nenhuma placa grafica dedicada.\r\n\r\nE muito provavel que o jogo feche ou que faltem graficos: a grafica integrada usa a RAM do PC, de que o jogo ja precisa, e o driver recusa alguns shaders. E preciso uma placa grafica com 4 GB ou mais de memoria propria.\r\n\r\nO launcher escolheu o Ultra baixo com as opcoes pesadas desligadas. Podes tentar na mesma.",
+                             "Graphique intégré trouvé (Intel Iris Xe / UHD, AMD Radeon Graphics), sans carte graphique dédiée.\r\n\r\nLe jeu risque fort de planter ou d'avoir des graphismes manquants : le graphique intégré emprunte la RAM du PC, dont le jeu a déjà besoin, et le pilote refuse certains shaders. Il faut une carte graphique avec 4 Go ou plus de mémoire à elle.\r\n\r\nLe launcher a choisi Ultra bas avec les options lourdes désactivées. Tu peux essayer quand même.");
+                var answer = Notice(L("Integrated graphics", "Grafica integrada", "Graphique intégré"), body,
+                    L("Play anyway", "Jogar na mesma", "Jouer quand même"), L("Cancel", "Cancelar", "Annuler"));
+                if (answer != 1) return;
+                WriteSetting("igpu_ack", "1");
+            }
             if (setupBusy)
             {
                 MessageBox.Show(this, L("Setup is still working (building VIctory or preparing shaders). PLAY opens when it finishes.",

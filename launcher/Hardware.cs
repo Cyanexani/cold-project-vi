@@ -21,6 +21,10 @@ namespace VIctoryLauncher
     {
         // ---------------------------------------------------------------- cards and engines
         bool hasNvidia, hasRadeon, rtx30;
+        // Every adapter DXGI reports, and whether the PC has only integrated graphics (Intel Iris Xe / UHD, an
+        // AMD APU's Radeon Graphics): no memory of its own, far below what the game needs (Gpus.cs).
+        List<GpuAdapter> adapters = new List<GpuAdapter>();
+        bool integratedOnly;
         string driverVersion = "";
         string radeonName = "";
 
@@ -56,6 +60,17 @@ namespace VIctoryLauncher
                     }
             }
             catch (Exception) { }
+            adapters = Gpus.List();
+            integratedOnly = adapters.Count > 0 && adapters.TrueForAll(a => a.Integrated);
+            GpuAdapter best = null;
+            foreach (var a in adapters)
+                if (best == null || (best.Integrated && !a.Integrated) || (best.Integrated == a.Integrated && a.DedicatedMb > best.DedicatedMb)) best = a;
+            if (best != null && vramGb <= 0)
+            {
+                // Without nvidia-smi (AMD, Intel): the adapter's own memory, never "unknown" read as large.
+                vramGb = best.DedicatedMb / 1024.0;
+                if (!hasNvidia && !hasRadeon) gpuName = best.Name;
+            }
             rtx30 = Regex.IsMatch(gpuName, @"RTX\s*30\d\d");
             if (!hasNvidia && hasRadeon) gpuName = radeonName.Replace("AMD ", "");
         }
@@ -176,7 +191,19 @@ namespace VIctoryLauncher
         // repository's engine only, the AMD engine does not have it yet).
         bool NvSmoothHere { get { return rtx30 && File.Exists(NvSmoothDll); } }
         bool OwnFrameGen { get { return !rtxFrameGen && !NvSmoothHere && !UseAmdEngine; } }
-        bool FrameGenAvailable { get { return rtxFrameGen || NvSmoothHere || OwnFrameGen; } }
+        // (VIctory's own frame generation needs memory an integrated GPU does not have.)
+        // "dedicated, 12.0 GB of its own" / "integrated, 0.1 GB of its own (shares RAM)", for the hardware page and reports.
+        string GpuKind()
+        {
+            GpuAdapter best = null;
+            foreach (var a in adapters) if (best == null || (best.Integrated && !a.Integrated) || (best.Integrated == a.Integrated && a.DedicatedMb > best.DedicatedMb)) best = a;
+            double own = best != null ? Math.Max(vramGb, best.DedicatedMb / 1024.0) : vramGb;
+            return integratedOnly
+                ? string.Format(L("integrated, {0:0.0} GB of its own (shares RAM)", "integrada, {0:0.0} GB proprios (partilha a RAM)", "intégrée, {0:0.0} Go à elle (partage la RAM)"), own)
+                : string.Format(L("dedicated, {0:0.0} GB of its own", "dedicada, {0:0.0} GB proprios", "dédiée, {0:0.0} Go à elle"), own);
+        }
+
+        bool FrameGenAvailable { get { return rtxFrameGen || NvSmoothHere || (OwnFrameGen && !integratedOnly); } }
 
         string FrameGenLine()
         {
@@ -682,6 +709,7 @@ namespace VIctoryLauncher
                          "Todas as placas jogam com o motor edupode: VRAM de ~12 GB para 6-8 GB, ~4x mais texturas, o mais estavel. Para placas Radeon ha tambem o VIctory-Belobug-AMD, o fork do Belobug afinado para Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0; todo o credito e do Belobug), que o Preparar compila uma vez.") });
             y += 48;
 
+            y = SavesSection(page, X, y, W);
             page.Controls.Add(new Heading(L("Hardware sharing (only hardware)", "Partilha de hardware (so hardware)")) { Location = new Point(X, y), Width = W });
             y += 32;
             shareBox = new OptionCard { Text = L("Share my hardware with edupode", "Partilhar o meu hardware com o edupode"), Line = L("Off by default. Only the list below; never logs, options, paths, names or your IP.", "Desligado por defeito. So a lista em baixo; nunca logs, opcoes, caminhos, nomes nem o teu IP."),
@@ -714,7 +742,7 @@ namespace VIctoryLauncher
                         hw = h;
                         idLabel.Text = h.Id;
                         hwText.Text = string.Join("\r\n", new[] {
-                            L("Graphics card ", "Placa grafica ") + ": " + h.Gpu + (h.Driver.Length > 0 ? "  (driver " + h.Driver + ")" : "") + "  ·  " + h.VramMb / 1024 + " GB",
+                            L("Graphics card ", "Placa grafica ") + ": " + h.Gpu + (h.Driver.Length > 0 ? "  (driver " + h.Driver + ")" : "") + "  ·  " + GpuKind(),
                             "Resizable BAR : " + RebarText() + (probeAdapter.Length > 0 ? "  ·  " + L("VIctory runs on ", "o VIctory corre na ") + probeAdapter : ""),
                             L("Processor     ", "Processador   ") + ": " + h.Cpu + "  ·  " + h.Cores + L(" cores, ", " nucleos, ") + h.Threads + " threads",
                             "RAM           : " + h.RamGb + " GB",

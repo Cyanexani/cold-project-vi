@@ -153,6 +153,7 @@ namespace VIctoryLauncher
         List<string> Missing()
         {
             var m = new List<string>();
+            if (integratedOnly) m.Add(L("a graphics card with 4 GB or more (only integrated graphics found)", "uma placa grafica com 4 GB ou mais (so ha grafica integrada)", "une carte graphique de 4 Go ou plus (seulement un graphique intégré)"));
             if (!pagefileOk) m.Add(L("virtual memory managed by Windows", "memoria virtual gerida pelo Windows"));
             if (!powerOk) m.Add(L("best performance power (plugged in)", "energia em melhor desempenho (ligado a corrente)"));
             if (!rebar && ReadSetting("rebar_ack") != "1") m.Add("Resizable BAR");
