@@ -88,3 +88,4 @@ Thumbs.db
 /Julia's Launcher.exe
 /Julia's Launcher.old.exe
 /reports/
+/server/release-signer/.wrangler/

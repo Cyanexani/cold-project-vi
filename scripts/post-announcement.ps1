@@ -11,6 +11,12 @@ $file = Join-Path $PSScriptRoot '..\docs\ANNOUNCEMENT.md'
 if (-not (Test-Path $file)) { throw "No announcement at $file." }
 $version = $Tag.TrimStart('v') -replace '-.*$', ''
 $text = [IO.File]::ReadAllText($file).Replace('{tag}', $Tag).Replace('{version}', $version).Trim()
+# Every announcement ends with docs\ANNOUNCEMENT-FOOTER.md, before the @everyone line.
+$footerFile = Join-Path $PSScriptRoot '..\docs\ANNOUNCEMENT-FOOTER.md'
+if (Test-Path $footerFile) {
+    $footer = [IO.File]::ReadAllText($footerFile).Trim()
+    if ($text.EndsWith('@everyone')) { $text = $text.Substring(0, $text.Length - 9).TrimEnd() + "`n`n" + $footer + "`n`n@everyone" } else { $text = $text + "`n`n" + $footer }
+}
 if ($text.Length -gt 2000) { throw "The announcement is $($text.Length) characters; Discord takes 2000." }
 if ($DryRun) { $text; "($($text.Length) characters)"; return }
 $hookFile = Join-Path $env:USERPROFILE '.vi-release\discord-webhook.txt'
