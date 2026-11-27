@@ -1,5 +1,5 @@
 // Julia's Launcher: the PC's hardware, its permanent ID, the hardware-only report (opt-in, write-only),
-// the engine an AMD card plays with (Belobug's AMD fork), and frame generation for each card.
+// the engine (edupode for every card; Belobug's AMD fork as the Radeon alternative), and frame generation for each card.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -33,17 +33,11 @@ namespace VIctoryLauncher
         // Beside the other data, so it never depends on where the launcher sits (Downloads, Program Files).
         string AmdEngineDir { get { return Path.Combine(Path.GetDirectoryName(dataRoot), "engines", "amd"); } }
 
-        // launcher.ini's engine=: auto (an AMD card without an NVIDIA one plays with the AMD engine), edupode, amd.
-        string EngineChoice { get { var v = ReadSetting("engine"); return v == "amd" || v == "edupode" ? v : "auto"; } }
+        // launcher.ini's engine=: edupode (the default, every card: the least video memory and the most
+        // stable), or amd (Belobug's AMD engine, the alternative for Radeon cards, chosen by the player).
+        string EngineChoice { get { return ReadSetting("engine") == "amd" ? "amd" : "edupode"; } }
 
-        bool UseAmdEngine
-        {
-            get
-            {
-                var c = EngineChoice;
-                return c == "amd" || (c == "auto" && (hasRadeon && !hasNvidia || probeVendor == "1002"));
-            }
-        }
+        bool UseAmdEngine { get { return EngineChoice == "amd"; } }
 
         string EngineName { get { return UseAmdEngine ? "AMD · Belobug" : "edupode"; } }
 
@@ -546,37 +540,31 @@ namespace VIctoryLauncher
             {
                 WriteSetting("notice_amd", "1");
                 var body = string.Join("\r\n", Pt ? new[] {
-                    "Placa AMD detetada (" + gpuName + "). Jogas com o motor AMD do Belobug (VIctory-Belobug-AMD); o credito e dele.",
+                    "Placa AMD detetada (" + gpuName + "). Jogas com o motor edupode, o motor deste projeto e o predefinido",
+                    "para todas as placas:",
+                    "   •  VRAM de ~12 GB para 6-8 GB na placa do autor, e ~4 vezes mais texturas na mesma memoria;",
+                    "   •  sessoes longas e missoes sem crashes.",
                     "",
-                    "QUERES EXPERIMENTAR O MOTOR EDUPODE?",
-                    "   Tem o trabalho de memoria deste projeto: na placa do autor a VRAM passou de ~12 GB para 6-8 GB,",
-                    "   e cabem cerca de 4 vezes mais texturas na mesma memoria (de ~10 mil para ~40 mil).",
-                    "   Foi feito numa placa NVIDIA e ainda nao foi testado em AMD: pode correr melhor, pior ou nao arrancar.",
+                    "Foi afinado numa placa NVIDIA: conta-nos no Discord (\"" + DiscordChannel + "\") os FPS e a VRAM na tua Radeon.",
                     "",
-                    "   1.  Carrega em 'Experimentar o motor edupode' (o Preparar compila-o uma vez).",
-                    "   2.  Joga uns minutos com o F3 ligado.",
-                    "   3.  Conta no Discord, no canal \"" + DiscordChannel + "\": a tua placa, FPS e VRAM com cada motor.",
-                    "",
-                    "Voltas ao motor do Belobug quando quiseres: Hardware e ID > Motor.",
+                    "Alternativa para Radeon: o VIctory-Belobug-AMD, o fork do Belobug afinado para AMD (o credito e dele).",
+                    "Podes trocar quando quiseres em Hardware e ID > Motor.",
                 } : new[] {
-                    "AMD card found (" + gpuName + "). You play with Belobug's AMD engine (VIctory-Belobug-AMD); the credit is his.",
+                    "AMD card found (" + gpuName + "). You play with the edupode engine, this project's engine and the default",
+                    "for every card:",
+                    "   •  video memory from ~12 GB down to 6-8 GB on the author's card, ~4 times more textures in the same memory;",
+                    "   •  long sessions and missions without crashes.",
                     "",
-                    "WANT TO TRY THE EDUPODE ENGINE?",
-                    "   It has this project's memory work: on the author's card video memory went from ~12 GB to 6-8 GB,",
-                    "   and about 4 times more textures fit in the same memory (from ~10 thousand to ~40 thousand).",
-                    "   It was made on an NVIDIA card and has not been tested on AMD: it may run better, worse, or not start.",
+                    "It was tuned on an NVIDIA card: tell us on Discord (\"" + DiscordChannel + "\") the FPS and video memory on your Radeon.",
                     "",
-                    "   1.  Press 'Try the edupode engine' (Setup builds it once).",
-                    "   2.  Play a few minutes with F3 on.",
-                    "   3.  Tell us on Discord, in the \"" + DiscordChannel + "\" channel: your card, FPS and video memory with each engine.",
-                    "",
-                    "You can go back to Belobug's engine any time: Hardware & ID > Engine.",
+                    "Alternative for Radeon: VIctory-Belobug-AMD, Belobug's fork tuned for AMD (the credit is his).",
+                    "You can switch any time in Hardware & ID > Engine.",
                 });
-                var answer = Notice(L("AMD card: try the edupode engine?", "Placa AMD: experimentar o motor edupode?"), body,
-                    L("Try the edupode engine", "Experimentar o motor edupode"), L("Keep Belobug's", "Ficar com o do Belobug"));
-                if (answer == 1)
+                var answer = Notice(L("AMD card: you play with the edupode engine", "Placa AMD: jogas com o motor edupode"), body,
+                    L("Keep edupode", "Ficar com o edupode"), L("Try Belobug's instead", "Experimentar o do Belobug"));
+                if (answer == 2)
                 {
-                    WriteSetting("engine", "edupode");
+                    WriteSetting("engine", "amd");
                     if (engineBox != null) engineBox.SelectedIndex = 1;
                     UpdateBanner(); Refresh2();
                     if (VictoryExe == null) { Show(PageSetup); Build(); }
@@ -632,21 +620,20 @@ namespace VIctoryLauncher
             y += 32;
             engineBox = new ComboBox { Location = new Point(X, y), Width = 420, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Theme.Card, ForeColor = Theme.Text };
             engineBox.Items.AddRange(new object[] {
-                L("Automatic (AMD cards: Belobug's AMD engine)", "Automatico (placas AMD: motor AMD do Belobug)"),
-                L("edupode (NVIDIA)", "edupode (NVIDIA)"),
-                L("AMD · VIctory-Belobug-AMD by Belobug", "AMD · VIctory-Belobug-AMD do Belobug"),
+                L("★ edupode (recommended, every card: least video memory, most stable)", "★ edupode (recomendado, todas as placas: menos VRAM, mais estavel)"),
+                L("AMD alternative · VIctory-Belobug-AMD by Belobug", "Alternativa AMD · VIctory-Belobug-AMD do Belobug"),
             });
-            engineBox.SelectedIndex = EngineChoice == "edupode" ? 1 : EngineChoice == "amd" ? 2 : 0;
+            engineBox.SelectedIndex = EngineChoice == "amd" ? 1 : 0;
             engineBox.SelectedIndexChanged += (s, e) => {
-                WriteSetting("engine", engineBox.SelectedIndex == 1 ? "edupode" : engineBox.SelectedIndex == 2 ? "amd" : "auto");
+                WriteSetting("engine", engineBox.SelectedIndex == 1 ? "amd" : "edupode");
                 Log(L("Engine: ", "Motor: ") + EngineName);
                 UpdateBanner(); Refresh2();
             };
             page.Controls.Add(engineBox);
             y += 34;
             page.Controls.Add(new Label { Location = new Point(X, y), Size = new Size(W, 40), ForeColor = Theme.Dim, BackColor = Theme.Back, Font = Theme.Ui(9f),
-                Text = L("AMD cards play with VIctory-Belobug-AMD, Belobug's fork tuned for Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0). All credit for it is Belobug's. Setup builds it once.",
-                         "As placas AMD jogam com o VIctory-Belobug-AMD, o fork do Belobug afinado para Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0). Todo o credito e do Belobug. O Preparar compila-o uma vez.") });
+                Text = L("Every card plays with the edupode engine: video memory from ~12 GB down to 6-8 GB, ~4x more textures in it, the most stable. For Radeon cards there is also VIctory-Belobug-AMD, Belobug's fork tuned for Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0; all credit for it is Belobug's), which Setup builds once.",
+                         "Todas as placas jogam com o motor edupode: VRAM de ~12 GB para 6-8 GB, ~4x mais texturas, o mais estavel. Para placas Radeon ha tambem o VIctory-Belobug-AMD, o fork do Belobug afinado para Radeon (github.com/Belobug/VIctory-Belobug-AMD, GPL-3.0; todo o credito e do Belobug), que o Preparar compila uma vez.") });
             y += 48;
 
             page.Controls.Add(new Heading(L("Hardware sharing (only hardware)", "Partilha de hardware (so hardware)")) { Location = new Point(X, y), Width = W });

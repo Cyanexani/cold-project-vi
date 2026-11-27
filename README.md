@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/VRAM-6--8%20GB%20of%2012-ffc371?style=flat-square" alt="VRAM"/>
   <img src="https://img.shields.io/badge/RAM-~20%20GB-ffc371?style=flat-square" alt="RAM"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
-  <img src="https://img.shields.io/badge/GPU-NVIDIA%20RTX-76B900?style=flat-square&logo=nvidia" alt="NVIDIA RTX"/>
+  <img src="https://img.shields.io/badge/GPU-NVIDIA%20%7C%20AMD%20%7C%20Intel-76B900?style=flat-square" alt="NVIDIA, AMD, Intel"/>
   <img src="https://img.shields.io/badge/Rust-pinned-B7410E?style=flat-square&logo=rust" alt="Rust"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-845ec2?style=flat-square" alt="GPL-3.0"/>
 </p>
@@ -55,9 +55,23 @@
 > Hope this helps anyone, missions are already possible and doesn't crash even after long sessions  
 > on menus it goes from 30-32/33fps now its 60 fixed  
 
-GTA VI from **your own Xbox Series dump**, on Windows with an NVIDIA RTX card, through
-[VIctory](https://github.com/Marvisak/VIctory) (this branch: the cgbj build with the VIctory-NVIDIA
-lighting and many changes of our own). **No game files are included.**
+GTA VI from **your own Xbox Series dump**, on Windows, through [VIctory](https://github.com/Marvisak/VIctory)
+(this branch: the cgbj build with the VIctory-NVIDIA lighting and many changes of our own). **No game files are
+included.**
+
+### The edupode engine
+
+The engine every card plays with by default. Measured on the author's RTX 5070 Ti laptop (12 GB, 32 GB RAM):
+
+| | cgbj before | edupode engine |
+|---|---|---|
+| Video memory | ~12 GB, over the system's budget | **6-8 GB** |
+| Textures that fit on the card | ~10,000 | **~40,000** |
+| RAM | 27-29 GB | **20-21 GB** |
+| Open world | 10-15 FPS | **22-26 FPS** |
+| Crowds and fights | 10-15 FPS | **14-17 FPS** |
+| Cutscenes / menus | ~26 / 30-33 FPS | **35-38 / 60 FPS** |
+| Long sessions | | **missions without crashes** |
 
 ## Download
 
@@ -147,7 +161,7 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 | **Shaders** | Live: shaders translated, pipelines made, the ones that failed, the driver, disk room, the last errors.<br>Two progress bars: **Shaders** (how much of the game's files has been translated) and **Pipelines** (how many are made, also during the loading before each game).<br>**Repair** retries what failed; **Rebuild everything** starts again. |
 | **Performance** | The apps holding video memory and RAM; tick them and they close.<br>The video memory reserve and frame generation are set here. |
 | **Frame generation** | **RTX 40/50:** NVIDIA Smooth Motion, written into the driver's profile (no NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Every other card (GTX 10, RTX 20, AMD with the edupode engine, Intel):** VI frame generation (experimental, off by default) makes a frame between each two of the game's from the pictures alone, at the cost of half a frame of delay. |
-| **AMD cards** | Detected on their own. They play with **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug**, his fork tuned for Radeon (GPL-3.0). All credit for the AMD engine is his. Setup downloads and builds it once. |
+| **AMD cards** | They play with the **edupode engine** too, like every card. As an alternative tuned for Radeon there is **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) by Belobug** (GPL-3.0; all credit for it is his): pick it in Hardware & ID, and Setup downloads and builds it once. |
 | **Advanced Tweaks (Custom)** | Resolution, texture size, buffers, memory guards and FPS clock.<br>**Copy my profile** gives a code (`VI1-...`) to share. Paste a friend's code in the box and **Apply**: it shows what changes first, and a code can only hold these values. |
 | **Hardware & ID** | Your permanent ID (`VI-XXXX-XXXX`, from PC parts; it stays after reinstalling Windows) with a copy button, your hardware, and the engine choice. |
 | **Hardware sharing** | **Off by default.** When on, it sends **only hardware** (graphics card, processor, RAM, motherboard, Windows, disk type), at most once a day, to a write-only database only edupode can read.<br>It never sends logs, options, paths, names or your IP. The page shows exactly what is sent.<br>While it is off, the launcher asks before each game, explaining why it helps; **Don't ask again** ends that. Only the averages are public: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), updated every 6 hours. |

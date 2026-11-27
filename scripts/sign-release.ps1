@@ -15,7 +15,10 @@ New-Item -ItemType Directory $work | Out-Null
 gh release download $Tag -R $repo -D $work -p 'Julias-Launcher.exe' -p 'victory.exe' -p 'nvsmooth30-version.dll'
 foreach ($f in Get-ChildItem $work -File) {
     gh attestation verify $f.FullName -R $repo | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "$($f.Name): no provenance from $repo's workflow; not signing." }
+    if ($LASTEXITCODE -eq 0) { continue }
+    # The experimental RTX 30 add-on may be left out of an update; the launcher and VIctory may not.
+    if ($f.Name -like 'nvsmooth30-*') { Write-Warning "$($f.Name): no provenance; left out of this update."; Remove-Item $f.FullName; continue }
+    throw "$($f.Name): no provenance from $repo's workflow; not signing."
 }
 # Where each download goes beside the launcher (Updater.Allowed).
 $map = @{ 'Julias-Launcher.exe' = "Julia's Launcher.exe"; 'victory.exe' = 'victory.exe'; 'nvsmooth30-version.dll' = 'tools/nvsmooth30/version.dll' }
@@ -27,8 +30,9 @@ $files = foreach ($f in Get-ChildItem $work -File) {
         size   = $f.Length
     }
 }
-$notes = if (Test-Path "$PSScriptRoot\..\docs\RELEASE-NOTES.md") { Get-Content "$PSScriptRoot\..\docs\RELEASE-NOTES.md" -Raw } else { '' }
-$notesPt = if (Test-Path "$PSScriptRoot\..\docs\RELEASE-NOTES.pt.md") { Get-Content "$PSScriptRoot\..\docs\RELEASE-NOTES.pt.md" -Raw } else { '' }
+# Plain text only ([IO.File]::ReadAllText): Get-Content's strings carry PSPath, PSDrive... and ConvertTo-Json would publish them.
+$notes = if (Test-Path "$PSScriptRoot\..\docs\RELEASE-NOTES.md") { [IO.File]::ReadAllText("$PSScriptRoot\..\docs\RELEASE-NOTES.md") } else { '' }
+$notesPt = if (Test-Path "$PSScriptRoot\..\docs\RELEASE-NOTES.pt.md") { [IO.File]::ReadAllText("$PSScriptRoot\..\docs\RELEASE-NOTES.pt.md") } else { '' }
 $manifest = [ordered]@{ version = $Tag.TrimStart('v'); notes = $notes; notes_pt = $notesPt; files = @($files) } | ConvertTo-Json -Depth 4
 $manifestPath = Join-Path $work 'manifest.json'
 [IO.File]::WriteAllText($manifestPath, $manifest, (New-Object Text.UTF8Encoding $false))

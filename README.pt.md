@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/VRAM-6--8%20GB%20de%2012-ffc371?style=flat-square" alt="VRAM"/>
   <img src="https://img.shields.io/badge/RAM-~20%20GB-ffc371?style=flat-square" alt="RAM"/>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows"/>
-  <img src="https://img.shields.io/badge/GPU-NVIDIA%20RTX-76B900?style=flat-square&logo=nvidia" alt="NVIDIA RTX"/>
+  <img src="https://img.shields.io/badge/GPU-NVIDIA%20%7C%20AMD%20%7C%20Intel-76B900?style=flat-square" alt="NVIDIA, AMD, Intel"/>
 </p>
 
 </div>
@@ -30,9 +30,23 @@
 > **Este repositório não tem ficheiros do jogo**: nem executável, nem dados, nem shaders extraídos. Precisas da
 > tua própria cópia do jogo. Sem ligação nem apoio do estúdio ou da editora do jogo.
 
-GTA VI a partir do **teu próprio dump de Xbox Series**, no Windows com uma placa NVIDIA RTX, através do
+GTA VI a partir do **teu próprio dump de Xbox Series**, no Windows, através do
 [VIctory](https://github.com/Marvisak/VIctory). Este ramo é a build do cgbj com a iluminação do VIctory-NVIDIA
 e muitas mudanças nossas. **Não inclui ficheiros do jogo.**
+
+### O motor edupode
+
+O motor com que todas as placas jogam por defeito. Medido no portátil do autor (RTX 5070 Ti de 12 GB, 32 GB de RAM):
+
+| | cgbj antes | motor edupode |
+|---|---|---|
+| VRAM | ~12 GB, acima do limite do sistema | **6-8 GB** |
+| Texturas que cabem na placa | ~10 000 | **~40 000** |
+| RAM | 27-29 GB | **20-21 GB** |
+| Mundo aberto | 10-15 FPS | **22-26 FPS** |
+| Multidões e lutas | 10-15 FPS | **14-17 FPS** |
+| Cutscenes / menus | ~26 / 30-33 FPS | **35-38 / 60 FPS** |
+| Sessões longas | | **missões sem crashes** |
 
 ## Download
 
@@ -120,7 +134,7 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
 | **Shaders** | Ao vivo: shaders traduzidos, pipelines feitas, as que falharam, o driver, o espaço em disco e os últimos erros.<br>Duas barras de progresso: **Shaders** (quanto dos ficheiros do jogo já foi traduzido) e **Pipelines** (quantas estão feitas, também durante o carregamento antes de cada jogo).<br>**Reparar** tenta de novo o que falhou; **Refazer tudo** recomeça do zero. |
 | **Desempenho** | As apps que ocupam VRAM e RAM; marca-as e elas fecham.<br>A reserva de VRAM e a geração de frames definem-se aqui. |
 | **Geração de frames** | **RTX 40/50:** NVIDIA Smooth Motion, escrito no perfil do driver (sem a NVIDIA App).<br>**RTX 30:** [NVSmooth30](https://github.com/ItsAdeline/NVSmooth30), experimental.<br>**Todas as outras placas (GTX 10, RTX 20, AMD com o motor edupode, Intel):** geração de frames VI (experimental, desligada por defeito). Cria um frame entre cada dois do jogo só a partir das imagens, à custa de meio frame de atraso. |
-| **Placas AMD** | Detetadas sozinhas. Jogam com o **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) do Belobug**, o fork dele afinado para Radeon (GPL-3.0). Todo o crédito do motor AMD é dele. O Preparar descarrega-o e compila-o uma vez. |
+| **Placas AMD** | Também jogam com o **motor edupode**, como todas as placas. Como alternativa afinada para Radeon há o **[VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD) do Belobug** (GPL-3.0; todo o crédito é dele): escolhe-se em Hardware e ID, e o Preparar descarrega-o e compila-o uma vez. |
 | **Ajustes avançados (Personalizado)** | Resolução, tamanho das texturas, buffers, proteções de memória e relógio de FPS.<br>**Copiar o meu perfil** dá um código (`VI1-...`) para partilhar. Cola o código de um amigo na caixa e carrega em **Aplicar**: mostra primeiro o que muda, e um código só pode ter estes valores. |
 | **Hardware e ID** | O teu ID permanente (`VI-XXXX-XXXX`, feito a partir de peças do PC; fica igual depois de reinstalar o Windows) com botão de copiar, o teu hardware e a escolha do motor. |
 | **Partilha de hardware** | **Desligada por defeito.** Ligada, envia **só hardware** (placa gráfica, processador, RAM, placa-mãe, Windows, tipo de disco), no máximo uma vez por dia, para uma base de dados que só recebe dados e que só o edupode lê.<br>Nunca envia logs, opções, caminhos, nomes nem o IP. A página mostra exatamente o que é enviado.<br>Enquanto está desligada, o launcher pergunta antes de cada jogo e explica porque ajuda; **Não perguntar mais** acaba com isso. Só as médias são públicas: [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md), atualizadas de 6 em 6 horas. |

@@ -61,6 +61,7 @@ jobs:
             dist/Julia's Launcher.exe
             dist/victory.exe
             dist/VI-Setup-*.exe
+            dist/nvsmooth30-version.dll
       - name: Draft release
         if: github.event_name == 'push'
         shell: pwsh

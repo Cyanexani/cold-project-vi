@@ -117,9 +117,9 @@ namespace VIctoryLauncher
                 Fix = BuildBlocking,
             });
             steps.Add(new Step {
-                Title = L("AMD engine (Belobug)", "Motor AMD (Belobug)"),
-                Why = L("AMD cards play with VIctory-Belobug-AMD, Belobug's fork for Radeon (GPL-3.0). Downloads its source and builds it once.",
-                        "As placas AMD jogam com o VIctory-Belobug-AMD, o fork do Belobug para Radeon (GPL-3.0). Descarrega o codigo e compila-o uma vez."),
+                Title = L("AMD alternative engine (Belobug)", "Motor alternativo AMD (Belobug)"),
+                Why = L("Only if you chose it in Hardware & ID: VIctory-Belobug-AMD, Belobug's fork for Radeon (GPL-3.0). Downloads its source and builds it once.",
+                        "So se o escolheste em Hardware e ID: VIctory-Belobug-AMD, o fork do Belobug para Radeon (GPL-3.0). Descarrega o codigo e compila-o uma vez."),
                 FixText = L("Build it", "Compilar"),
                 Check = () => !UseAmdEngine ? -1 : VictoryExe != null ? 1 : 0,
                 Fix = BuildAmdEngine,
