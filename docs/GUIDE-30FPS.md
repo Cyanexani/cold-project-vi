@@ -193,3 +193,20 @@ Details, measurements and the full list of changes: [LUZ-24FPS.md](LUZ-24FPS.md)
 ---
 
 Maintained by **@edupode** on GitHub: <https://github.com/edupode>
+
+## Latest changes (27 Nov 2026)
+
+- **Overlay (F3)**: FPS now, the last minute's average (`AVG 1M`), the whole run's (`ALL`) and the worst
+  half second (`LOW`).
+- **Video memory**: VIctory asks Windows to reserve video memory for itself (`VICTORY_VRAM_RESERVE`: `max`
+  by default, a number of MB, or `0`), so other apps are moved out first. Copies of textures whose memory the
+  game has already unmapped are let go after 3 s (`VICTORY_TEXTURE_DEAD=0` turns this off); about 1 GB sat in
+  them in a 720p session. The memory line in the log counts them.
+- **edu launcher**: new design; a Performance page that lists the apps holding video memory and RAM and closes
+  the ones you tick; NVIDIA Smooth Motion written into the driver's profile for `victory.exe` (no NVIDIA App
+  needed); a loading bar that makes the pipelines of earlier sessions before the game opens; an explanation
+  for each option, ★ marking what was tested on the author's PC; English by default, Portuguese in the side bar.
+- **Frame recorder**: F9 in the game creates the trigger file when `VICTORY_RECORD` is set (a high beep).
+  `VICTORY_REPLAY_WARP=1` replays a capture on WARP, which runs waves of 64, to compare a wave64 program's
+  native form with the two-waves-of-32 form NVIDIA cards get (the `_Tiled` volumetrics work).
+- Crowds and fights: 14-17 FPS in the last session (were 10-15).

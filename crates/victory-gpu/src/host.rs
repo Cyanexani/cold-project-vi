@@ -9363,6 +9363,7 @@ impl Host {
             let copy = self.new_list()?;
             copy.close();
             tracing::info!(width, height, ?out, format = format.0, "presenting to a window");
+            self.reserve_video_memory();
             self.log_video_memory("right after the swap chain is made");
             Ok(Presenter {
                 swap_chain,
@@ -9490,6 +9491,7 @@ impl Host {
                 last[2] >> 20
             );
             self.log_video_memory("right after that change");
+            self.reserve_video_memory();
         }
         Some([own.Budget, own.CurrentUsage, shared.Budget, shared.CurrentUsage])
     }
@@ -9497,7 +9499,7 @@ impl Host {
     /// Both of the system's memory groups for this process, in bytes: for
     /// the card's own memory and then for the PC's memory shared with the
     /// card, the budget, the use, what could still be reserved and what
-    /// is reserved (the layer reserves none).
+    /// is reserved.
     pub(crate) fn video_memory_groups(&self) -> Option<[[u64; 4]; 2]> {
         let adapter = self.adapter.as_ref()?;
         let mut own = DXGI_QUERY_VIDEO_MEMORY_INFO::default();
@@ -9517,13 +9519,47 @@ impl Host {
         Some([all(&own), all(&shared)])
     }
 
+    /// Tells the system how much of the card's memory this process cannot go
+    /// without, so that when other programs (an overlay, a browser, the
+    /// desktop) ask for more, theirs is moved out first and our budget does
+    /// not shrink below it. `VICTORY_VRAM_RESERVE`: megabytes, `max` (the
+    /// default: all the system lets us reserve) or `0` (none).
+    pub(crate) fn reserve_video_memory(&self) {
+        let Some(adapter) = self.adapter.as_ref() else { return };
+        let asked = std::env::var("VICTORY_VRAM_RESERVE").unwrap_or_default();
+        let asked = asked.trim();
+        let want = match asked {
+            "" | "max" => u64::MAX,
+            n => match n.parse::<u64>() {
+                Ok(mb) => mb << 20,
+                Err(_) => u64::MAX,
+            },
+        };
+        if want == 0 {
+            return;
+        }
+        let Some([own, _]) = self.video_memory_groups() else { return };
+        let bytes = want.min(own[2]);
+        // SAFETY: a plain call on our adapter; the amount is within what the system offers.
+        let r = unsafe { adapter.SetVideoMemoryReservation(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, bytes) };
+        match r {
+            Ok(()) => tracing::info!(
+                "reserved {} MB of the card's memory for us (VICTORY_VRAM_RESERVE; {} MB could be reserved, budget {} MB)",
+                bytes >> 20,
+                own[2] >> 20,
+                own[0] >> 20
+            ),
+            Err(e) => tracing::warn!("the card's memory could not be reserved ({} MB): {e}", bytes >> 20),
+        }
+    }
+
     /// Logs [`Self::video_memory_groups`], with `when` it is said.
     pub(crate) fn log_video_memory(&self, when: &str) {
         let Some([own, shared]) = self.video_memory_groups() else {
             return;
         };
         tracing::info!(
-            "video memory as the system counts it, {}: the card's own: budget {} MB, in use {} MB, {} MB could still be reserved, {} MB reserved; the PC's shared with the card: budget {} MB, in use {} MB, {} MB could still be reserved, {} MB reserved (the layer reserves none)",
+            "video memory as the system counts it, {}: the card's own: budget {} MB, in use {} MB, {} MB could still be reserved, {} MB reserved; the PC's shared with the card: budget {} MB, in use {} MB, {} MB could still be reserved, {} MB reserved",
             when,
             own[0] >> 20,
             own[1] >> 20,

@@ -27,7 +27,7 @@ const GLYPH: (u32, u32) = (5, 7);
 const CELL: (u32, u32) = (6, 9);
 /// Characters in a line, lines, and the box's rim in dots.
 const COLUMNS: u32 = 40;
-const LINES: u32 = 9;
+const LINES: u32 = 10;
 const RIM: u32 = 3;
 
 /// The texts are put into one of these in turn: the card reads the others,
@@ -57,6 +57,38 @@ fn pressed() -> bool {
     // SAFETY: plain queries; room for the answer.
     unsafe { GetWindowThreadProcessId(GetForegroundWindow(), &mut process) };
     process == std::process::id()
+}
+
+/// F9 with one of our windows in front, while the frame recorder waits
+/// (`VICTORY_RECORD=<folder>`): the trigger file `<folder>\go`, so the next
+/// frame is captured without leaving the game. A beep says it was asked.
+fn record_on_f9() {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_F9;
+    static FOLDER: OnceLock<Option<std::path::PathBuf>> = OnceLock::new();
+    let Some(folder) = FOLDER.get_or_init(|| std::env::var_os("VICTORY_RECORD").map(Into::into)) else {
+        return;
+    };
+    static DOWN: AtomicBool = AtomicBool::new(false);
+    // SAFETY: a plain query.
+    let down = unsafe { GetAsyncKeyState(i32::from(VK_F9)) } < 0;
+    if DOWN.swap(down, Ordering::Relaxed) || !down {
+        return;
+    }
+    let mut process = 0;
+    // SAFETY: plain queries; room for the answer.
+    unsafe { GetWindowThreadProcessId(GetForegroundWindow(), &mut process) };
+    if process != std::process::id() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(folder);
+    match std::fs::write(folder.join("go"), b"F9") {
+        Ok(()) => {
+            tracing::info!("F9: the frame recorder was asked for the next frame ({})", folder.display());
+            // SAFETY: a plain call.
+            unsafe { windows_sys::Win32::System::Diagnostics::Debug::Beep(1500, 150) };
+        }
+        Err(e) => tracing::warn!("F9: the frame recorder's trigger could not be written: {e}"),
+    }
 }
 
 /// Seven rows of five dots, the leftmost the highest bit.
@@ -205,15 +237,57 @@ impl Counters {
     }
 }
 
+/// The frame rate over longer times: the last minute's, everything since
+/// the panel was shown, and the lowest half second of the last minute.
+#[derive(Clone, Copy, Default)]
+struct Averages {
+    minute: f64,
+    all: f64,
+    low: f64,
+}
+
+/// Half-second looks kept for [`Averages`]: (seconds, frames).
+struct History {
+    looks: std::collections::VecDeque<(f64, f64)>,
+    seconds: f64,
+    frames: f64,
+}
+
+impl History {
+    const MINUTE: f64 = 60.0;
+
+    fn new() -> History {
+        History { looks: std::collections::VecDeque::new(), seconds: 0.0, frames: 0.0 }
+    }
+
+    fn add(&mut self, seconds: f64, frames: f64) -> Averages {
+        self.seconds += seconds;
+        self.frames += frames;
+        self.looks.push_back((seconds, frames));
+        let mut kept: f64 = self.looks.iter().map(|l| l.0).sum();
+        while kept - self.looks.front().map_or(0.0, |l| l.0) >= Self::MINUTE {
+            kept -= self.looks.pop_front().map_or(0.0, |l| l.0);
+        }
+        let (s, f) = self.looks.iter().fold((0.0, 0.0), |(s, f), l| (s + l.0, f + l.1));
+        let rate = |s: f64, f: f64| if s > 0.0 { f / s } else { 0.0 };
+        Averages {
+            minute: rate(s, f),
+            all: rate(self.seconds, self.frames),
+            low: self.looks.iter().map(|l| rate(l.0, l.1)).fold(f64::INFINITY, f64::min).min(1e3),
+        }
+    }
+}
+
 /// The text. `c`: [`Counters`] per frame, `ms` a frame's time, `worst` the
 /// longest frame's, `cost` what this takes of a frame, in microseconds.
-fn text(c: &[f64; COUNTERS], ms: f64, worst: f64, cost: f64, host: &Host) -> Vec<String> {
+fn text(c: &[f64; COUNTERS], ms: f64, worst: f64, cost: f64, avg: Averages, host: &Host) -> Vec<String> {
     let gb = |bytes: u64| bytes as f64 / (1u64 << 30) as f64;
     let (working, private) = crate::copystat::process_memory();
     let [budget, used, _, shared] = host.video_memory().unwrap_or_default();
     let idle = (c[1] / 1e3).min(ms);
     vec![
-        format!("FPS {:.1}  FRAME {ms:.1} MS  LONGEST {worst:.0}", 1e3 / ms.max(0.001)),
+        format!("FPS {:.1}  AVG 1M {:.1}  ALL {:.1}", 1e3 / ms.max(0.001), avg.minute, avg.all),
+        format!("FRAME {ms:.1} MS  LONGEST {worst:.0}  LOW {:.1}", avg.low),
         format!("DRAWS {:.0}  DROPPED {:.0}", c[10], c[8]),
         format!("SUBMIT BUSY {:.1}  WAITS FOR GPU {:.1}", c[0] / 1e3, c[3] / 1e3),
         format!("GPU BUSY {:.1}  IDLE BEHIND US {:.1}", ms - idle, c[2] / 1e3),
@@ -291,6 +365,7 @@ pub(super) struct Panel {
     cost: Duration,
     before: Counters,
     lines: Vec<String>,
+    history: History,
     changed: bool,
     buffers: Option<Buffers>,
     failed: bool,
@@ -307,6 +382,7 @@ impl Panel {
             cost: Duration::ZERO,
             before: Counters::default(),
             lines: Vec::new(),
+            history: History::new(),
             changed: false,
             buffers: None,
             failed: false,
@@ -319,6 +395,7 @@ impl Panel {
         if pressed() {
             shown().fetch_xor(true, Ordering::Relaxed);
         }
+        record_on_f9();
         if !shown().load(Ordering::Relaxed) {
             self.frames = 0;
             return;
@@ -328,6 +405,7 @@ impl Panel {
             // (Shown from here on.)
             (self.since, self.last, self.worst, self.before) = (now, now, 0.0, Counters::now());
             self.frames = 0;
+            self.history = History::new();
         }
         self.frames += 1;
         self.worst = self.worst.max((now - self.last).as_secs_f64() * 1e3);
@@ -342,7 +420,8 @@ impl Panel {
         let c = counters.since(self.before, frames);
         self.before = counters;
         let cost = self.cost.as_secs_f64() * 1e6 / frames;
-        self.lines = text(&c, elapsed.as_secs_f64() * 1e3 / frames, self.worst, cost, host);
+        let avg = self.history.add(elapsed.as_secs_f64(), frames);
+        self.lines = text(&c, elapsed.as_secs_f64() * 1e3 / frames, self.worst, cost, avg, host);
         self.changed = true;
         (self.since, self.frames, self.worst) = (now, 0, 0.0);
         self.cost = now.elapsed();
@@ -461,6 +540,19 @@ mod tests {
             // Nothing past a line's end.
             assert_eq!(at((RIM + CELL.0 * 2 + 2) * scale, (RIM + CELL.1) * scale), colours[0]);
         }
+    }
+
+    #[test]
+    fn averages_keep_a_minute_and_the_whole_run() {
+        let mut h = History::new();
+        for _ in 0..120 {
+            h.add(0.5, 15.0);
+        }
+        let a = h.add(0.5, 5.0);
+        assert!((a.all - (120.0 * 15.0 + 5.0) / 60.5).abs() < 1e-9);
+        assert!((a.low - 10.0).abs() < 1e-9);
+        // The first look fell out of the minute.
+        assert!((a.minute - (119.0 * 15.0 + 5.0) / 60.0).abs() < 1e-9);
     }
 
     #[test]

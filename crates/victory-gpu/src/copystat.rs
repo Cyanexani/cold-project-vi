@@ -940,10 +940,13 @@ fn log_memory() {
     tracing::info!(
         "memory, windows: the {:.0} MB of windows lie over {:.0} MB of title memory (the rest is \
          memory that is in more than one window, and is copied once for each); host lists never \
-         reset since they were made: {}",
+         reset since they were made: {}; copies of textures whose title memory was unmapped, \
+         let go since the start: {} ({:.0} MB; VICTORY_TEXTURE_DEAD)",
         mb(copies[3]),
         mb(crate::shadow::window_cover()),
         lists[3],
+        crate::resource::DEAD[0].load(Relaxed),
+        mb(crate::resource::DEAD[1].load(Relaxed)),
     );
 }
 

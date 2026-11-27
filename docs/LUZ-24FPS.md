@@ -180,3 +180,19 @@ Commits deste ramo, por cima do cgbj e das ferramentas de teste:
 - A linha `host: N fps, N ms/frame (…)` mostra o tempo do processador
   (`preparing`), da placa (`on the GPU`) e das cópias de volta.
 - A linha `video memory as the system counts it` mostra a VRAM usada e o limite.
+
+## Novidades (27/11/2026)
+
+- **Overlay (F3)**: FPS agora, média do último minuto (`AVG 1M`), média desde o início (`ALL`) e o pior meio
+  segundo (`LOW`).
+- **VRAM**: o VIctory pede ao Windows uma reserva de VRAM (`VICTORY_VRAM_RESERVE`: `max` por defeito, um número
+  de MB, ou `0`), para as outras apps saírem primeiro. As cópias de texturas cuja memória o jogo já desmapeou saem
+  da placa ao fim de 3 s (`VICTORY_TEXTURE_DEAD=0` desliga); numa sessão a 720p estava ~1 GB preso nelas.
+- **edu launcher**: design novo; página Desempenho com as apps que ocupam VRAM e RAM (fecha as que marcares);
+  NVIDIA Smooth Motion escrito no perfil do driver para o `victory.exe` (sem NVIDIA App); barra de carregamento
+  que prepara as pipelines das sessões anteriores antes de o jogo abrir; explicação de cada opção, com ★ no que
+  foi testado no PC do autor; inglês por defeito, português na barra lateral.
+- **Gravador de frames**: F9 no jogo cria o ficheiro `go` quando o `VICTORY_RECORD` está definido (apito agudo).
+  `VICTORY_REPLAY_WARP=1` corre uma gravação no WARP, que corre ondas de 64, para comparar a forma nativa de um
+  programa wave64 com a forma de duas ondas de 32 que as placas NVIDIA recebem (trabalho do `_Tiled`).
+- Multidões e lutas: 14-17 FPS na última sessão (eram 10-15).

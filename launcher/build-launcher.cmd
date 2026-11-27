@@ -7,6 +7,6 @@ if not exist "%CSC%" (
   echo The .NET Framework 4 C# compiler was not found.
   exit /b 1
 )
-"%CSC%" /nologo /target:winexe /optimize+ /out:"%~dp0..\edu-launcher.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.VisualBasic.dll /reference:System.Core.dll "%~dp0VIctoryLauncher.cs"
+"%CSC%" /nologo /target:winexe /optimize+ /out:"%~dp0..\edu-launcher.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.VisualBasic.dll /reference:System.Core.dll "%~dp0VIctoryLauncher.cs" "%~dp0Widgets.cs" "%~dp0SmoothMotion.cs"
 if errorlevel 1 exit /b 1
 echo Built: %~dp0..\edu-launcher.exe

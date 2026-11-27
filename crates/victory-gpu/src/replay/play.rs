@@ -3448,6 +3448,13 @@ fn make_device(frame: &Frame, debug: bool, breadcrumbs: bool) -> Result<(ID3D12D
                 break;
             }
         }
+        // `VICTORY_REPLAY_WARP=1`: Microsoft's software device, which runs waves of 4 to 128
+        // lanes: a title's wave64 programs as one wave of 64 (translated with
+        // `VICTORY_HOST_WAVE=64`) beside the two-waves-of-32 form NVIDIA cards get.
+        if std::env::var_os("VICTORY_REPLAY_WARP").is_some_and(|v| v == "1") {
+            adapter = factory.EnumWarpAdapter::<IDXGIAdapter1>().ok();
+            tracing::info!("replaying on WARP (VICTORY_REPLAY_WARP=1)");
+        }
         if adapter.is_none() {
             tracing::warn!(
                 "the adapter recorded on ({}) is not here: the default one is used",

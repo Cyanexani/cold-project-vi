@@ -2128,6 +2128,69 @@ pub(crate) fn let_go_idle() {
     let from = if part == PART { FROM.load(Relaxed) } else { 0 };
     let mut looked = 0;
     let began = std::time::Instant::now();
+    // Dead weight first, whatever the card's room: copies of placed textures
+    // whose title memory the title has unmapped (their first page is gone),
+    // idle for 3 s and held by no list or slot. The title has given them up
+    // and fills that memory with others when it maps it again; a later use
+    // makes the copy again, as for any let go. A part at each look (asking
+    // the kernel about a page costs): 1,191 MB of them sat on the card in a
+    // 720p play, while the sweep let go of live ones to stay under the line.
+    // `VICTORY_TEXTURE_DEAD=0`: off.
+    static DEAD_ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *DEAD_ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_DEAD").is_none_or(|v| v != "0")) {
+        const DEAD_PART: usize = 512;
+        static DEAD_FROM: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let start = DEAD_FROM.load(Relaxed);
+        let mut seen = 0;
+        let mut next = 0;
+        for &at in all.range(start..).take(DEAD_PART) {
+            seen += 1;
+            next = at + 1;
+            // SAFETY: as below.
+            let r = unsafe { &*(at as *const Resource) };
+            let used = r.host.used.load(Relaxed);
+            if used == 0
+                || !fills(&r.desc)
+                || !r.host.placed.load(Relaxed)
+                || !crate::host::long_ago(used, 3_000, IDLE_FRAMES)
+                || crate::texture::host_wrote(at)
+            {
+                continue;
+            }
+            if crate::texture::committed(r.data().cast_const(), 1) {
+                continue;
+            }
+            let gone = {
+                let mut made = r.host.made.lock().unwrap_or_else(|e| e.into_inner());
+                let idle = made.as_ref().is_some_and(|(host, _)| {
+                    crate::host::long_ago(r.host.used.load(Relaxed), 3_000, IDLE_FRAMES)
+                        && std::sync::Arc::strong_count(host) == 1
+                        && crate::host::references(&host.texture) == 1
+                });
+                if idle {
+                    crate::texture::unstage(at as This);
+                    r.host.wanted.store(u32::MAX, Relaxed);
+                    made.take()
+                } else {
+                    None
+                }
+            };
+            if let Some((host, _)) = gone {
+                r.host.gone.store(true, Relaxed);
+                KINDS[2].fetch_add(1, Relaxed);
+                KINDS[3].fetch_add(host.bytes, Relaxed);
+                DEAD[0].fetch_add(1, Relaxed);
+                DEAD[1].fetch_add(host.bytes, Relaxed);
+                went += 1;
+                bytes += host.bytes;
+                if first.is_none() {
+                    first = Some(at);
+                }
+                crate::host::retire(host);
+            }
+        }
+        DEAD_FROM.store(if seen == DEAD_PART { next } else { 0 }, Relaxed);
+    }
     for at in all.range(from..).take(part).copied().chain(by_age.iter().map(|&(_, at)| at)) {
         if bytes >= most {
             break;
@@ -2194,6 +2257,11 @@ fn favour_reused() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("VICTORY_TEXTURE_FAVOR_REUSED").is_none_or(|v| v != "0"))
 }
+
+/// Since the start: host copies of textures whose title memory was unmapped
+/// that [`let_go_idle`] let go, and their bytes.
+#[cfg(windows)]
+pub(crate) static DEAD: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
 
 /// Since the start: looks of [`let_go_idle`], their microseconds, and the
 /// longest one's.
