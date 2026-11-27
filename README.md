@@ -27,7 +27,9 @@ on menus it goes from 30-32/33fps
 > - Refresh checks: each of the ~7,000 per frame looked through every range asked of the write watch that
 >   frame (a linear scan, quadratic in all); now a binary search over the sorted ranges. Under test.
 > - `60` switch (`VICTORY_FPS_MAX=60`): the console's frame clock at 60 a second instead of the 30 the game asks
->   for, so menus and light scenes can pass 30 FPS. Under test (the game's own timing should follow real time).
+>   for, so menus and light scenes can pass 30 FPS. **Measured: menus at 60 FPS** (2026-11-27); gameplay stays
+>   CPU-bound (~20-26 in the open world). The `qualidade` switch (relay 1, no card steps) did not stop characters'
+>   black flickers and cost a lot (8-14 FPS in a cutscene, ~35-41 ms a frame waiting for the card).
 > - Borderless window for NVIDIA Smooth Motion exists (`VICTORY_BORDERLESS=1`) but is off: it dropped the game
 >   to 1-2 FPS on a 2560x1600 screen at 150 %.
 > - Keyboard/mouse: click to capture the mouse (Alt/F1 releases), F enters vehicles and switches W/S to the
