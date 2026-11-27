@@ -17,7 +17,10 @@ on menus it goes from 30-32/33fps
 > **Latest (2026-11-27), RTX 5070 Ti Laptop 12 GB, Core Ultra 9 275HX, 32 GB, Series S profile:**
 > - **`Jogar-Luz.cmd tudo`: every optimization at once** (720p + game upscaler, texture levels held, textures
 >   over 2048 halved, 1.5 GB of buffers compared on the card, BAR windows, 60 FPS clock, fullest-block texture
->   packing, up to 384 MB of textures staged a frame instead of 192 so they load sooner). `caras` adds waiting for memory remaps against rainbow faces (costs some FPS).
+>   packing, up to 384 MB of textures staged a frame instead of 192 so they load sooner). **Measured: cutscenes
+>   35-38 FPS** (above the game's 30 thanks to the 60 FPS clock), open world 14-22 while new areas stream in.
+>   While streaming, texture refreshes wait 40-55 ms a frame for the game's memory remaps, and the pass over the
+>   descriptor heap takes ~9 ms a frame: the next targets. `caras` adds waiting for memory remaps against rainbow faces (costs some FPS).
 > - `Jogar-Luz.cmd 720p texturas`: open world **20-26 FPS** (was 14-15), cutscenes ~30. Video memory now
 >   **under** the system's budget (7.6 of 8.6 GB; was ~1 GB over), textures waiting ~130 (was 6,000-15,000).
 >   The big win: `VICTORY_LEVELS_ON_DEMAND=0` (host copies hold only the texture levels the game shows).
