@@ -76,7 +76,7 @@ Passa o rato por uma opção para ver o que faz; **★** marca o que foi testado
 
 | Modo | O que faz | Portátil RTX 5070 Ti |
 |---|---|---|
-| **★ Recomendado - 720p** | Mundo a 1280x720 + o upscaler do jogo para 1080p, níveis de texturas guardados, relógio de 60 FPS, sem bordas | mundo aberto 22-26 FPS, multidões 14-17, cutscenes 35+, menus 60 |
+| **★ Recomendado - 720p** (+ ★ multidões e lutas: a configuração do autor) | Mundo a 1280x720 + o upscaler do jogo para 1080p, níveis de texturas guardados, relógio de 60 FPS, sem bordas | mundo aberto 22-26 FPS, multidões 14-17, cutscenes 35+, menus 60 |
 | Mais rápido - 540p | Imagem mais suave, mais frames; para processadores mais lentos | uns FPS a mais |
 | PC modesto - 540p, leve | Para placas de 6-8 GB e 16 GB de RAM: menos VRAM e RAM | |
 | Nítido - 1080p | Resolução completa | mais lento no mundo aberto |

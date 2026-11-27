@@ -103,7 +103,7 @@ English by default, **Português** in the side bar. `Jogar-Luz.cmd` does the sam
 
 | Mode | What it does | RTX 5070 Ti laptop |
 |---|---|---|
-| **★ Recommended - 720p** | World at 1280x720 + the game's own upscaler to 1080p, texture levels held, 60 FPS clock, borderless | open world 22-26 FPS, crowds 14-17, cutscenes 35+, menus 60 |
+| **★ Recommended - 720p** (+ ★ crowds and fights: the author's daily setup) | World at 1280x720 + the game's own upscaler to 1080p, texture levels held, 60 FPS clock, borderless | open world 22-26 FPS, crowds 14-17, cutscenes 35+, menus 60 |
 | Fastest - 540p | Softer picture, most frames; for slower CPUs | a few FPS more |
 | Modest PC - 540p, light | For 6-8 GB cards and 16 GB of RAM: less video memory and RAM | |
 | Sharp - 1080p | Full resolution | slower in the open world |

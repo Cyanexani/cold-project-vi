@@ -303,7 +303,7 @@ namespace VIctoryLauncher
             fps60Box = T(L("★ Unlock 30 FPS (60 FPS clock)", "★ Desbloquear 30 FPS (relogio de 60)"), 0, 2, true);
             smoothBox = T(L("NVIDIA Smooth Motion (RTX 40/50, set up for you)", "NVIDIA Smooth Motion (RTX 40/50, configurado por ti)"), 0, 3, true);
             reserveBox = T(L("Keep the most video memory for the game", "Guardar o maximo de VRAM para o jogo"), 0, 4, true);
-            fightsBox = T(L("Crowds and fights: 2 GB of buffers on the card", "Multidoes e lutas: 2 GB de buffers na placa"), 1, 0, false);
+            fightsBox = T(L("★ Crowds and fights: 2 GB of buffers on the card", "★ Multidoes e lutas: 2 GB de buffers na placa"), 1, 0, true);
             qualityBox = T(L("Anti-stretch: fewer stretched bodies (slower)", "Anti-esticados: menos corpos esticados (mais lento)"), 1, 1, false);
             facesBox = T(L("Rainbow-face fix (slower)", "Correcao das caras arco-iris (mais lento)"), 1, 2, false);
             loadingBox = T(L("Fast loading (experimental)", "Carregamento rapido (experimental)"), 1, 3, false);
@@ -348,8 +348,8 @@ namespace VIctoryLauncher
                              "Novo: a geracao de frames do driver NVIDIA para RTX 40/50. O launcher escreve-a no perfil do driver para o victory.exe, sem NVIDIA App. Duplica os frames mostrados; junta um pouco de atraso.");
             d[reserveBox] = L("New: asks Windows to reserve video memory for the game, so other apps are moved out first when memory runs short. Fewer black and flat textures.",
                               "Novo: pede ao Windows uma reserva de VRAM para o jogo, por isso as outras apps saem primeiro quando falta memoria. Menos texturas pretas e lisas.");
-            d[fightsBox] = L("Keeps 2 GB of the game's buffers on the card instead of 1.5: for crowds and fights, where the FPS drops. Needs a 12 GB card. Still being tested.",
-                             "Mantem 2 GB de buffers do jogo na placa em vez de 1,5: para multidoes e lutas, onde os FPS caem. Precisa de placa de 12 GB. Ainda em teste.");
+            d[fightsBox] = L("Keeps 2 GB of the game's buffers on the card instead of 1.5: for crowds and fights, where the FPS drops. Needs a 12 GB card. Tested on edupode's PC: crowds 14-17 FPS instead of 10-15.",
+                             "Mantem 2 GB de buffers do jogo na placa em vez de 1,5: para multidoes e lutas, onde os FPS caem. Precisa de placa de 12 GB. Testado no PC do edupode: multidoes a 14-17 FPS em vez de 10-15.");
             d[qualityBox] = L("Waits for every copy of the game's buffers before drawing: fewer stretched bodies ('spaghetti'), but several FPS slower.",
                               "Espera por todas as copias dos buffers do jogo antes de desenhar: menos corpos esticados ('esparguete'), mas varios FPS mais lento.");
             d[facesBox] = L("Waits for textures to finish uploading before use: fixes rainbow faces, costs FPS.",
@@ -368,9 +368,9 @@ namespace VIctoryLauncher
             SelectMode(0);
             panelBox.Checked = true; borderlessBox.Checked = true; fps60Box.Checked = true; reserveBox.Checked = true;
             smoothBox.Checked = rtxFrameGen;
-            fightsBox.Checked = false; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
-            Log(L("Recommended setup: Recommended 720p, overlay, borderless, 60 FPS clock, video memory reserve" + (rtxFrameGen ? ", Smooth Motion." : "."),
-                  "Configuracao recomendada: Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
+            fightsBox.Checked = vramGb == 0 || vramGb >= 11; qualityBox.Checked = false; facesBox.Checked = false; loadingBox.Checked = false; warmBox.Checked = true;
+            Log(L("Recommended setup (= the TUDO + lutas shortcut): Recommended 720p, overlay, borderless, 60 FPS clock, 2 GB of buffers for crowds, video memory reserve" + (rtxFrameGen ? ", Smooth Motion." : "."),
+                  "Configuracao recomendada (= atalho TUDO + lutas): Recomendado 720p, overlay, sem bordas, relogio de 60 FPS, 2 GB de buffers para multidoes, reserva de VRAM" + (rtxFrameGen ? ", Smooth Motion." : ".")));
         }
 
         void SelectMode(int k)
