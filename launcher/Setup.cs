@@ -196,7 +196,15 @@ namespace VIctoryLauncher
                 FixText = L("Turn on", "Ligar"),
                 Check = () => !hasNvidia || !rebarBios ? -1 : SmoothMotion.RebarSet() ? 1 : 0,
                 Applies = () => hasNvidia && rebarBios,
-                Fix = () => { var err = SmoothMotion.SetRebar(true); if (err != null) Log("rBAR: " + err); else Log(L("Resizable BAR is on in victory.exe's driver profile.", "Resizable BAR ligado no perfil do driver do victory.exe.")); return err == null; },
+                Fix = () => {
+                    var err = SmoothMotion.SetRebar(true);
+                    // The driver keeps its Resizable BAR settings for administrators (-137, NVAPI_INVALID_USER_PRIVILEGE):
+                    // without them "Turn on" failed and the step stayed red. Asked once more as administrator.
+                    if (err != null && err.Contains("-137"))
+                        err = Elevated(Application.ExecutablePath, "--rebar-profile") && SmoothMotion.RebarSet() ? null : L("Windows did not give administrator rights, or the driver refused it.", "O Windows nao deu permissoes de administrador, ou o driver recusou.", "Windows n'a pas donné les droits administrateur, ou le pilote a refusé.");
+                    if (err != null) Log("rBAR: " + err); else Log(L("Resizable BAR is on in victory.exe's driver profile.", "Resizable BAR ligado no perfil do driver do victory.exe."));
+                    return err == null;
+                },
             });
         }
 

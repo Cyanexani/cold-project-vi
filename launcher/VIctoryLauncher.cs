@@ -36,6 +36,8 @@ namespace VIctoryLauncher
             if (args.Contains("--admin-setup")) return AdminTasks.Run(args);
             // The Setup page's virtual memory step, run as administrator (no PowerShell).
             if (args.Contains("--pagefile")) return LauncherForm.SetManagedPagefile() ? 0 : 1;
+            // The Setup page's "Resizable BAR in the NVIDIA driver", run as administrator (the driver asks for it).
+            if (args.Contains("--rebar-profile")) return SmoothMotion.SetRebar(true) == null ? 0 : 1;
             // After an update: the launcher it replaced ends first (it still holds the one-launcher lock).
             int wait = Array.IndexOf(args, "--wait-pid");
             int pid;
@@ -465,7 +467,7 @@ namespace VIctoryLauncher
                 L("Output 1080p (Full HD)", "Saida 1080p (Full HD)"),
                 L("Output 1440p (2K)", "Saida 1440p (2K)"),
                 L("Output 2160p (4K)", "Saida 2160p (4K)"),
-                L("Output 720p (HD)", "Saida 720p (HD)"),
+                L("World at 720p (lighter)", "Mundo a 720p (mais leve)"),
             });
             outputBox.SelectedIndex = 0;
             outputBox.SelectedIndexChanged += (s, e) => { SaveSettings(); Refresh2(); };
@@ -1258,18 +1260,22 @@ namespace VIctoryLauncher
         int OutputHeight { get { return outputBox == null ? 1080 : outputBox.SelectedIndex == 3 ? 720 : outputBox.SelectedIndex == 2 ? 2160 : outputBox.SelectedIndex == 1 ? 1440 : 1080; } }
         int OutputWidth { get { return OutputHeight * 16 / 9; } }
 
-        // A preset's scale is for 1080p and up (the scale applies on top of the output). At 720p output the world
-        // is drawn at the preset's 1080p size or 720p, whichever is smaller: Recommended (720p) becomes native 720p,
-        // the 540p presets 960x540 upscaled to 720p. Never less than at 1080p, and the screen's images are smaller
-        // (less video memory). null: native.
+        // The size the console reports to the game. Never 720p: the game stops on a 1280x720 display mode with its
+        // own fatal error (title+0x2219650; every one of 11 sessions at 720p in 0.3.6, players' logs 27/11/2026),
+        // and Belobug's engine crashed with a 1280x720 output. "720p" keeps a 1080p screen and draws the world at
+        // 720p at most (EffectiveScale).
+        int DisplayHeight { get { return OutputHeight == 720 ? 1080 : OutputHeight; } }
+        int DisplayWidth { get { return DisplayHeight * 16 / 9; } }
+
+        // At "720p" the world is drawn at the preset's size or 720p, whichever is smaller (the preset's scale and
+        // 2/3 of the 1080p screen): Recommended, Sharp and Classic at 1280x720, the 540p presets as they are. null: native.
         string EffectiveScale(string scale)
         {
             if (OutputHeight != 720) return scale;
             double s = 1.0;
             if (scale != null) double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out s);
             if (s <= 0) s = 1.0;
-            var at720 = Math.Min(1.0, s * 1080.0 / 720.0);
-            return at720 >= 0.999 ? null : at720.ToString("0.#######", System.Globalization.CultureInfo.InvariantCulture);
+            return Math.Min(s, 2.0 / 3.0).ToString("0.#######", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         // The edupode engine is the default on every card. On a Radeon, when it ends with an error in the first
@@ -1318,8 +1324,8 @@ namespace VIctoryLauncher
             string pic;
             double sc;
             if (scale != null && double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out sc) && sc < 0.999)
-                pic = string.Format(L("{0}×{1} internal upscaled to {2}p", "{0}×{1} interno ampliado para {2}p"), (int)Math.Round(OutputWidth * sc), (int)Math.Round(OutputHeight * sc), OutputHeight);
-            else pic = string.Format(L("native {0}p", "{0}p nativo"), OutputHeight);
+                pic = string.Format(L("{0}×{1} internal upscaled to {2}p", "{0}×{1} interno ampliado para {2}p"), (int)Math.Round(DisplayWidth * sc), (int)Math.Round(DisplayHeight * sc), DisplayHeight);
+            else pic = string.Format(L("native {0}p", "{0}p nativo"), DisplayHeight);
             bool sixty = m.Custom ? custom.Fps == 60 : fps60Box.Checked && !m.UltraLow;
             return pic + " · " + (sixty ? L("60 FPS clock", "relogio de 60 FPS") : L("30 FPS clock", "relogio de 30 FPS"));
         }
@@ -1453,7 +1459,7 @@ namespace VIctoryLauncher
             set("VICTORY_DATA_DIR", dataDir);
             set("VICTORY_LOG", "warn,victory_gpu::host=info,victory_gpu::copystat=info,victory_gpu::framegen=info");
             // The cgbj base (Play-VIctory.cmd pareto-residency) for a 12 GB card.
-            set("VICTORY_DISPLAY_MODE", OutputWidth + "x" + OutputHeight);
+            set("VICTORY_DISPLAY_MODE", DisplayWidth + "x" + DisplayHeight);
             set("VICTORY_CARD_BUFFERS_MB", "1024");
             set("VICTORY_PIPELINE_BOOK", "1");
             set("VICTORY_RIPE_BLOCKS", "4");

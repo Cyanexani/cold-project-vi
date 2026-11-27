@@ -121,6 +121,9 @@ jobs:
           if ('${{ github.repository }}' -eq 'felicienradio/cold-project-vi' -and (Test-Path docs/ANNOUNCEMENT.md)) {
             $version = $tag.TrimStart('v') -replace '-.*$', ''
             $text = [IO.File]::ReadAllText('docs/ANNOUNCEMENT.md').Replace('{tag}', $tag).Replace('{version}', $version).Trim()
+            # Discord keeps the preview of a link it has seen: /releases/latest showed the version before (0.3.7's post
+            # carried 0.3.6's card). The release's own page is a new link each time.
+            $text = $text.Replace("https://github.com/$repo/releases/latest", "https://github.com/$repo/releases/tag/$tag")
             # Every announcement ends with docs/ANNOUNCEMENT-FOOTER.md, before the @everyone line.
             if (Test-Path docs/ANNOUNCEMENT-FOOTER.md) {
               $footer = [IO.File]::ReadAllText('docs/ANNOUNCEMENT-FOOTER.md').Trim()

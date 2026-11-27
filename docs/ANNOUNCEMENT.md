@@ -1,11 +1,7 @@
 ## Julia's Launcher {tag} is out 🔧
 **Fix**
-🇫🇷 **The launcher is fully in French again**: the Windows Security step added in 0.3.6 is translated.
-
-**Also since 0.3.7**
-🌈 No more rainbow textures on faces, shirts and walls.
-🪟 Windows 10 starts the game (D3D12 Agility SDK).
-💾 VIctory's files can go on your fastest drive.
+🖥️ **The game closed at start with "720p" picked.** Sorry, that one was ours: the game refuses a 720p screen. The option is now **World at 720p (lighter)** (1080p screen, world at 720p). If it crashed for you, just press PLAY again.
+🟢 **"Resizable BAR in the NVIDIA driver" stayed red.** The driver wants administrator rights for it: Windows now asks once, and it turns on.
 
 **Install**
 🔄 On 0.3.x: nothing to do, it installs itself within 5 minutes while the game is closed.

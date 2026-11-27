@@ -494,7 +494,7 @@ namespace VIctoryLauncher
             { "Output 1080p (Full HD)", "Sortie 1080p (Full HD)" },
             { "Output 1440p (2K)", "Sortie 1440p (2K)" },
             { "Output 2160p (4K)", "Sortie 2160p (4K)" },
-            { "Output 720p (HD)", "Sortie 720p (HD)" },
+            { "World at 720p (lighter)", "Monde en 720p (plus léger)" },
             { "ReBAR n/a (card)", "ReBAR n/d (carte)" },
             { "ReBAR not offered by Windows", "ReBAR non proposé par Windows" },
             { "ReBAR ?", "ReBAR ?" },
