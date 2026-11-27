@@ -153,8 +153,8 @@ namespace VIctoryLauncher
             set("VICTORY_PORT_CBV", "1");
             set("VICTORY_PORT_GUARD", "1");
             set("VICTORY_PORT_JOURNAL", "1");
-            set("VICTORY_OUTPUT", "1920x1080");
-            set("VICTORY_WINDOW_MAX", "1920x1080");
+            set("VICTORY_OUTPUT", OutputWidth + "x" + OutputHeight);
+            set("VICTORY_WINDOW_MAX", OutputWidth + "x" + OutputHeight);
             set("VICTORY_KBM_GTA", "1");
             // AMD cards run 64-lane waves natively: the wave-wide form is the console's own.
             set("VICTORY_WAVE_WIDE", "1");

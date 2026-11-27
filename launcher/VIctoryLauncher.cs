@@ -435,8 +435,21 @@ namespace VIctoryLauncher
             page.Controls.Add(ExeBox(X + W - 300, y - 2, 300));
             y += 34;
 
-            presetHeading = new Heading(L("Render preset", "Predefinicao de imagem")) { Location = new Point(X, y), Width = W };
+            presetHeading = new Heading(L("Render preset", "Predefinicao de imagem")) { Location = new Point(X, y), Width = W - 230 };
             page.Controls.Add(presetHeading);
+            // The resolution the console reports to the game (VICTORY_DISPLAY_MODE): the preset's scale applies on top.
+            outputBox = new ComboBox { Location = new Point(X + W - 220, y - 2), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Theme.Card, ForeColor = Theme.Text };
+            outputBox.Items.AddRange(new object[] {
+                L("Output 1080p (Full HD)", "Saida 1080p (Full HD)"),
+                L("Output 1440p (2K)", "Saida 1440p (2K)"),
+                L("Output 2160p (4K)", "Saida 2160p (4K)"),
+            });
+            outputBox.SelectedIndex = 0;
+            outputBox.SelectedIndexChanged += (s, e) => { SaveSettings(); Refresh2(); };
+            new ToolTip { AutoPopDelay = 20000 }.SetToolTip(outputBox, L(
+                "The resolution the game draws its picture for; the preset's scale applies on top (Recommended at 4K draws 2560x1440 and upscales). Higher output: a sharper picture, more video memory for the screen's images (about +0.5 GB at 2K, +1.5 GB at 4K) and more work for the card; the CPU stays the limit on strong cards. 2K and 4K are new: tell us on Discord how they run.",
+                "A resolucao para a qual o jogo desenha a imagem; a escala do preset aplica-se por cima (o Recomendado em 4K desenha 2560x1440 e amplia). Saida maior: imagem mais nitida, mais VRAM para as imagens do ecra (cerca de +0,5 GB em 2K, +1,5 GB em 4K) e mais trabalho para a placa; em placas fortes o limite continua a ser o processador. 2K e 4K sao novos: conta-nos no Discord como correm."));
+            page.Controls.Add(outputBox);
             y += 32;
             int cw = (W - 6 * 8) / 7;
             for (int i = 0; i < CardOrder.Length; i++)
@@ -1131,6 +1144,12 @@ namespace VIctoryLauncher
             footerStatus.Text = string.Format("{0} ({1})  ·  {2:0} GB VRAM  ·  {3:0} GB RAM  ·  {4}", Selected.Name, Selected.Custom ? CustomTag() : Selected.Tag, vramGb, ramGb, EngineName);
         }
 
+        ComboBox outputBox;
+
+        // The output size picked: 1080p, 1440p or 2160p.
+        int OutputHeight { get { return outputBox == null ? 1080 : outputBox.SelectedIndex == 2 ? 2160 : outputBox.SelectedIndex == 1 ? 1440 : 1080; } }
+        int OutputWidth { get { return OutputHeight * 16 / 9; } }
+
         // "1280×720 internal upscaled to 1080p · 60 FPS clock" for the preset's heading.
         string PresetSummary()
         {
@@ -1140,8 +1159,8 @@ namespace VIctoryLauncher
             string pic;
             double sc;
             if (scale != null && double.TryParse(scale, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out sc) && sc < 0.999)
-                pic = string.Format(L("{0}×{1} internal upscaled to 1080p", "{0}×{1} interno ampliado para 1080p"), (int)Math.Round(1920 * sc), (int)Math.Round(1080 * sc));
-            else pic = L("native 1080p", "1080p nativo");
+                pic = string.Format(L("{0}×{1} internal upscaled to {2}p", "{0}×{1} interno ampliado para {2}p"), (int)Math.Round(OutputWidth * sc), (int)Math.Round(OutputHeight * sc), OutputHeight);
+            else pic = string.Format(L("native {0}p", "{0}p nativo"), OutputHeight);
             bool sixty = m.Custom ? custom.Fps == 60 : fps60Box.Checked && !m.UltraLow;
             return pic + " · " + (sixty ? L("60 FPS clock", "relogio de 60 FPS") : L("30 FPS clock", "relogio de 30 FPS"));
         }
@@ -1263,7 +1282,7 @@ namespace VIctoryLauncher
             set("VICTORY_DATA_DIR", dataDir);
             set("VICTORY_LOG", "warn,victory_gpu::host=info,victory_gpu::copystat=info,victory_gpu::framegen=info");
             // The cgbj base (Play-VIctory.cmd pareto-residency) for a 12 GB card.
-            set("VICTORY_DISPLAY_MODE", "1920x1080");
+            set("VICTORY_DISPLAY_MODE", OutputWidth + "x" + OutputHeight);
             set("VICTORY_CARD_BUFFERS_MB", "1024");
             set("VICTORY_PIPELINE_BOOK", "1");
             set("VICTORY_RIPE_BLOCKS", "4");
@@ -1570,6 +1589,7 @@ namespace VIctoryLauncher
                         case "fights": fightsBox.Checked = v == "1"; break;
                         case "warm": warmBox.Checked = v == "1"; break;
                         case "cpu": cpuBox.Checked = v == "1"; break;
+                        case "output": { int o; if (outputBox != null && int.TryParse(v, out o) && o >= 0 && o <= 2) outputBox.SelectedIndex = o; } break;
                     }
                 }
             }
@@ -1586,7 +1606,7 @@ namespace VIctoryLauncher
                     "lang=" + (Pt ? "pt" : "en"), "cache=" + cacheDir, "data=" + dataDir,
                     "game=" + gameBox.Text.Trim(), "exe=" + (exeChoice ?? ""), "mode=" + modeIndex,
                     "panel=" + b(panelBox), "borderless=" + b(borderlessBox), "fps60=" + b(fps60Box), "reserve=" + b(reserveBox),
-                    "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox), "cpu=" + b(cpuBox),
+                    "smooth=" + b(smoothBox), "quality=" + b(qualityBox), "faces=" + b(facesBox), "loading=" + b(loadingBox), "fights=" + b(fightsBox), "warm=" + b(warmBox), "cpu=" + b(cpuBox), "output=" + (outputBox == null ? 0 : outputBox.SelectedIndex),
                 };
                 // The other keys (shaders=, engine=, custom=, source=...) are kept: this used to drop them.
                 var keys = new HashSet<string>(mine.Select(l => l.Substring(0, l.IndexOf('=') + 1)));

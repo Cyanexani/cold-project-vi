@@ -151,7 +151,7 @@ Le launcher est en anglais par défaut, avec le **portugais** dans la barre lat�
 
 | | |
 |---|---|
-| **Play** | Choisit un préréglage selon votre matériel la première fois.<br>**Préréglages :** Recommended (720p), Fastest et Modest PC (540p), **Ultra Low** (cartes de 4-6 Go, 8-16 Go de RAM), Sharp et Classic cgbj (1080p), **Custom** (vos valeurs).<br>Une bande indique si le dump, l'émulateur, les shaders et Windows sont prêts. Un **avis jaune** liste ce qui manquerait au jeu (mémoire virtuelle, alimentation, Resizable BAR, carte graphique dédiée, shaders) et ouvre la correction. |
+| **Play** | Choisit un préréglage selon votre matériel la première fois.<br>**Préréglages :** Recommended (720p), Fastest et Modest PC (540p), **Ultra Low** (cartes de 4-6 Go, 8-16 Go de RAM), Sharp et Classic cgbj (1080p), **Custom** (vos valeurs).<br>**Sortie :** 1080p, 1440p (2K) ou 2160p (4K) ; l'échelle du préréglage s'applique par-dessus (Recommended en 4K dessine en 2560x1440 puis agrandit).<br>Une bande indique si le dump, l'émulateur, les shaders et Windows sont prêts. Un **avis jaune** liste ce qui manquerait au jeu (mémoire virtuelle, alimentation, Resizable BAR, carte graphique dédiée, shaders) et ouvre la correction. |
 | **Jeu bloqué** | Un VIctory qui ne répond plus (plantage, fenêtre d'erreur) ne bloque jamais PLAY : le bouton devient **CLOSE AND PLAY**, et **Close game** le ferme. |
 | **Plusieurs exécutables** | Quand le dump a plus d'un `game_scarlett*.exe`, vous choisissez lequel à côté du dossier du jeu.<br>Un fichier cassé (téléchargement interrompu, paquet chiffré) est signalé avant PLAY, au lieu du « malformed image » de VIctory. |
 | **Barre de chargement avant le jeu** | Chaque pipeline utilisé lors des sessions précédentes est créé avant l'ouverture du jeu : pas de saccade la première fois que vous voyez un endroit. |
@@ -164,7 +164,7 @@ Le launcher est en anglais par défaut, avec le **portugais** dans la barre lat�
 | **Advanced Tweaks (Custom)** | Résolution, taille des textures, buffers, garde-fous mémoire et horloge FPS.<br>**Copy my profile** donne un code (`VI1-...`) à partager. Collez le code d'un ami et **Apply** : il montre d'abord ce qui change. |
 | **Hardware & ID** | Votre ID permanent (`VI-XXXX-XXXX`, tiré des composants du PC ; il reste après une réinstallation de Windows), votre matériel et le choix du moteur. |
 | **Partage du matériel** | **Désactivé par défaut.** Activé, il envoie **uniquement le matériel** (carte graphique, processeur, RAM, carte mère, Windows, type de disque), au plus une fois par jour, vers une base en écriture seule que seul edupode peut lire.<br>Il n'envoie jamais de logs, d'options, de chemins, de noms ni votre IP. Seules les moyennes sont publiques : [docs/HARDWARE-STATS.md](docs/HARDWARE-STATS.md). |
-| **Mises à jour** | Vérifie GitHub à l'ouverture du launcher et **toutes les 5 minutes**. Une nouvelle version s'installe quand le jeu ne tourne pas, et seulement si sa signature et son SHA-256 correspondent. |
+| **Mises à jour** | Vérifie GitHub à l'ouverture du launcher et **toutes les 5 minutes** : la release la plus récente du dépôt qui a un manifeste signé, quelle que soit la branche (`main` ou `edupode`). Une nouvelle version s'installe quand le jeu ne tourne pas, et seulement si sa signature et son SHA-256 correspondent. |
 | **Overlay FPS (F3)** | FPS actuels, moyenne de la dernière minute (AVG 1M), de toute la session (ALL), la pire demi-seconde (LOW), temps par image, draws, mémoire vidéo et RAM. |
 
 ### Logs et erreurs
