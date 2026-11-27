@@ -1933,6 +1933,14 @@ unsafe fn of(this: Ptr) -> Option<(&'static Recorder, &'static ListState)> {
     if ours() {
         return None;
     }
+    // A runtime that gives a list a table of its own again (D3D12Core of
+    // recent Windows builds does at `Close`) leaves it pointing at no shim of
+    // ours, and what lies before that table is not our state: writing there
+    // lost the process at the first list closed (2026-11-27).
+    // SAFETY: a live list.
+    if !unsafe { hook::ours(this) } {
+        return None;
+    }
     // SAFETY: a list with a shim; its state is a list's.
     Some((r, unsafe { hook::state::<ListState>(this) }))
 }
@@ -1950,7 +1958,10 @@ unsafe fn note(this: Ptr, cmd: impl FnOnce(&Recorder) -> Cmd) {
 unsafe extern "system" fn list_close(this: Ptr) -> HRESULT {
     // SAFETY: as above.
     unsafe {
+        let table = hook::table(this);
         let hr = own!(this, ID3D12GraphicsCommandList_Vtbl.Close)(this);
+        // A close may set the list's table pointer anew, as a reset does.
+        hook::again(this, table, list_table);
         if let Some((_, state)) = of(this) {
             let mut inner = lock(&state.inner);
             let bytes = std::mem::take(&mut inner.bytes);

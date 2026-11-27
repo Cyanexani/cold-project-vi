@@ -156,7 +156,8 @@ video memory reserve help), and the `_Tiled` volumetrics shader, still being fix
   memory sat in them), and VIctory reserves its video memory with Windows.
 - `_Tiled` (water volumetrics): off for now (black squares when on). F9 in the recording mode captures a
   frame, which can be replayed on WARP (`VICTORY_REPLAY_WARP=1`) as one wave of 64 and as two of 32 to find
-  the instruction where the two disagree.
+  the instruction where the two disagree. (Fixed: on recent Windows builds D3D12Core swaps a command list's
+  method table when it is closed, which made the recorder crash at start.)
 - Known problems: stretched bodies for a frame or two ("spaghetti"), rainbow faces now and then, black
   flickers on characters, no ray tracing.
 

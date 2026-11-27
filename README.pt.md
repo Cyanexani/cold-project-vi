@@ -120,7 +120,8 @@ o Lossless Scaling fazem 3x-4x de qualquer janela, mas a partir de ~22 FPS isso 
   VIctory reserva a sua VRAM junto do Windows.
 - `_Tiled` (volumetria da água): desligado por agora (quadrados pretos quando ligado). F9 no modo de gravação grava um
   frame. Esse frame pode correr no WARP (`VICTORY_REPLAY_WARP=1`) como onda de 64 e como duas de 32, para encontrar a
-  instrução onde as duas formas divergem.
+  instrução onde as duas formas divergem. (Corrigido: nas versões recentes do Windows o D3D12Core troca a tabela de
+  métodos de uma lista de comandos quando a fecha, e isso fazia o gravador rebentar ao arrancar.)
 - Problemas conhecidos: corpos esticados durante um frame ou dois ("esparguete"), caras arco-íris de vez em quando,
   piscar preto nas personagens, sem ray tracing.
 
