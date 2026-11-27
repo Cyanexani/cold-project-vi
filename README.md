@@ -91,6 +91,8 @@ Points past 50 are our estimate (PortWatch counts them only with proof, a video)
 
 ## Download
 
+> This branch follows felicienradio's **Julia's Launcher 0.3.1** (accented user names, French) with edupode's fixes on top: **0.3.2-edupode**.
+
 **[Releases](https://github.com/edupode/cold-project-vi/releases/latest)**: get `VI-Setup-<version>.exe` and run it.
 
 - **One administrator prompt at the start.** After that the installer does the rest in the background:
@@ -161,7 +163,7 @@ No winget? Download Git from <https://git-scm.com/download/win>, or skip Git: on
 The launcher checks your GPU, video memory, RAM, Resizable BAR and Smooth Motion support and sets everything
 else. Point at any option to see what it does; **★** marks what was tested on the author's PC. On cards with
 less than 10 GB or PCs with less than 24 GB of RAM it picks the **Modest PC** mode.
-English by default, **Português** in the side bar; this page also in [Português](README.pt.md) and [Français](README.fr.md). `Jogar-Luz.cmd` does the same from a command line
+English by default, **Português** and **Français** in the side bar; this page also in [Português](README.pt.md) and [Français](README.fr.md). `Jogar-Luz.cmd` does the same from a command line
 (`Jogar-Luz.cmd tudo`).
 
 ### What the launcher does

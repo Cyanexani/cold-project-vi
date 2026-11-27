@@ -69,6 +69,8 @@ une preuve, une vidéo).
 
 ## Téléchargement
 
+> Cette branche suit le **Julia's Launcher 0.3.1** de felicienradio (noms d'utilisateur accentués, français) avec les corrections d'edupode par-dessus : **0.3.2-edupode**.
+
 **[Releases](https://github.com/edupode/cold-project-vi/releases/latest)** : prenez `VI-Setup-<version>.exe` et lancez-le.
 
 - **Une seule demande administrateur au début.** Ensuite l'installateur fait le reste en arrière-plan :
@@ -145,7 +147,7 @@ appuyez sur **Code → Download ZIP**, extrayez-le et lancez `launcher\build-lau
 Le launcher vérifie votre carte graphique, la mémoire vidéo, la RAM, le Resizable BAR et la prise en charge de Smooth
 Motion, et règle le reste. Survolez une option pour voir ce qu'elle fait ; **★** marque ce qui a été testé sur le PC de
 l'auteur. Sur les cartes de moins de 10 Go ou les PC de moins de 24 Go de RAM, il choisit le mode **Modest PC**.
-Le launcher est en anglais par défaut, avec le **portugais** dans la barre latérale.
+Le launcher est en anglais par défaut, avec le **portugais** et le **français** dans la barre latérale.
 
 ### Ce que fait le launcher
 

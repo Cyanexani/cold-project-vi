@@ -66,6 +66,8 @@ pontos. Os pontos acima de 50 são a nossa estimativa (o PortWatch só os conta 
 
 ## Download
 
+> Este ramo segue o **Julia's Launcher 0.3.1** do felicienradio (nomes de utilizador com acentos, francês) com as correções do edupode por cima: **0.3.2-edupode**.
+
 **[Versões](https://github.com/edupode/cold-project-vi/releases/latest)**: descarrega o `VI-Setup-<versão>.exe` e corre-o.
 
 - **Um pedido de administrador no início.** Depois o instalador faz o resto em segundo plano:
